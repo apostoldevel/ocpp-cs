@@ -49,17 +49,27 @@ namespace Apostol {
         }
         //--------------------------------------------------------------------------------------------------------------
 
-        CString GetISOTime() {
+        CString IntToString(int Value) {
             CString S;
+            S << Value;
+            return S;
+        }
+        //--------------------------------------------------------------------------------------------------------------
 
-            time_t now;
-            struct tm *wtm;
+        CString GetISOTime(long int Delta = 0) {
+            CString S;
+            TCHAR buffer[80] = {0};
 
-            now = time(&now);
-            wtm = gmtime(&now);
+            struct timeval now = {};
+            struct tm *timeinfo = nullptr;
 
-            S.SetLength(20);
-            strftime(S.Data(), S.Size(), "%FT%TZ", wtm);
+            gettimeofday(&now, nullptr);
+            if (Delta > 0) now.tv_sec += Delta;
+            timeinfo = gmtime(&now.tv_sec);
+
+            strftime(buffer, sizeof buffer, "%FT%T", timeinfo);
+
+            S.Format("%s.%03ldZ", buffer, now.tv_usec / 1000);
 
             return S;
         }
@@ -70,31 +80,7 @@ namespace Apostol {
 
         //--------------------------------------------------------------------------------------------------------------
 
-        //<s:Envelope xmlns:a="http://www.w3.org/2005/08/addressing"
-        // xmlns:s="http://www.w3.org/2003/05/soap-envelope"
-        // xmlns="urn://Ocpp/Cs/2012/06/">
-        // <s:Header>
-        //   <chargeBoxIdentity>PROD</chargeBoxIdentity>
-        //   <a:Action>/BootNotification</a:Action>
-        //   <a:MessageID>urn:uuid:767a6f97-1d0f-4d1a-9e9b-976d49cfd8f2</a:MessageID>
-        //   <a:From><a:Address>http://100.68.200.61:80/Ocpp/ChargePointService</a:Address></a:From>
-        //   <a:To>http://80.78.254.216:8080/ocpp/LAFON001</a:To>
-        //   <a:ReplyTo><a:Address>http://www.w3.org/2005/08/addressing/anonymous</a:Address></a:ReplyTo>
-        //   <a:FaultTo><a:Address>http://www.w3.org/2005/08/addressing/anonymous</a:Address></a:FaultTo>
-        // </s:Header>
-        // <s:Body>
-        //   <bootNotificationRequest>
-        //     <chargePointVendor>LAFON TECHNOLOGIES</chargePointVendor>
-        //     <chargePointModel>PROD</chargePointModel>
-        //     <chargePointSerialNumber>PROD</chargePointSerialNumber>
-        //     <chargeBoxSerialNumber>PROD</chargeBoxSerialNumber>
-        //     <firmwareVersion>BBBC134B110AKIPA226A</firmwareVersion>
-        //     <iccid>897010269640820435FF</iccid>
-        //   </bootNotificationRequest>
-        // </s:Body>
-        //</s:Envelope>
-
-        void CSOAPProtocol::Request(const CString &xmlString, COCPPMessage &Message) {
+        void CSOAPProtocol::Request(const CString &xmlString, CMessage &Message) {
             xml_document<> xmlDocument;
             xmlDocument.parse<0>((char *) xmlString.c_str());
 
@@ -121,7 +107,7 @@ namespace Apostol {
         }
         //--------------------------------------------------------------------------------------------------------------
 
-        void CSOAPProtocol::Response(const COCPPMessage &Message, CString &xmlString) {
+        void CSOAPProtocol::Response(const CMessage &Message, CString &xmlString) {
 
             const CStringPairs &Headers = Message.Headers;
             const CStringPairs &Values = Message.Values;
@@ -160,6 +146,29 @@ namespace Apostol {
             xmlString << R"(</s:Body>)" LINEFEED;
             xmlString << R"(</s:Envelope>)";
         }
+        //--------------------------------------------------------------------------------------------------------------
+
+        void CSOAPProtocol::PrepareResponse(const CMessage &Request, CMessage &Response) {
+
+            const CStringPairs &Headers = Request.Headers;
+            const CStringPairs &Values = Request.Values;
+
+            const CString &Identity = Headers.Values("chargeBoxIdentity");
+            const CString &MessageID = Headers.Values("a:MessageID");
+            const CString &From = Headers.Values("a:From");
+            const CString &To = Headers.Values("a:To");
+            const CString &ReplyTo = Headers.Values("a:ReplyTo");
+            const CString &FaultTo = Headers.Values("a:FaultTo");
+            const CString &Action = Headers.Values("a:Action");
+
+            Response.Headers.AddPair("chargeBoxIdentity", Identity);
+            Response.Headers.AddPair("a:MessageID", MessageID);
+            Response.Headers.AddPair("a:From", To); // <- It is right, swap!!!
+            Response.Headers.AddPair("a:To", From); // <- It is right, swap!!!
+            Response.Headers.AddPair("a:ReplyTo", ReplyTo);
+            Response.Headers.AddPair("a:FaultTo", FaultTo);
+            Response.Headers.AddPair("a:Action", Action);
+        }
 
         //--------------------------------------------------------------------------------------------------------------
 
@@ -167,29 +176,118 @@ namespace Apostol {
 
         //--------------------------------------------------------------------------------------------------------------
 
-        void CSOAPMessage::Prepare(CChargingPoint *APoint, const COCPPMessage &Request, COCPPMessage &Response) {
-
-            const CStringPairs &Headers = Request.Headers;
-            const CStringPairs &Values = Request.Values;
-
-            const CString &MessageID = Headers.Values("a:MessageID");
-            const CString &From = Headers.Values("a:From");
-            const CString &To = Headers.Values("a:To");
-            const CString &ReplyTo = Headers.Values("a:ReplyTo");
-            const CString &FaultTo = Headers.Values("a:FaultTo");
-
-            Response.Headers.AddPair("chargeBoxIdentity", APoint->Identity());
-            Response.Headers.AddPair("a:MessageID", MessageID);
-            Response.Headers.AddPair("a:From", To);
-            Response.Headers.AddPair("a:To", From);
-            Response.Headers.AddPair("a:ReplyTo", ReplyTo);
-            Response.Headers.AddPair("a:FaultTo", FaultTo);
+        CChargePointStatus CSOAPMessage::StringToChargePointStatus(const CString &Value) {
+            if (Value == "Available")
+                return cpsAvailable;
+            if (Value == "Occupied")
+                return cpsOccupied;
+            if (Value == "Faulted")
+                return cpsFaulted;
+            if (Value == "Unavailable")
+                return cpsUnavailable;
+            if (Value == "Reserved")
+                return cpsReserved;
+            return cpsUnknown;
         }
         //--------------------------------------------------------------------------------------------------------------
 
-        void CSOAPMessage::Parse(CChargingPoint *APoint, const COCPPMessage &Request, COCPPMessage &Response) {
-            if (Request.Notification.Lower() == "bootnotificationrequest") {
+        CString CSOAPMessage::ChargePointStatusToString(CChargePointStatus Value) {
+            switch (Value) {
+                case cpsAvailable:
+                    return "Available";
+                case cpsOccupied:
+                    return "Occupied";
+                case cpsFaulted:
+                    return "Faulted";
+                case cpsUnavailable:
+                    return "Unavailable";
+                case cpsReserved:
+                    return "Reserved";
+                default:
+                    throw ExceptionFrm("Invalid \"ChargePointStatus\" value: %d", Value);
+            }
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
+        CChargePointErrorCode CSOAPMessage::StringToChargePointErrorCode(const CString &Value) {
+            if (Value == "ConnectorLockFailure")
+                return cpeConnectorLockFailure;
+            if (Value == "HighTemperature")
+                return cpeHighTemperature;
+            if (Value == "Mode3Error")
+                return cpeMode3Error;
+            if (Value == "NoError")
+                return cpeNoError;
+            if (Value == "PowerMeterFailure")
+                return cpePowerMeterFailure;
+            if (Value == "PowerSwitchFailure")
+                return cpePowerSwitchFailure;
+            if (Value == "ReaderFailure")
+                return cpeReaderFailure;
+            if (Value == "ResetFailure")
+                return cpeResetFailure;
+            if (Value == "GroundFailure")
+                return cpeGroundFailure;
+            if (Value == "OverCurrentFailure")
+                return cpeOverCurrentFailure;
+            if (Value == "UnderVoltage")
+                return cpeUnderVoltage;
+            if (Value == "WeakSignal")
+                return cpeWeakSignal;
+            if (Value == "OtherError")
+                return cpeOtherError;
+            return cpeUnknown;
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
+        CString CSOAPMessage::ChargePointErrorCodeToString(CChargePointErrorCode Value) {
+            switch (Value) {
+                case cpeConnectorLockFailure:
+                    return "ConnectorLockFailure";
+                case cpeHighTemperature:
+                    return "HighTemperature";
+                case cpeMode3Error:
+                    return "Mode3Error";
+                case cpeNoError:
+                    return "NoError";
+                case cpePowerMeterFailure:
+                    return "PowerMeterFailure";
+                case cpePowerSwitchFailure:
+                    return "PowerSwitchFailure";
+                case cpeReaderFailure:
+                    return "ReaderFailure";
+                case cpeResetFailure:
+                    return "ResetFailure";
+                case cpeGroundFailure:
+                    return "GroundFailure";
+                case cpeOverCurrentFailure:
+                    return "OverCurrentFailure";
+                case cpeUnderVoltage:
+                    return "UnderVoltage";
+                case cpeWeakSignal:
+                    return "WeakSignal";
+                case cpeOtherError:
+                    return "OtherError";
+                default:
+                    throw ExceptionFrm("Invalid \"ChargePointErrorCode\" value: %d", Value);
+            }
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
+        void CSOAPMessage::Parse(CChargingPoint *APoint, const CMessage &Request, CMessage &Response) {
+
+            CSOAPProtocol::PrepareResponse(Request, Response);
+
+            if (Request.Notification.Lower() == "authorizerequest") {
+                APoint->Authorize(Request, Response);
+            } else if (Request.Notification.Lower() == "starttransactionrequest") {
+                APoint->StartTransaction(Request, Response);
+            } else if (Request.Notification.Lower() == "stoptransactionrequest") {
+                APoint->StopTransaction(Request, Response);
+            } else if (Request.Notification.Lower() == "bootnotificationrequest") {
                 APoint->BootNotification(Request, Response);
+            } else if (Request.Notification.Lower() == "statusnotificationrequest") {
+                APoint->StatusNotification(Request, Response);
             } else if (Request.Notification.Lower() == "heartbeatrequest") {
                 APoint->Heartbeat(Request, Response);
             }
@@ -203,6 +301,7 @@ namespace Apostol {
 
         CChargingPoint::CChargingPoint(CHTTPServerConnection *AConnection, CChargingPointManager *AManager) : CCollectionItem(AManager) {
             m_Connection = AConnection;
+            m_TransactionId = 0;
         }
         //--------------------------------------------------------------------------------------------------------------
 
@@ -211,24 +310,125 @@ namespace Apostol {
         }
         //--------------------------------------------------------------------------------------------------------------
 
-        void CChargingPoint::BootNotification(const COCPPMessage &Request, COCPPMessage &Response) {
+        void CChargingPoint::StringToMeterValue(const CString &String, CMeterValue &MeterValue) {
+            xml_document<> xmlDocument;
+            xmlDocument.parse<0>((char *) String.c_str());
 
+            xml_node<> *meterValue = xmlDocument.first_node("MeterValue");
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
+        void CChargingPoint::Authorize(const CMessage &Request, CMessage &Response) {
             const CStringPairs &Headers = Request.Headers;
             const CStringPairs &Body = Request.Values;
 
             m_Address = Headers.Values("a:From");
             m_Identity = Headers.Values("chargeBoxIdentity");
 
-            m_iccid = Body.Values("iccid");
-            m_Vendor = Body.Values("chargePointVendor");
-            m_Model = Body.Values("chargePointModel");
-            m_SerialNumber = Body.Values("chargeSerialNumber");
-            m_BoxSerialNumber = Body.Values("chargeBoxIdentity");
-            m_FirmwareVersion = Body.Values("firmwareVersion");
+            m_AuthorizeRequest.idTag = Body.Values("idTag");
 
-            CSOAPMessage::Prepare(this, Request, Response);
+            Response.Notification = "authorizeResponse";
 
-            Response.Headers.AddPair("a:Action", "/BootNotification");
+            CString IdTagInfo(LINEFEED);
+            CStringPairs Values;
+
+            Values.AddPair("status", "Accepted");
+            Values.AddPair("expiryDate", GetISOTime(5 * 60));
+
+            for (int i = 0; i < Values.Count(); i++ ) {
+                const CString& Name = Values[i].Name;
+                const CString& Value = Values[i].Value;
+
+                IdTagInfo.Format(R"(<%s>%s</%s>)" LINEFEED, Name.c_str(), Value.c_str(), Name.c_str());
+            }
+
+            Response.Values.AddPair("idTagInfo", IdTagInfo);
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
+        void CChargingPoint::StartTransaction(const CMessage &Request, CMessage &Response) {
+            const CStringPairs &Headers = Request.Headers;
+            const CStringPairs &Body = Request.Values;
+
+            m_Address = Headers.Values("a:From");
+            m_Identity = Headers.Values("chargeBoxIdentity");
+
+            m_StartTransactionRequest.connectorId = StrToInt(Body.Values("connectorId").c_str());
+            m_StartTransactionRequest.idTag = Body.Values("idTag");
+            m_StartTransactionRequest.timestamp = StrToDateTimeDef(Body.Values("timestamp").c_str(), 0, "%04d-%02d-%02dT%02d:%02d:%02d");
+            m_StartTransactionRequest.meterStart = StrToInt(Body.Values("meterStart").c_str());
+            m_StartTransactionRequest.reservationId = StrToInt(Body.Values("reservationId").c_str());
+
+            Response.Notification = "startTransactionResponse";
+
+            CString IdTagInfo(LINEFEED);
+            CStringPairs Values;
+
+            Response.Values.AddPair("transactionId", IntToString(++m_TransactionId));
+
+            Values.AddPair("status", "Accepted");
+            Values.AddPair("expiryDate", GetISOTime(5 * 60));
+
+            for (int i = 0; i < Values.Count(); i++ ) {
+                const CString& Name = Values[i].Name;
+                const CString& Value = Values[i].Value;
+
+                IdTagInfo.Format(R"(<%s>%s</%s>)" LINEFEED, Name.c_str(), Value.c_str(), Name.c_str());
+            }
+
+            Response.Values.AddPair("idTagInfo", IdTagInfo);
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
+        void CChargingPoint::StopTransaction(const CMessage &Request, CMessage &Response) {
+            const CStringPairs &Headers = Request.Headers;
+            const CStringPairs &Body = Request.Values;
+
+            m_Address = Headers.Values("a:From");
+            m_Identity = Headers.Values("chargeBoxIdentity");
+
+            m_StopTransactionRequest.transactionId = StrToInt(Body.Values("transactionId").c_str());
+            m_StopTransactionRequest.idTag = Body.Values("idTag");
+            m_StopTransactionRequest.timestamp = StrToDateTimeDef(Body.Values("timestamp").c_str(), 0, "%04d-%02d-%02dT%02d:%02d:%02d");
+            m_StopTransactionRequest.meterStop = StrToInt(Body.Values("meterStop").c_str());
+            m_StopTransactionRequest.reason = Body.Values("reason");
+
+            StringToMeterValue(Body.Values("transactionData"), m_StopTransactionRequest.transactionData);
+
+            Response.Notification = "stopTransactionResponse";
+
+            CString IdTagInfo(LINEFEED);
+            CStringPairs Values;
+
+            Values.AddPair("status", "Accepted");
+            Values.AddPair("expiryDate", GetISOTime(5 * 60));
+
+            for (int i = 0; i < Values.Count(); i++ ) {
+                const CString& Name = Values[i].Name;
+                const CString& Value = Values[i].Value;
+
+                IdTagInfo.Format(R"(<%s>%s</%s>)" LINEFEED, Name.c_str(), Value.c_str(), Name.c_str());
+            }
+
+            Response.Values.AddPair("idTagInfo", IdTagInfo);
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
+        void CChargingPoint::BootNotification(const CMessage &Request, CMessage &Response) {
+            const CStringPairs &Headers = Request.Headers;
+            const CStringPairs &Body = Request.Values;
+
+            m_Address = Headers.Values("a:From");
+            m_Identity = Headers.Values("chargeBoxIdentity");
+
+            m_BootNotificationRequest.iccid = Body.Values("iccid");
+            m_BootNotificationRequest.chargePointVendor = Body.Values("chargePointVendor");
+            m_BootNotificationRequest.chargePointModel = Body.Values("chargePointModel");
+            m_BootNotificationRequest.chargePointSerialNumber = Body.Values("chargePointSerialNumber");
+            m_BootNotificationRequest.chargeBoxSerialNumber = Body.Values("chargeBoxSerialNumber");
+            m_BootNotificationRequest.firmwareVersion = Body.Values("firmwareVersion");
+            m_BootNotificationRequest.meterType = Body.Values("meterType");
+            m_BootNotificationRequest.meterSerialNumber = Body.Values("meterSerialNumber");
 
             Response.Notification = "bootNotificationResponse";
 
@@ -238,26 +438,41 @@ namespace Apostol {
         }
         //--------------------------------------------------------------------------------------------------------------
 
-        void CChargingPoint::Heartbeat(const COCPPMessage &Request, COCPPMessage &Response) {
-
+        void CChargingPoint::StatusNotification(const CMessage &Request, CMessage &Response) {
             const CStringPairs &Headers = Request.Headers;
             const CStringPairs &Body = Request.Values;
 
             m_Address = Headers.Values("a:From");
             m_Identity = Headers.Values("chargeBoxIdentity");
 
-            CSOAPMessage::Prepare(this, Request, Response);
+            m_StatusNotificationRequest.connectorId = StrToInt(Body.Values("connectorId").c_str());
+            m_StatusNotificationRequest.status = CSOAPMessage::StringToChargePointStatus(Body.Values("status"));
+            m_StatusNotificationRequest.errorCode = CSOAPMessage::StringToChargePointErrorCode(Body.Values("errorCode"));
+            m_StatusNotificationRequest.info = Body.Values("info");
+            m_StatusNotificationRequest.timestamp = StrToDateTimeDef(Body.Values("timestamp").c_str(), 0, "%04d-%02d-%02dT%02d:%02d:%02d");
+            m_StatusNotificationRequest.vendorId = Body.Values("vendorId");
+            m_StatusNotificationRequest.vendorErrorCode = Body.Values("vendorErrorCode");
 
-            Response.Headers.AddPair("a:Action", "/Heartbeat");
-            Response.Notification = "HeartbeatResponse";
+            Response.Notification = "statusNotificationResponse";
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
+        void CChargingPoint::Heartbeat(const CMessage &Request, CMessage &Response) {
+            const CStringPairs &Headers = Request.Headers;
+            const CStringPairs &Body = Request.Values;
+
+            m_Address = Headers.Values("a:From");
+            m_Identity = Headers.Values("chargeBoxIdentity");
+
+            Response.Notification = "heartbeatResponse";
             Response.Values.AddPair("currentTime", GetISOTime());
         }
         //--------------------------------------------------------------------------------------------------------------
 
         void CChargingPoint::Parse(const CString &Request, CString &Response) {
 
-            COCPPMessage LRequest;
-            COCPPMessage LResponse;
+            CMessage LRequest;
+            CMessage LResponse;
 
             CSOAPProtocol::Request(Request, LRequest);
             CSOAPMessage::Parse(this, LRequest, LResponse);

@@ -31,18 +31,18 @@ namespace Apostol {
 
     namespace CSService {
 
-        typedef struct COCPPMessage {
-            CStringPairs Headers;
-            CString Notification;
-            CStringPairs Values;
-        } COCPPMessage;
-        //--------------------------------------------------------------------------------------------------------------
-
         typedef struct CDataBase {
             CString Username;
             CString Password;
             CString Session;
         } CDataBase;
+        //--------------------------------------------------------------------------------------------------------------
+
+        typedef struct CMessage {
+            CStringPairs Headers;
+            CStringPairs Values;
+            CString Notification;
+        } CMessage;
 
         //--------------------------------------------------------------------------------------------------------------
 
@@ -53,27 +53,24 @@ namespace Apostol {
         class CSOAPProtocol {
         public:
 
-            static void Request(const CString &xmlString, COCPPMessage &Message);
-            static void Response(const COCPPMessage &Message, CString &xmlString);
+            static void Request(const CString &xmlString, CMessage &Message);
+            static void Response(const CMessage &Message, CString &xmlString);
+
+            static void PrepareResponse(const CMessage &Request, CMessage &Response);
 
         };
 
         //--------------------------------------------------------------------------------------------------------------
 
-        //-- COCPPMessage ----------------------------------------------------------------------------------------------
-
-        //--------------------------------------------------------------------------------------------------------------
-
-        typedef struct COCPPMessageItem {
-            CString MessageID;
-            CString From;
-            CString To;
-            CString Action;
-        } COCPPMessageItem, *POCPPMessageItem;
-
-        //--------------------------------------------------------------------------------------------------------------
-
         //-- CSOAPMessage ----------------------------------------------------------------------------------------------
+
+        //--------------------------------------------------------------------------------------------------------------
+
+        enum CChargePointStatus { cpsUnknown = -1, cpsAvailable, cpsOccupied, cpsFaulted, cpsUnavailable, cpsReserved };
+
+        enum CChargePointErrorCode { cpeUnknown = -1, cpeConnectorLockFailure, cpeHighTemperature, cpeMode3Error, cpeNoError,
+                cpePowerMeterFailure, cpePowerSwitchFailure, cpeReaderFailure, cpeResetFailure, cpeGroundFailure,
+                cpeOverCurrentFailure, cpeUnderVoltage, cpeWeakSignal, cpeOtherError };
 
         //--------------------------------------------------------------------------------------------------------------
 
@@ -84,8 +81,13 @@ namespace Apostol {
         class CSOAPMessage {
         public:
 
-            static void Prepare(CChargingPoint *APoint, const COCPPMessage &Request, COCPPMessage &Response);
-            static void Parse(CChargingPoint *APoint, const COCPPMessage &Request, COCPPMessage &Response);
+            static CChargePointStatus StringToChargePointStatus(const CString& Value);
+            static CString ChargePointStatusToString(CChargePointStatus Value);
+
+            static CChargePointErrorCode StringToChargePointErrorCode(const CString& Value);
+            static CString ChargePointErrorCodeToString(CChargePointErrorCode Value);
+
+            static void Parse(CChargingPoint *APoint, const CMessage &Request, CMessage &Response);
 
         };
 
@@ -95,17 +97,84 @@ namespace Apostol {
 
         //--------------------------------------------------------------------------------------------------------------
 
+        typedef struct AuthorizeRequest {
+            CString idTag;
+        } CAuthorizeRequest, *PAuthorizeRequest;
+        //--------------------------------------------------------------------------------------------------------------
+
+        typedef struct StartTransactionRequest {
+            int connectorId = 0;
+            CString idTag;
+            CDateTime timestamp = 0;
+            int meterStart = 0;
+            int reservationId = 0;
+        } CStartTransactionRequest, *PStartTransactionRequest;
+        //--------------------------------------------------------------------------------------------------------------
+
+        typedef struct SampledValue {
+            CString value;
+            CString context;
+            CString format;
+            CString measurand;
+            CString phase;
+            CString location;
+            CString unit;
+        } CSampledValue, *PSampledValue;
+        //--------------------------------------------------------------------------------------------------------------
+
+        typedef struct MeterValue {
+            CDateTime timestamp = 0;
+            CSampledValue sampledValue;
+        } CMeterValue, *PMeterValue;
+        //--------------------------------------------------------------------------------------------------------------
+
+        typedef struct StopTransactionRequest {
+            int transactionId = 0;
+            CString idTag;
+            CDateTime timestamp = 0;
+            int meterStop = 0;
+            CString reason;
+            CMeterValue transactionData;
+        } CStopTransactionRequest, *PStopTransactionRequest;
+        //--------------------------------------------------------------------------------------------------------------
+
+        typedef struct BootNotificationRequest {
+            CString imsi;
+            CString iccid;
+            CString chargePointVendor;
+            CString chargePointModel;
+            CString chargePointSerialNumber;
+            CString chargeBoxSerialNumber;
+            CString firmwareVersion;
+            CString meterType;
+            CString meterSerialNumber;
+        } CBootNotificationRequest, *PBootNotificationRequest;
+        //--------------------------------------------------------------------------------------------------------------
+
+        typedef struct StatusNotificationRequest {
+            int connectorId = 0;
+            CChargePointStatus status = cpsUnknown;
+            CChargePointErrorCode errorCode = cpeUnknown;
+            CString info;
+            CDateTime timestamp = 0;
+            CString vendorId;
+            CString vendorErrorCode;
+        } CStatusNotificationRequest, *PStatusNotificationRequest;
+        //--------------------------------------------------------------------------------------------------------------
+
         class CChargingPoint: public CCollectionItem {
         private:
 
             CString m_Address;
             CString m_Identity;
-            CString m_iccid;
-            CString m_Vendor;
-            CString m_Model;
-            CString m_SerialNumber;
-            CString m_BoxSerialNumber;
-            CString m_FirmwareVersion;
+
+            int m_TransactionId;
+
+            CAuthorizeRequest m_AuthorizeRequest;
+            CStartTransactionRequest m_StartTransactionRequest;
+            CStopTransactionRequest m_StopTransactionRequest;
+            CBootNotificationRequest m_BootNotificationRequest;
+            CStatusNotificationRequest m_StatusNotificationRequest;
 
             CHTTPServerConnection *m_Connection;
 
@@ -125,26 +194,14 @@ namespace Apostol {
             CString &Identity() { return m_Identity; };
             const CString &Identity() const { return m_Identity; };
 
-            CString &iccid() { return m_iccid; };
-            const CString &iccid() const { return m_iccid; };
+            static void StringToMeterValue(const CString &String, CMeterValue& MeterValue);
 
-            CString &Vendor() { return m_Vendor; };
-            const CString &Vendor() const { return m_Vendor; };
-
-            CString &Model() { return m_Model; };
-            const CString &Model() const { return m_Model; };
-
-            CString &SerialNumber() { return m_SerialNumber; };
-            const CString &SerialNumber() const { return m_SerialNumber; };
-
-            CString &BoxSerialNumber() { return m_BoxSerialNumber; };
-            const CString &BoxSerialNumber() const { return m_BoxSerialNumber; };
-
-            CString &FirmwareVersion() { return m_FirmwareVersion; };
-            const CString &FirmwareVersion() const { return m_FirmwareVersion; };
-
-            void BootNotification(const COCPPMessage &Request, COCPPMessage &Response);
-            void Heartbeat(const COCPPMessage &Request, COCPPMessage &Response);
+            void Authorize(const CMessage &Request, CMessage &Response);
+            void StartTransaction(const CMessage &Request, CMessage &Response);
+            void StopTransaction(const CMessage &Request, CMessage &Response);
+            void BootNotification(const CMessage &Request, CMessage &Response);
+            void StatusNotification(const CMessage &Request, CMessage &Response);
+            void Heartbeat(const CMessage &Request, CMessage &Response);
 
             void Parse(const CString &Request, CString &Response);
 
