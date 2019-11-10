@@ -109,9 +109,9 @@ namespace Apostol {
             for (int I = 0; I < Count(); ++I) {
                 LJob = Get(I);
                 if (LJob->JobId() == Id)
-                    break;
+                    return LJob;
             }
-            return LJob;
+            return nullptr;
         }
         //--------------------------------------------------------------------------------------------------------------
 
@@ -120,9 +120,9 @@ namespace Apostol {
             for (int I = 0; I < Count(); ++I) {
                 LJob = Get(I);
                 if (LJob->PollQuery() == Query)
-                    break;
+                    return LJob;
             }
-            return LJob;
+            return nullptr;
         }
 #endif
         //--------------------------------------------------------------------------------------------------------------

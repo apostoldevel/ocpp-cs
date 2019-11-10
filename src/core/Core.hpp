@@ -82,6 +82,7 @@ public:
 };
 //----------------------------------------------------------------------------------------------------------------------
 
+#include "OCPP.hpp"
 #include "Module.hpp"
 #include "Process.hpp"
 #include "Application.hpp"

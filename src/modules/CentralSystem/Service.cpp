@@ -30,495 +30,24 @@ Author:
 #include <openssl/sha.h>
 //----------------------------------------------------------------------------------------------------------------------
 
-#include "rapidxml.hpp"
-
-using namespace rapidxml;
-//----------------------------------------------------------------------------------------------------------------------
-
 extern "C++" {
 
 namespace Apostol {
 
     namespace CSService {
 
+        CString to_string(unsigned long Value) {
+            TCHAR szString[_INT_T_LEN + 1] = {0};
+            sprintf(szString, "%lu", Value);
+            return CString(szString);
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
         CString SHA1(const CString &data) {
             CString digest;
             digest.SetLength(SHA_DIGEST_LENGTH);
             ::SHA1((unsigned char *) data.data(), data.length(), (unsigned char *) digest.Data());
             return digest;
-        }
-        //--------------------------------------------------------------------------------------------------------------
-
-        CString IntToString(int Value) {
-            CString S;
-            S << Value;
-            return S;
-        }
-        //--------------------------------------------------------------------------------------------------------------
-
-        CString GetISOTime(long int Delta = 0) {
-            CString S;
-            TCHAR buffer[80] = {0};
-
-            struct timeval now = {};
-            struct tm *timeinfo = nullptr;
-
-            gettimeofday(&now, nullptr);
-            if (Delta > 0) now.tv_sec += Delta;
-            timeinfo = gmtime(&now.tv_sec);
-
-            strftime(buffer, sizeof buffer, "%FT%T", timeinfo);
-
-            S.Format("%s.%03ldZ", buffer, now.tv_usec / 1000);
-
-            return S;
-        }
-
-        //--------------------------------------------------------------------------------------------------------------
-
-        //-- CSOAPProtocol ---------------------------------------------------------------------------------------------
-
-        //--------------------------------------------------------------------------------------------------------------
-
-        void CSOAPProtocol::Request(const CString &xmlString, CMessage &Message) {
-            xml_document<> xmlDocument;
-            xmlDocument.parse<0>((char *) xmlString.c_str());
-
-            xml_node<> *root = xmlDocument.first_node("s:Envelope");
-
-            xml_node<> *headers = root->first_node("s:Header");
-            for (xml_node<> *header = headers->first_node(); header; header = header->next_sibling()) {
-                xml_node<> *address = header->first_node("a:Address");
-                if (address)
-                    Message.Headers.AddPair(header->name(), address->value());
-                else
-                    Message.Headers.AddPair(header->name(), header->value());
-            }
-
-            xml_node<> *body = root->first_node("s:Body");
-
-            xml_node<> *notification = body->first_node();
-            Message.Notification = notification->name();
-
-            xml_node<> *values = body->first_node(notification->name());
-            for (xml_node<> *value = values->first_node(); value; value = value->next_sibling()) {
-                Message.Values.AddPair(value->name(), value->value());
-            }
-        }
-        //--------------------------------------------------------------------------------------------------------------
-
-        void CSOAPProtocol::Response(const CMessage &Message, CString &xmlString) {
-
-            const CStringPairs &Headers = Message.Headers;
-            const CStringPairs &Values = Message.Values;
-
-            xmlString =  R"(<?xml version="1.0" encoding="UTF-8"?>)" LINEFEED;
-            xmlString << R"(<s:Envelope xmlns:a="http://www.w3.org/2005/08/addressing")" LINEFEED;
-            xmlString << R"(xmlns:s="http://www.w3.org/2003/05/soap-envelope")" LINEFEED;
-            xmlString << R"(xmlns="urn://Ocpp/Cs/2012/06/">)" LINEFEED;
-
-            xmlString << R"(<s:Header>)" LINEFEED;
-
-            for (int i = 0; i < Headers.Count(); i++ ) {
-                const CString& Name = Headers[i].Name;
-                const CString& Value = Headers[i].Value;
-
-                if (Name == "a:From" || Name == "a:ReplyTo" || Name == "a:FaultTo")
-                    xmlString.Format(R"(<%s><a:Address>%s</a:Address></%s>)" LINEFEED, Name.c_str(), Value.c_str(), Name.c_str());
-                else
-                    xmlString.Format(R"(<%s>%s</%s>)" LINEFEED, Name.c_str(), Value.c_str(), Name.c_str());
-            }
-
-            xmlString << R"(</s:Header>)" LINEFEED;
-            xmlString << R"(<s:Body>)" LINEFEED;
-
-            xmlString.Format(R"(<%s>)" LINEFEED, Message.Notification.c_str());
-
-            for (int i = 0; i < Values.Count(); i++ ) {
-                const CString& Name = Values[i].Name;
-                const CString& Value = Values[i].Value;
-
-                xmlString.Format(R"(<%s>%s</%s>)" LINEFEED, Name.c_str(), Value.c_str(), Name.c_str());
-            }
-
-            xmlString.Format(R"(</%s>)" LINEFEED, Message.Notification.c_str());
-
-            xmlString << R"(</s:Body>)" LINEFEED;
-            xmlString << R"(</s:Envelope>)";
-        }
-        //--------------------------------------------------------------------------------------------------------------
-
-        void CSOAPProtocol::PrepareResponse(const CMessage &Request, CMessage &Response) {
-
-            const CStringPairs &Headers = Request.Headers;
-            const CStringPairs &Values = Request.Values;
-
-            const CString &Identity = Headers.Values("chargeBoxIdentity");
-            const CString &MessageID = Headers.Values("a:MessageID");
-            const CString &From = Headers.Values("a:From");
-            const CString &To = Headers.Values("a:To");
-            const CString &ReplyTo = Headers.Values("a:ReplyTo");
-            const CString &FaultTo = Headers.Values("a:FaultTo");
-            const CString &Action = Headers.Values("a:Action");
-
-            Response.Headers.AddPair("chargeBoxIdentity", Identity);
-            Response.Headers.AddPair("a:MessageID", MessageID);
-            Response.Headers.AddPair("a:From", To); // <- It is right, swap!!!
-            Response.Headers.AddPair("a:To", From); // <- It is right, swap!!!
-            Response.Headers.AddPair("a:ReplyTo", ReplyTo);
-            Response.Headers.AddPair("a:FaultTo", FaultTo);
-            Response.Headers.AddPair("a:Action", Action);
-        }
-
-        //--------------------------------------------------------------------------------------------------------------
-
-        //-- CSOAPMessage ----------------------------------------------------------------------------------------------
-
-        //--------------------------------------------------------------------------------------------------------------
-
-        CChargePointStatus CSOAPMessage::StringToChargePointStatus(const CString &Value) {
-            if (Value == "Available")
-                return cpsAvailable;
-            if (Value == "Occupied")
-                return cpsOccupied;
-            if (Value == "Faulted")
-                return cpsFaulted;
-            if (Value == "Unavailable")
-                return cpsUnavailable;
-            if (Value == "Reserved")
-                return cpsReserved;
-            return cpsUnknown;
-        }
-        //--------------------------------------------------------------------------------------------------------------
-
-        CString CSOAPMessage::ChargePointStatusToString(CChargePointStatus Value) {
-            switch (Value) {
-                case cpsAvailable:
-                    return "Available";
-                case cpsOccupied:
-                    return "Occupied";
-                case cpsFaulted:
-                    return "Faulted";
-                case cpsUnavailable:
-                    return "Unavailable";
-                case cpsReserved:
-                    return "Reserved";
-                default:
-                    throw ExceptionFrm("Invalid \"ChargePointStatus\" value: %d", Value);
-            }
-        }
-        //--------------------------------------------------------------------------------------------------------------
-
-        CChargePointErrorCode CSOAPMessage::StringToChargePointErrorCode(const CString &Value) {
-            if (Value == "ConnectorLockFailure")
-                return cpeConnectorLockFailure;
-            if (Value == "HighTemperature")
-                return cpeHighTemperature;
-            if (Value == "Mode3Error")
-                return cpeMode3Error;
-            if (Value == "NoError")
-                return cpeNoError;
-            if (Value == "PowerMeterFailure")
-                return cpePowerMeterFailure;
-            if (Value == "PowerSwitchFailure")
-                return cpePowerSwitchFailure;
-            if (Value == "ReaderFailure")
-                return cpeReaderFailure;
-            if (Value == "ResetFailure")
-                return cpeResetFailure;
-            if (Value == "GroundFailure")
-                return cpeGroundFailure;
-            if (Value == "OverCurrentFailure")
-                return cpeOverCurrentFailure;
-            if (Value == "UnderVoltage")
-                return cpeUnderVoltage;
-            if (Value == "WeakSignal")
-                return cpeWeakSignal;
-            if (Value == "OtherError")
-                return cpeOtherError;
-            return cpeUnknown;
-        }
-        //--------------------------------------------------------------------------------------------------------------
-
-        CString CSOAPMessage::ChargePointErrorCodeToString(CChargePointErrorCode Value) {
-            switch (Value) {
-                case cpeConnectorLockFailure:
-                    return "ConnectorLockFailure";
-                case cpeHighTemperature:
-                    return "HighTemperature";
-                case cpeMode3Error:
-                    return "Mode3Error";
-                case cpeNoError:
-                    return "NoError";
-                case cpePowerMeterFailure:
-                    return "PowerMeterFailure";
-                case cpePowerSwitchFailure:
-                    return "PowerSwitchFailure";
-                case cpeReaderFailure:
-                    return "ReaderFailure";
-                case cpeResetFailure:
-                    return "ResetFailure";
-                case cpeGroundFailure:
-                    return "GroundFailure";
-                case cpeOverCurrentFailure:
-                    return "OverCurrentFailure";
-                case cpeUnderVoltage:
-                    return "UnderVoltage";
-                case cpeWeakSignal:
-                    return "WeakSignal";
-                case cpeOtherError:
-                    return "OtherError";
-                default:
-                    throw ExceptionFrm("Invalid \"ChargePointErrorCode\" value: %d", Value);
-            }
-        }
-        //--------------------------------------------------------------------------------------------------------------
-
-        void CSOAPMessage::Parse(CChargingPoint *APoint, const CMessage &Request, CMessage &Response) {
-
-            CSOAPProtocol::PrepareResponse(Request, Response);
-
-            if (Request.Notification.Lower() == "authorizerequest") {
-                APoint->Authorize(Request, Response);
-            } else if (Request.Notification.Lower() == "starttransactionrequest") {
-                APoint->StartTransaction(Request, Response);
-            } else if (Request.Notification.Lower() == "stoptransactionrequest") {
-                APoint->StopTransaction(Request, Response);
-            } else if (Request.Notification.Lower() == "bootnotificationrequest") {
-                APoint->BootNotification(Request, Response);
-            } else if (Request.Notification.Lower() == "statusnotificationrequest") {
-                APoint->StatusNotification(Request, Response);
-            } else if (Request.Notification.Lower() == "heartbeatrequest") {
-                APoint->Heartbeat(Request, Response);
-            }
-        }
-
-        //--------------------------------------------------------------------------------------------------------------
-
-        //-- CChargingPoint --------------------------------------------------------------------------------------------
-
-        //--------------------------------------------------------------------------------------------------------------
-
-        CChargingPoint::CChargingPoint(CHTTPServerConnection *AConnection, CChargingPointManager *AManager) : CCollectionItem(AManager) {
-            m_Connection = AConnection;
-            m_TransactionId = 0;
-        }
-        //--------------------------------------------------------------------------------------------------------------
-
-        CChargingPoint::~CChargingPoint() {
-            m_Connection = nullptr;
-        }
-        //--------------------------------------------------------------------------------------------------------------
-
-        void CChargingPoint::StringToMeterValue(const CString &String, CMeterValue &MeterValue) {
-            xml_document<> xmlDocument;
-            xmlDocument.parse<0>((char *) String.c_str());
-
-            xml_node<> *meterValue = xmlDocument.first_node("MeterValue");
-        }
-        //--------------------------------------------------------------------------------------------------------------
-
-        void CChargingPoint::Authorize(const CMessage &Request, CMessage &Response) {
-            const CStringPairs &Headers = Request.Headers;
-            const CStringPairs &Body = Request.Values;
-
-            m_Address = Headers.Values("a:From");
-            m_Identity = Headers.Values("chargeBoxIdentity");
-
-            m_AuthorizeRequest.idTag = Body.Values("idTag");
-
-            Response.Notification = "authorizeResponse";
-
-            CString IdTagInfo(LINEFEED);
-            CStringPairs Values;
-
-            Values.AddPair("status", "Accepted");
-            Values.AddPair("expiryDate", GetISOTime(5 * 60));
-
-            for (int i = 0; i < Values.Count(); i++ ) {
-                const CString& Name = Values[i].Name;
-                const CString& Value = Values[i].Value;
-
-                IdTagInfo.Format(R"(<%s>%s</%s>)" LINEFEED, Name.c_str(), Value.c_str(), Name.c_str());
-            }
-
-            Response.Values.AddPair("idTagInfo", IdTagInfo);
-        }
-        //--------------------------------------------------------------------------------------------------------------
-
-        void CChargingPoint::StartTransaction(const CMessage &Request, CMessage &Response) {
-            const CStringPairs &Headers = Request.Headers;
-            const CStringPairs &Body = Request.Values;
-
-            m_Address = Headers.Values("a:From");
-            m_Identity = Headers.Values("chargeBoxIdentity");
-
-            m_StartTransactionRequest.connectorId = StrToInt(Body.Values("connectorId").c_str());
-            m_StartTransactionRequest.idTag = Body.Values("idTag");
-            m_StartTransactionRequest.timestamp = StrToDateTimeDef(Body.Values("timestamp").c_str(), 0, "%04d-%02d-%02dT%02d:%02d:%02d");
-            m_StartTransactionRequest.meterStart = StrToInt(Body.Values("meterStart").c_str());
-            m_StartTransactionRequest.reservationId = StrToInt(Body.Values("reservationId").c_str());
-
-            Response.Notification = "startTransactionResponse";
-
-            CString IdTagInfo(LINEFEED);
-            CStringPairs Values;
-
-            Response.Values.AddPair("transactionId", IntToString(++m_TransactionId));
-
-            Values.AddPair("status", "Accepted");
-            Values.AddPair("expiryDate", GetISOTime(5 * 60));
-
-            for (int i = 0; i < Values.Count(); i++ ) {
-                const CString& Name = Values[i].Name;
-                const CString& Value = Values[i].Value;
-
-                IdTagInfo.Format(R"(<%s>%s</%s>)" LINEFEED, Name.c_str(), Value.c_str(), Name.c_str());
-            }
-
-            Response.Values.AddPair("idTagInfo", IdTagInfo);
-        }
-        //--------------------------------------------------------------------------------------------------------------
-
-        void CChargingPoint::StopTransaction(const CMessage &Request, CMessage &Response) {
-            const CStringPairs &Headers = Request.Headers;
-            const CStringPairs &Body = Request.Values;
-
-            m_Address = Headers.Values("a:From");
-            m_Identity = Headers.Values("chargeBoxIdentity");
-
-            m_StopTransactionRequest.transactionId = StrToInt(Body.Values("transactionId").c_str());
-            m_StopTransactionRequest.idTag = Body.Values("idTag");
-            m_StopTransactionRequest.timestamp = StrToDateTimeDef(Body.Values("timestamp").c_str(), 0, "%04d-%02d-%02dT%02d:%02d:%02d");
-            m_StopTransactionRequest.meterStop = StrToInt(Body.Values("meterStop").c_str());
-            m_StopTransactionRequest.reason = Body.Values("reason");
-
-            StringToMeterValue(Body.Values("transactionData"), m_StopTransactionRequest.transactionData);
-
-            Response.Notification = "stopTransactionResponse";
-
-            CString IdTagInfo(LINEFEED);
-            CStringPairs Values;
-
-            Values.AddPair("status", "Accepted");
-            Values.AddPair("expiryDate", GetISOTime(5 * 60));
-
-            for (int i = 0; i < Values.Count(); i++ ) {
-                const CString& Name = Values[i].Name;
-                const CString& Value = Values[i].Value;
-
-                IdTagInfo.Format(R"(<%s>%s</%s>)" LINEFEED, Name.c_str(), Value.c_str(), Name.c_str());
-            }
-
-            Response.Values.AddPair("idTagInfo", IdTagInfo);
-        }
-        //--------------------------------------------------------------------------------------------------------------
-
-        void CChargingPoint::BootNotification(const CMessage &Request, CMessage &Response) {
-            const CStringPairs &Headers = Request.Headers;
-            const CStringPairs &Body = Request.Values;
-
-            m_Address = Headers.Values("a:From");
-            m_Identity = Headers.Values("chargeBoxIdentity");
-
-            m_BootNotificationRequest.iccid = Body.Values("iccid");
-            m_BootNotificationRequest.chargePointVendor = Body.Values("chargePointVendor");
-            m_BootNotificationRequest.chargePointModel = Body.Values("chargePointModel");
-            m_BootNotificationRequest.chargePointSerialNumber = Body.Values("chargePointSerialNumber");
-            m_BootNotificationRequest.chargeBoxSerialNumber = Body.Values("chargeBoxSerialNumber");
-            m_BootNotificationRequest.firmwareVersion = Body.Values("firmwareVersion");
-            m_BootNotificationRequest.meterType = Body.Values("meterType");
-            m_BootNotificationRequest.meterSerialNumber = Body.Values("meterSerialNumber");
-
-            Response.Notification = "bootNotificationResponse";
-
-            Response.Values.AddPair("status", "Accepted");
-            Response.Values.AddPair("currentTime", GetISOTime());
-            Response.Values.AddPair("heartbeatInterval", "60");
-        }
-        //--------------------------------------------------------------------------------------------------------------
-
-        void CChargingPoint::StatusNotification(const CMessage &Request, CMessage &Response) {
-            const CStringPairs &Headers = Request.Headers;
-            const CStringPairs &Body = Request.Values;
-
-            m_Address = Headers.Values("a:From");
-            m_Identity = Headers.Values("chargeBoxIdentity");
-
-            m_StatusNotificationRequest.connectorId = StrToInt(Body.Values("connectorId").c_str());
-            m_StatusNotificationRequest.status = CSOAPMessage::StringToChargePointStatus(Body.Values("status"));
-            m_StatusNotificationRequest.errorCode = CSOAPMessage::StringToChargePointErrorCode(Body.Values("errorCode"));
-            m_StatusNotificationRequest.info = Body.Values("info");
-            m_StatusNotificationRequest.timestamp = StrToDateTimeDef(Body.Values("timestamp").c_str(), 0, "%04d-%02d-%02dT%02d:%02d:%02d");
-            m_StatusNotificationRequest.vendorId = Body.Values("vendorId");
-            m_StatusNotificationRequest.vendorErrorCode = Body.Values("vendorErrorCode");
-
-            Response.Notification = "statusNotificationResponse";
-        }
-        //--------------------------------------------------------------------------------------------------------------
-
-        void CChargingPoint::Heartbeat(const CMessage &Request, CMessage &Response) {
-            const CStringPairs &Headers = Request.Headers;
-            const CStringPairs &Body = Request.Values;
-
-            m_Address = Headers.Values("a:From");
-            m_Identity = Headers.Values("chargeBoxIdentity");
-
-            Response.Notification = "heartbeatResponse";
-            Response.Values.AddPair("currentTime", GetISOTime());
-        }
-        //--------------------------------------------------------------------------------------------------------------
-
-        void CChargingPoint::Parse(const CString &Request, CString &Response) {
-
-            CMessage LRequest;
-            CMessage LResponse;
-
-            CSOAPProtocol::Request(Request, LRequest);
-            CSOAPMessage::Parse(this, LRequest, LResponse);
-            CSOAPProtocol::Response(LResponse, Response);
-        }
-
-        //--------------------------------------------------------------------------------------------------------------
-
-        //-- CChargingPointManager -------------------------------------------------------------------------------------
-
-        //--------------------------------------------------------------------------------------------------------------
-
-        CChargingPoint *CChargingPointManager::Get(int Index) {
-            return dynamic_cast<CChargingPoint *> (inherited::GetItem(Index));
-        }
-        //--------------------------------------------------------------------------------------------------------------
-
-        void CChargingPointManager::Set(int Index, CChargingPoint *Value) {
-            inherited::SetItem(Index, Value);
-        }
-        //--------------------------------------------------------------------------------------------------------------
-
-        CChargingPoint *CChargingPointManager::Add(CHTTPServerConnection *AConnection) {
-            return new CChargingPoint(AConnection, this);
-        }
-        //--------------------------------------------------------------------------------------------------------------
-
-        CChargingPoint *CChargingPointManager::FindPointByIdentity(const CString &Value) {
-            CChargingPoint *Point = nullptr;
-            for (int I = 0; I < Count(); ++I) {
-                Point = Get(I);
-                if (Point->Identity() == Value)
-                    break;
-            }
-            return Point;
-        }
-        //--------------------------------------------------------------------------------------------------------------
-
-        CChargingPoint *CChargingPointManager::FindPointByConnection(CHTTPServerConnection *Value) {
-            CChargingPoint *Point = nullptr;
-            for (int I = 0; I < Count(); ++I) {
-                Point = Get(I);
-                if (Point->Connection() == Value)
-                    break;
-            }
-            return Point;
         }
 
         //--------------------------------------------------------------------------------------------------------------
@@ -552,20 +81,31 @@ namespace Apostol {
         //--------------------------------------------------------------------------------------------------------------
 
         void CCSService::DebugRequest(CRequest *ARequest) {
-            DebugMessage("[%p] Request:\n%s %s HTTP/%d.%d\n", ARequest, ARequest->Method.c_str(), ARequest->Uri.c_str(), ARequest->VMajor, ARequest->VMinor);
+            DebugMessage("\n[%p] Request:\n%s %s HTTP/%d.%d\n", ARequest, ARequest->Method.c_str(), ARequest->Uri.c_str(), ARequest->VMajor, ARequest->VMinor);
 
             for (int i = 0; i < ARequest->Headers.Count(); i++)
                 DebugMessage("%s: %s\n", ARequest->Headers[i].Name.c_str(), ARequest->Headers[i].Value.c_str());
 
-            DebugMessage("\n%s\n", ARequest->Content.c_str());
+            if (!ARequest->Content.IsEmpty())
+                DebugMessage("\n%s\n", ARequest->Content.c_str());
         }
         //--------------------------------------------------------------------------------------------------------------
 
         void CCSService::DebugReply(CReply *AReply) {
+            TCHAR ch;
+            CString String;
             CMemoryStream Stream;
+
             AReply->ToBuffers(&Stream);
-            CString S(&Stream);
-            DebugMessage("[%p] Reply:\n%s\n", AReply, S.c_str());
+            Stream.Position(0);
+
+            for (size_t i = 0; i < Stream.Size(); ++i) {
+                Stream.Read(&ch, 1);
+                if (ch != '\r')
+                    String.Append(ch);
+            }
+
+            DebugMessage("\n[%p] Reply:\n%s\n", AReply, String.c_str());
         }
         //--------------------------------------------------------------------------------------------------------------
 
@@ -789,33 +329,150 @@ namespace Apostol {
         //--------------------------------------------------------------------------------------------------------------
 
         void CCSService::DoGet(CHTTPServerConnection *AConnection) {
+
             auto LRequest = AConnection->Request();
             auto LReply = AConnection->Reply();
 
-            const CString& LSecWebSocketKey = LRequest->Headers.Values("sec-websocket-key");
+            CStringList LUri;
+            SplitColumns(LRequest->Uri.c_str(), LRequest->Uri.Size(), &LUri, '/');
 
-            if (LSecWebSocketKey.IsEmpty()) {
-                AConnection->SendStockReply(CReply::bad_request);
+            if (LUri.Count() < 2) {
+                AConnection->SendStockReply(CReply::not_found);
                 return;
             }
 
-            AConnection->CloseConnection(false);
+            const auto& LService = LUri[0].Lower();
 
-            LReply->Status = CReply::switching_protocols;
+            if (LService == "api") {
 
-            LReply->AddHeader("Upgrade", "websocket");
-            LReply->AddHeader("Connection", "Upgrade");
+                if (LUri.Count() < 3) {
+                    AConnection->SendStockReply(CReply::not_found);
+                    return;
+                }
 
-            const CString LAccept(SHA1(LSecWebSocketKey + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"));
+                const auto& LVersion = LUri[1].Lower();
+                const auto& LCommand = LUri[2];
 
-            LReply->AddHeader("Sec-WebSocket-Accept", base64_encode(LAccept));
+                if (LVersion == "v1") {
 
-            const CString& LSecWebSocketProtocol = LRequest->Headers.Values("sec-websocket-protocol");
-            if (!LSecWebSocketProtocol.IsEmpty()) {
-                LReply->AddHeader("Sec-WebSocket-Protocol", LSecWebSocketProtocol.SubString(0, LSecWebSocketProtocol.Find(',')));
+                    LReply->ContentType = CReply::json;
+
+                    if (LCommand == "ping") {
+
+                        AConnection->SendStockReply(CReply::ok);
+                        return;
+
+                    } else if (LCommand == "time") {
+
+                        LReply->Content << "{\"serverTime\": " << to_string(MsEpoch()) << "}";
+                        AConnection->SendReply(CReply::ok);
+                        return;
+
+                    } else if (LCommand == "ChargePoint") {
+
+                        if (LUri.Count() < 5) {
+                            AConnection->SendStockReply(CReply::not_found);
+                            return;
+                        }
+
+                        const auto& LIdentity = LUri[3];
+                        const auto& LAction = LUri[4];
+
+                        auto LPoint = m_CPManager->FindPointByIdentity(LIdentity);
+
+                        if (LPoint == nullptr) {
+                            LReply->Content.Format(R"({"error": {"code": %u, "message": "%s"}})", 300, "Charge point not found.");
+                            AConnection->SendReply(CReply::ok);
+                            return;
+                        }
+
+                        auto LConnection = LPoint->Connection();
+                        if (LConnection == nullptr) {
+                            LReply->Content.Format(R"({"error": {"code": %u, "message": "%s"}})", 301, "Charge point offline.");
+                            AConnection->SendReply(CReply::ok);
+                            return;
+                        }
+
+                        if (!LConnection->Connected()) {
+                            LReply->Content.Format(R"({"error": {"code": %u, "message": "%s"}})", 302, "Charge point not connected.");
+                            AConnection->SendReply(CReply::ok);
+                            return;
+                        }
+
+                        if (LConnection->Protocol() != pWebSocket) {
+                            LReply->Content.Format(R"({"error": {"code": %u, "message": "%s"}})", 303, "Incorrect charge point protocol version.");
+                            AConnection->SendReply(CReply::ok);
+                            return;
+                        }
+
+                        if (LAction == "GetConfiguration") {
+
+                            auto OnRequest = [AConnection](CObject *Sender) {
+                                auto LWSConnection = dynamic_cast<CHTTPServerConnection *> (Sender);
+
+                                auto LWSRequest = LWSConnection->WSRequest();
+                                const CString LRequest(LWSRequest->Payload());
+
+                                CJSONMessage LMessage;
+                                CJSONProtocol::Request(LRequest, LMessage);
+
+                                try {
+                                    auto LReply = AConnection->Reply();
+                                    LReply->Content = LMessage.Payload.ToString();
+                                    AConnection->SendReply(CReply::ok, nullptr, true);
+                                } catch (std::exception &e) {
+                                    Log()->Error(APP_LOG_EMERG, 0, e.what());
+                                }
+
+                                LWSConnection->OnRequest(nullptr);
+                            };
+
+                            CString Result;
+                            const auto& UniqueId = GetUID(APOSTOL_MODULE_UID_LENGTH);
+
+                            CJSONProtocol::Call(UniqueId, LAction, CJSON("{}"), Result);
+
+                            auto LWSReply = LConnection->WSReply();
+
+                            LWSReply->Clear();
+                            LWSReply->SetPayload(Result);
+
+                            LConnection->OnRequest(OnRequest);
+                            LConnection->SendWebSocket(true);
+
+                            return;
+                        }
+                    }
+                }
+
+            } else if (LService == "ocpp") {
+
+                LReply->ContentType = CReply::html;
+
+                const CString& LSecWebSocketKey = LRequest->Headers.Values("sec-websocket-key");
+                if (LSecWebSocketKey.IsEmpty()) {
+                    AConnection->SendStockReply(CReply::bad_request);
+                    return;
+                }
+
+                const auto& LIdentity = LUri[1];
+                const CString LAccept(SHA1(LSecWebSocketKey + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"));
+                const auto& LSecWebSocketProtocol = LRequest->Headers.Values("sec-websocket-protocol");
+                const CString LProtocol(LSecWebSocketProtocol.IsEmpty() ? "" : LSecWebSocketProtocol.SubString(0, LSecWebSocketProtocol.Find(',')));
+
+                AConnection->SwitchingProtocols(LAccept, LProtocol);
+
+                auto LPoint = m_CPManager->FindPointByConnection(AConnection);
+                if (LPoint == nullptr) {
+                    LPoint = m_CPManager->Add(AConnection);
+                    LPoint->Identity() = LIdentity;
+                    AConnection->OnDisconnected(std::bind(&CCSService::DoPointDisconnected, this, _1));
+                }
+
+                return;
             }
 
-            AConnection->SendReply();
+            AConnection->SendStockReply(CReply::not_found);
         }
         //--------------------------------------------------------------------------------------------------------------
 
@@ -830,26 +487,31 @@ namespace Apostol {
                 return;
             }
 
-            DebugRequest(LRequest);
-
             auto LPoint = m_CPManager->FindPointByConnection(AConnection);
             if (LPoint == nullptr) {
                 LPoint = m_CPManager->Add(AConnection);
                 AConnection->OnDisconnected(std::bind(&CCSService::DoPointDisconnected, this, _1));
             }
 
-            LPoint->Parse(LRequest->Content, LReply->Content);
+            LPoint->Parse(ptSOAP, LRequest->Content, LReply->Content);
 
             AConnection->SendReply(CReply::ok, "application/soap+xml");
-
-            DebugReply(LReply);
         }
         //--------------------------------------------------------------------------------------------------------------
 
-        void CCSService::Execute(CHTTPServerConnection *AConnection) {
+        void CCSService::DoHTTP(CHTTPServerConnection *AConnection) {
             int i = 0;
             auto LRequest = AConnection->Request();
             auto LReply = AConnection->Reply();
+
+            DebugRequest(AConnection->Request());
+
+            static auto DoReply = [](CObject *Sender) {
+                auto LConnection = dynamic_cast<CHTTPServerConnection *> (Sender);
+                DebugReply(LConnection->Reply());
+            };
+
+            AConnection->OnReply(DoReply);
 
             LReply->Clear();
             LReply->ContentType = CReply::html;
@@ -869,6 +531,41 @@ namespace Apostol {
 
             if (i == m_Methods.Count()) {
                 AConnection->SendStockReply(CReply::not_implemented);
+            }
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
+        void CCSService::DoWebSocket(CHTTPServerConnection *AConnection) {
+
+            auto LWSRequest = AConnection->WSRequest();
+            auto LWSReply = AConnection->WSReply();
+
+            const CString Request(LWSRequest->Payload());
+            CString Response;
+
+            auto LPoint = m_CPManager->FindPointByConnection(AConnection);
+            if (LPoint == nullptr) {
+                LPoint = m_CPManager->Add(AConnection);
+                AConnection->OnDisconnected(std::bind(&CCSService::DoPointDisconnected, this, _1));
+            }
+
+            DebugMessage("WS Request:\n%s\n", Request.c_str());
+            if (LPoint->Parse(ptJSON, Request, Response)) {
+                DebugMessage("WS Response:\n%s\n", Response.c_str());
+                LWSReply->SetPayload(Response);
+                AConnection->SendWebSocket();
+            }
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
+        void CCSService::Execute(CHTTPServerConnection *AConnection) {
+            switch (AConnection->Protocol()) {
+                case pHTTP:
+                    DoHTTP(AConnection);
+                    break;
+                case pWebSocket:
+                    DoWebSocket(AConnection);
+                    break;
             }
         }
         //--------------------------------------------------------------------------------------------------------------
