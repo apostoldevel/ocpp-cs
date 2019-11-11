@@ -424,13 +424,23 @@ namespace Apostol {
                                     Log()->Error(APP_LOG_EMERG, 0, e.what());
                                 }
 
+                                LWSConnection->ConnectionStatus(csReplySent);
                                 LWSConnection->OnRequest(nullptr);
                             };
 
                             CString Result;
                             const auto& UniqueId = GetUID(APOSTOL_MODULE_UID_LENGTH);
 
-                            CJSONProtocol::Call(UniqueId, LAction, CJSON("{}"), Result);
+                            CJSON LPayload(jvtObject);
+                            CJSONValue LArray(jvtArray);
+
+                            const CString& LKey = LRequest->Params["key"];
+                            if (!LKey.IsEmpty()) {
+                                LArray.Array().Add(LKey);
+                                LPayload.Object().AddPair("key", LArray);
+                            }
+
+                            CJSONProtocol::Call(UniqueId, LAction, LPayload, Result);
 
                             auto LWSReply = LConnection->WSReply();
 
@@ -543,17 +553,24 @@ namespace Apostol {
             const CString Request(LWSRequest->Payload());
             CString Response;
 
-            auto LPoint = m_CPManager->FindPointByConnection(AConnection);
-            if (LPoint == nullptr) {
-                LPoint = m_CPManager->Add(AConnection);
-                AConnection->OnDisconnected(std::bind(&CCSService::DoPointDisconnected, this, _1));
-            }
+            try {
+                auto LPoint = m_CPManager->FindPointByConnection(AConnection);
+                if (LPoint == nullptr) {
+                    LPoint = m_CPManager->Add(AConnection);
+                    AConnection->OnDisconnected(std::bind(&CCSService::DoPointDisconnected, this, _1));
+                }
 
-            DebugMessage("WS Request:\n%s\n", Request.c_str());
-            if (LPoint->Parse(ptJSON, Request, Response)) {
-                DebugMessage("WS Response:\n%s\n", Response.c_str());
-                LWSReply->SetPayload(Response);
-                AConnection->SendWebSocket();
+                DebugMessage("WS Request:\n%s\n", Request.c_str());
+
+                if (LPoint->Parse(ptJSON, Request, Response)) {
+                    DebugMessage("WS Response:\n%s\n", Response.c_str());
+                    LWSReply->SetPayload(Response);
+                    AConnection->SendWebSocket();
+                }
+            } catch (std::exception &e) {
+                AConnection->CloseConnection(true);
+                AConnection->SendWebSocketClose();
+                Log()->Error(APP_LOG_EMERG, 0, e.what());
             }
         }
         //--------------------------------------------------------------------------------------------------------------

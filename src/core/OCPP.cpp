@@ -185,27 +185,35 @@ namespace Apostol {
         //--------------------------------------------------------------------------------------------------------------
 
         //[2,"254ea8bf-df2b-4074-b7ab-71d8dc9e6620","BootNotification",{"chargePointVendor":"EV-BOX","chargePointModel":"G4-M5320E-F4017","chargePointSerialNumber":"18210114","firmwareVersion":"P0415B0415v0.190710_U5.0.1-002","iccid":"89462036051000106630","imsi":"240075810738432"}]
-        void CJSONProtocol::Request(const CString &String, CJSONMessage &Message) {
+        bool CJSONProtocol::Request(const CString &String, CJSONMessage &Message) {
+            bool Result = false;
 
-            if (String.Size() > 10) {
+            if (String.Size() > 0) {
 
                 CString Item;
                 size_t Pos = 0;
 
                 bool Quotes = false;
-                bool Payload = false;
+                int Brackets = 0;
 
-                CJSONParserState State = psMessageTyeId;
+                CJSONParserState State = psBegin;
 
-                TCHAR ch = String.at(Pos);
-                if (ch != '[')
-                    throw Delphi::Exception::Exception("Request not is OCPP-J protocol.");
+                TCHAR ch = String.at(Pos++);
 
                 while (ch != 0) {
 
-                    ch = String.at(++Pos);
-
                     switch (State) {
+                        case psBegin:
+
+                            if (ch == ' ')
+                                break;
+
+                            if (ch != '[')
+                                throw Delphi::Exception::Exception("This is not OCPP-J protocol.");
+
+                            State = psMessageTyeId;
+                            break;
+
                         case psMessageTyeId:
 
                             if (ch == ' ')
@@ -248,7 +256,7 @@ namespace Apostol {
                                         State = psAction;
                                         break;
                                     case mtCallResult:
-                                        State = psPayload;
+                                        State = psPayloadBegin;
                                         break;
                                     case mtCallError:
                                         State = psErrorCode;
@@ -272,7 +280,7 @@ namespace Apostol {
                             }
 
                             if (!Quotes && ch == ',') {
-                                State = psPayload;
+                                State = psPayloadBegin;
                                 break;
                             }
 
@@ -308,30 +316,74 @@ namespace Apostol {
                             }
 
                             if (!Quotes && ch == ',') {
-                                State = psPayload;
+                                State = psPayloadBegin;
                                 break;
                             }
 
                             Message.ErrorDescription.Append(ch);
                             break;
 
-                        case psPayload:
+                        case psPayloadBegin:
 
-                            if (ch == '{')
-                                Payload = true;
-
-                            if (Payload)
+                            if (ch == '{') {
+                                Brackets++;
                                 Item.Append(ch);
-
-                            if (ch == '}') {
-                                Message.Payload << Item;
-                                Payload = false;
+                                State = psPayloadObject;
+                            } else if (ch == '[') {
+                                Brackets++;
+                                Item.Append(ch);
+                                State = psPayloadArray;
                             }
 
                             break;
+
+                        case psPayloadObject:
+
+                            if (ch == '{') {
+                                Brackets++;
+                            } else if (ch == '}') {
+                                Brackets--;
+                            }
+
+                            Item.Append(ch);
+
+                            if (Brackets == 0) {
+                                Message.Payload << Item;
+                                State = psEnd;
+                            }
+
+                            break;
+
+                        case psPayloadArray:
+
+                            if (ch == '[') {
+                                Brackets++;
+                            } else if (ch == ']') {
+                                Brackets--;
+                            }
+
+                            Item.Append(ch);
+
+                            if (Brackets == 0) {
+                                Message.Payload << Item;
+                                State = psEnd;
+                            }
+
+                            break;
+
+                        case psEnd:
+
+                            if (ch == ']')
+                                Result = true;
+
+                            break;
                     }
+
+                    ch = String.at(Pos++);
                 }
             }
+
+            return Result;
         }
         //--------------------------------------------------------------------------------------------------------------
 

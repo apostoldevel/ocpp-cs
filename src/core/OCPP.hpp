@@ -81,12 +81,13 @@ namespace Apostol {
 
         //--------------------------------------------------------------------------------------------------------------
 
-        enum CJSONParserState { psMessageTyeId, psUniqueId, psAction, psErrorCode, psErrorDescription, psPayload };
+        enum CJSONParserState { psBegin, psMessageTyeId, psUniqueId, psAction, psErrorCode, psErrorDescription, psPayloadBegin,
+                psPayloadObject, psPayloadArray, psEnd };
 
         class CJSONProtocol {
         public:
 
-            static void Request(const CString &String, CJSONMessage &Message);
+            static bool Request(const CString &String, CJSONMessage &Message);
             static void Response(const CJSONMessage &Message, CString &String);
 
             static void PrepareResponse(const CJSONMessage &Request, CJSONMessage &Response);
