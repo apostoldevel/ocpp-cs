@@ -436,6 +436,8 @@ namespace Apostol {
 
             ~CChargingPoint() override;
 
+            void SwitchConnection(CHTTPServerConnection *Value);
+
             CHTTPServerConnection *Connection() { return m_Connection; };
 
             void Connection(CHTTPServerConnection *Value) { m_Connection = Value; };

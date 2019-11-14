@@ -321,7 +321,7 @@ namespace Apostol {
                                    LPoint->Identity().IsEmpty() ? "(empty)" : LPoint->Identity().c_str());
                     delete LPoint;
                 } else {
-                    Log()->Message(_T("[%s:%d] Client closed connection."), LConnection->Socket()->Binding()->PeerIP(),
+                    Log()->Message(_T("[%s:%d] Point closed connection."), LConnection->Socket()->Binding()->PeerIP(),
                                    LConnection->Socket()->Binding()->PeerPort());
                 }
             }
@@ -472,11 +472,13 @@ namespace Apostol {
 
                 AConnection->SwitchingProtocols(LAccept, LProtocol);
 
-                auto LPoint = m_CPManager->FindPointByConnection(AConnection);
+                auto LPoint = m_CPManager->FindPointByIdentity(LIdentity);
                 if (LPoint == nullptr) {
                     LPoint = m_CPManager->Add(AConnection);
                     LPoint->Identity() = LIdentity;
                     AConnection->OnDisconnected(std::bind(&CCSService::DoPointDisconnected, this, _1));
+                } else {
+                    LPoint->SwitchConnection(AConnection);
                 }
 
                 return;
