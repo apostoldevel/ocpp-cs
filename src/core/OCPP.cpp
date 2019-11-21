@@ -493,6 +493,8 @@ namespace Apostol {
 
         CString COCPPMessage::ChargePointStatusToString(CChargePointStatus Value) {
             switch (Value) {
+                case cpsUnknown:
+                    return "Unknown";
                 case cpsAvailable:
                     return "Available";
                 case cpsOccupied:
@@ -542,6 +544,8 @@ namespace Apostol {
 
         CString COCPPMessage::ChargePointErrorCodeToString(CChargePointErrorCode Value) {
             switch (Value) {
+                case cpeUnknown:
+                    return "Unknown";
                 case cpeConnectorLockFailure:
                     return "ConnectorLockFailure";
                 case cpeHighTemperature:
@@ -608,37 +612,101 @@ namespace Apostol {
         //--------------------------------------------------------------------------------------------------------------
 
         bool COCPPMessage::Parse(CChargingPoint *APoint, const CJSONMessage &Request, CJSONMessage &Response) {
-
-            const auto& Action = Request.Action.Lower();
-
-            CJSONProtocol::PrepareResponse(Request, Response);
-
             if (Request.MessageTypeId == mtCall) {
+                const auto &Action = Request.Action.Lower();
+
+                CJSONProtocol::PrepareResponse(Request, Response);
+
                 if (Action == "authorize") {
                     APoint->Authorize(Request, Response);
-                    return true;
                 } else if (Action == "starttransaction") {
                     APoint->StartTransaction(Request, Response);
-                    return true;
                 } else if (Action == "stoptransaction") {
                     APoint->StopTransaction(Request, Response);
-                    return true;
                 } else if (Action == "bootnotification") {
                     APoint->BootNotification(Request, Response);
-                    return true;
                 } else if (Action == "statusnotification") {
                     APoint->StatusNotification(Request, Response);
-                    return true;
                 } else if (Action == "datatransfer") {
                     APoint->DataTransfer(Request, Response);
-                    return true;
                 } else if (Action == "heartbeat") {
                     APoint->Heartbeat(Request, Response);
-                    return true;
+                } else {
+                    return false;
                 }
+
+                return true;
             }
 
             return false;
+        }
+
+        //--------------------------------------------------------------------------------------------------------------
+
+        //-- CMessageHandler -------------------------------------------------------------------------------------------
+
+        //--------------------------------------------------------------------------------------------------------------
+
+        CMessageHandler::CMessageHandler(CMessageManager *AManager, COnMessageHandlerEvent &&Handler) :
+                CCollectionItem(AManager), m_Handler(Handler) {
+            m_UniqueId = GetUID(APOSTOL_MODULE_UID_LENGTH);
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
+        void CMessageHandler::Handler(CHTTPServerConnection *AConnection) {
+            if (m_Handler != nullptr) {
+                m_Handler(this, AConnection);
+            }
+        }
+
+        //--------------------------------------------------------------------------------------------------------------
+
+        //-- CMessageManager -------------------------------------------------------------------------------------------
+
+        //--------------------------------------------------------------------------------------------------------------
+
+        CMessageHandler *CMessageManager::Get(int Index) {
+            return dynamic_cast<CMessageHandler *> (inherited::GetItem(Index));
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
+        void CMessageManager::Set(int Index, CMessageHandler *Value) {
+            inherited::SetItem(Index, Value);
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
+        CMessageHandler *CMessageManager::Add(COnMessageHandlerEvent &&Handler, const CString &Action,
+                const CJSON &Payload) {
+            auto LHandler = new CMessageHandler(this, static_cast<COnMessageHandlerEvent &&>(Handler));
+            auto LConnection = m_Point->Connection();
+
+            LHandler->Action() = Action;
+
+            CString LResult;
+
+            CJSONProtocol::Call(LHandler->UniqueId(), Action, Payload, LResult);
+
+            auto LWSReply = LConnection->WSReply();
+
+            LWSReply->Clear();
+            LWSReply->SetPayload(LResult);
+
+            LConnection->SendWebSocket(true);
+
+            return LHandler;
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
+        CMessageHandler *CMessageManager::FindMessageById(const CString &Value) {
+            CMessageHandler *Handler = nullptr;
+
+            for (int I = 0; I < Count(); ++I) {
+                Handler = Get(I);
+                if (Handler->UniqueId() == Value)
+                    return Handler;
+            }
+
+            return nullptr;
         }
 
         //--------------------------------------------------------------------------------------------------------------
@@ -650,11 +718,13 @@ namespace Apostol {
         CChargingPoint::CChargingPoint(CHTTPServerConnection *AConnection, CChargingPointManager *AManager) : CCollectionItem(AManager) {
             m_Connection = AConnection;
             m_TransactionId = 0;
+            m_Messages = new CMessageManager(this);
         }
         //--------------------------------------------------------------------------------------------------------------
 
         CChargingPoint::~CChargingPoint() {
             m_Connection = nullptr;
+            FreeAndNil(m_Messages);
         }
         //--------------------------------------------------------------------------------------------------------------
 
@@ -663,9 +733,10 @@ namespace Apostol {
                 auto LConnection = m_Connection;
                 m_Connection = Value;
                 if (Assigned(LConnection)) {
-                    if (LConnection->Protocol() == pWebSocket)
-                        LConnection->SendWebSocketClose(true);
-                    LConnection->CloseConnection(true);
+//                    if (LConnection->Protocol() == pWebSocket)
+//                        LConnection->SendWebSocketClose(true);
+//                    LConnection->CloseConnection(true);
+                    LConnection->CheckForDisconnect();
                 }
             }
         }
@@ -893,30 +964,38 @@ namespace Apostol {
         //--------------------------------------------------------------------------------------------------------------
 
         bool CChargingPoint::ParseSOAP(const CString &Request, CString &Response) {
-            bool Result;
-
             CSOAPMessage LRequest;
             CSOAPMessage LResponse;
 
             CSOAPProtocol::Request(Request, LRequest);
-            Result = COCPPMessage::Parse(this, LRequest, LResponse);
-            CSOAPProtocol::Response(LResponse, Response);
+            if (COCPPMessage::Parse(this, LRequest, LResponse)) {
+                CSOAPProtocol::Response(LResponse, Response);
+                return true;
+            }
 
-            return Result;
+            return false;
         }
         //--------------------------------------------------------------------------------------------------------------
 
         bool CChargingPoint::ParseJSON(const CString &Request, CString &Response) {
-            bool Result;
-
             CJSONMessage LRequest;
             CJSONMessage LResponse;
 
             CJSONProtocol::Request(Request, LRequest);
-            Result = COCPPMessage::Parse(this, LRequest, LResponse);
-            CJSONProtocol::Response(LResponse, Response);
+            if (LRequest.MessageTypeId == mtCall) {
+                if (COCPPMessage::Parse(this, LRequest, LResponse)) {
+                    CJSONProtocol::Response(LResponse, Response);
+                    return true;
+                }
+            } else {
+                auto LHandler = m_Messages->FindMessageById(LRequest.UniqueId);
+                if (Assigned(LHandler)) {
+                    LHandler->Handler(m_Connection);
+                    return true;
+                }
+            }
 
-            return Result;
+            return false;
         }
         //--------------------------------------------------------------------------------------------------------------
 
@@ -969,17 +1048,21 @@ namespace Apostol {
 
             for (int I = 0; I < Count(); ++I) {
                 Point = Get(I);
+                if (Point->Connection() == Value)
+                    return Point;
+/*
                 auto Connection = Point->Connection();
                 if (Assigned(Connection)) {
-                    if (Connection == Value) {
-                        return Point;
+                    if (SameText(Connection->Socket()->Binding()->PeerIP(), Value->Socket()->Binding()->PeerIP())) {
+                        if (Connection->Socket()->Binding()->PeerPort() == Value->Socket()->Binding()->PeerPort())
+                            return Point;
                     }
                 }
+*/
             }
 
             return nullptr;
         }
-        //--------------------------------------------------------------------------------------------------------------
 
     }
 }

@@ -113,7 +113,6 @@ namespace Apostol {
         //--------------------------------------------------------------------------------------------------------------
 
         class CChargingPoint;
-        class CChargingPointManager;
         //--------------------------------------------------------------------------------------------------------------
 
         class COCPPMessage {
@@ -341,6 +340,23 @@ namespace Apostol {
                 return *this;
             }
 
+            const BootNotificationRequest& operator>> (CJSONValue& Value) const {
+
+                if (Value.IsObject()) {
+                    CJSONObject &Object = Value.Object();
+
+                    Object.AddPair("iccid", iccid);
+                    Object.AddPair("chargePointVendor", chargePointVendor);
+                    Object.AddPair("chargePointModel", chargePointModel);
+                    Object.AddPair("chargePointSerialNumber", chargePointSerialNumber);
+                    Object.AddPair("firmwareVersion", firmwareVersion);
+                    Object.AddPair("meterType", meterType);
+                    Object.AddPair("meterSerialNumber", meterSerialNumber);
+                }
+
+                return *this;
+            }
+
         } CBootNotificationRequest, *PBootNotificationRequest;
         //--------------------------------------------------------------------------------------------------------------
 
@@ -380,6 +396,24 @@ namespace Apostol {
                 return *this;
             }
 
+            const StatusNotificationRequest& operator>> (CJSONValue& Value) const {
+
+                if (Value.IsObject()) {
+                    TCHAR szDate[25] = {0};
+                    CJSONObject &Object = Value.Object();
+
+                    Object.AddPair("connectorId", connectorId);
+                    Object.AddPair("status", COCPPMessage::ChargePointStatusToString(status));
+                    Object.AddPair("errorCode", COCPPMessage::ChargePointErrorCodeToString(errorCode));
+                    Object.AddPair("info", info);
+                    Object.AddPair("timestamp", DateTimeToStr(timestamp, szDate, sizeof(szDate)));
+                    Object.AddPair("vendorId", vendorId);
+                    Object.AddPair("vendorErrorCode", vendorErrorCode);
+                }
+
+                return *this;
+            }
+
         } CStatusNotificationRequest, *PStatusNotificationRequest;
         //--------------------------------------------------------------------------------------------------------------
 
@@ -408,10 +442,92 @@ namespace Apostol {
             }
 
         } CDataTransferRequest;
+
+        //--------------------------------------------------------------------------------------------------------------
+
+        //-- CMessageHandler -------------------------------------------------------------------------------------------
+
+        //--------------------------------------------------------------------------------------------------------------
+
+        class CMessageManager;
+        class CMessageHandler;
+        //--------------------------------------------------------------------------------------------------------------
+
+        typedef std::function<void (CMessageHandler *Handler, CHTTPServerConnection *Connection)> COnMessageHandlerEvent;
+        //--------------------------------------------------------------------------------------------------------------
+
+        class CMessageHandler: public CCollectionItem {
+        private:
+
+            CString m_UniqueId;
+            CString m_Action;
+
+            COnMessageHandlerEvent m_Handler;
+
+        public:
+
+            CMessageHandler(CMessageManager *AManager, COnMessageHandlerEvent && Handler);
+
+            const CString &UniqueId() const { return m_UniqueId; }
+
+            CString &Action() { return m_Action; }
+            const CString &Action() const { return m_Action; }
+
+            void Handler(CHTTPServerConnection *AConnection);
+
+        };
+
+        //--------------------------------------------------------------------------------------------------------------
+
+        //-- CMessageManager -------------------------------------------------------------------------------------------
+
+        //--------------------------------------------------------------------------------------------------------------
+
+        class CMessageManager: public CCollection {
+            typedef CCollection inherited;
+
+        private:
+
+            CChargingPoint *m_Point;
+
+            CMessageHandler *Get(int Index);
+            void Set(int Index, CMessageHandler *Value);
+
+        public:
+
+            explicit CMessageManager(CChargingPoint *APoint): CCollection(this), m_Point(APoint) {
+
+            }
+
+            CMessageHandler *Add(COnMessageHandlerEvent &&Handler, const CString &Action, const CJSON &Payload);
+
+            CMessageHandler *First() { return Get(0); };
+            CMessageHandler *Last() { return Get(Count() - 1); };
+
+            CMessageHandler *FindMessageById(const CString &Value);
+
+            CMessageHandler *Handlers(int Index) { return Get(Index); }
+            void Handlers(int Index, CMessageHandler *Value) { Set(Index, Value); }
+
+            CMessageHandler *operator[] (int Index) override { return Handlers(Index); };
+
+        };
+
+        //--------------------------------------------------------------------------------------------------------------
+
+        //-- CChargingPoint --------------------------------------------------------------------------------------------
+
+        //--------------------------------------------------------------------------------------------------------------
+
+        class CChargingPointManager;
         //--------------------------------------------------------------------------------------------------------------
 
         class CChargingPoint: public CCollectionItem {
         private:
+
+            CHTTPServerConnection *m_Connection;
+
+            CMessageManager *m_Messages;
 
             CString m_Address;
             CString m_Identity;
@@ -424,8 +540,6 @@ namespace Apostol {
             CBootNotificationRequest m_BootNotificationRequest;
             CStatusNotificationRequest m_StatusNotificationRequest;
             CDataTransferRequest m_DataTransferRequest;
-
-            CHTTPServerConnection *m_Connection;
 
             bool ParseSOAP(const CString &Request, CString &Response);
             bool ParseJSON(const CString &Request, CString &Response);
@@ -442,11 +556,20 @@ namespace Apostol {
 
             void Connection(CHTTPServerConnection *Value) { m_Connection = Value; };
 
+            CMessageManager *Messages() { return m_Messages; };
+
             CString &Address() { return m_Address; };
             const CString &Address() const { return m_Address; };
 
             CString &Identity() { return m_Identity; };
             const CString &Identity() const { return m_Identity; };
+
+            const CAuthorizeRequest &AuthorizeRequest() const { return m_AuthorizeRequest; }
+            const CStartTransactionRequest &StartTransactionRequest() const { return m_StartTransactionRequest; }
+            const CStopTransactionRequest &StopTransactionRequest() const { return m_StopTransactionRequest; }
+            const CBootNotificationRequest &BootNotificationRequest() const { return m_BootNotificationRequest; }
+            const CStatusNotificationRequest &StatusNotificationRequest() const { return m_StatusNotificationRequest; }
+            const CDataTransferRequest &DataTransferRequest() const { return m_DataTransferRequest; }
 
             void Authorize(const CSOAPMessage &Request, CSOAPMessage &Response);
             void Authorize(const CJSONMessage &Request, CJSONMessage &Response);

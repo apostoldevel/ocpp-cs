@@ -60,6 +60,8 @@ namespace Apostol {
 
         protected:
 
+            static void DoWWW(CHTTPServerConnection *AConnection);
+
             void DoGet(CHTTPServerConnection *AConnection);
             void DoPost(CHTTPServerConnection *AConnection);
 
