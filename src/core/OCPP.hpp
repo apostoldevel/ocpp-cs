@@ -314,6 +314,7 @@ namespace Apostol {
 
             BootNotificationRequest& operator<< (const CStringPairs& Value) {
 
+                imsi = Value.Values("imsi");
                 iccid = Value.Values("iccid");
                 chargePointVendor = Value.Values("chargePointVendor");
                 chargePointModel = Value.Values("chargePointModel");
@@ -328,6 +329,7 @@ namespace Apostol {
 
             BootNotificationRequest& operator<< (const CJSON& Value) {
 
+                imsi = Value["imsi"].AsSiring();
                 iccid = Value["iccid"].AsSiring();
                 chargePointVendor = Value["chargePointVendor"].AsSiring();
                 chargePointModel = Value["chargePointModel"].AsSiring();

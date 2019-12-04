@@ -423,14 +423,16 @@ namespace Apostol {
                             auto LPoint = m_CPManager->Points(i);
                             jsonPoint.Object().AddPair("Identity", LPoint->Identity());
 
-                            jsonConnection.Object().AddPair("Socket", LPoint->Connection()->Socket()->Binding()->Handle());
-                            jsonConnection.Object().AddPair("IP", LPoint->Connection()->Socket()->Binding()->PeerIP());
-                            jsonConnection.Object().AddPair("Port", LPoint->Connection()->Socket()->Binding()->PeerPort());
+                            if (LPoint->Connection()->Connected()) {
+                                jsonConnection.Object().AddPair("Socket", LPoint->Connection()->Socket()->Binding()->Handle());
+                                jsonConnection.Object().AddPair("IP", LPoint->Connection()->Socket()->Binding()->PeerIP());
+                                jsonConnection.Object().AddPair("Port", LPoint->Connection()->Socket()->Binding()->PeerPort());
+                                jsonPoint.Object().AddPair("Connection", jsonConnection);
+                            }
 
                             LPoint->BootNotificationRequest() >> jsonBootNotification;
                             LPoint->StatusNotificationRequest() >> jsonStatusNotification;
 
-                            jsonPoint.Object().AddPair("Connection", jsonConnection);
                             jsonPoint.Object().AddPair("BootNotification", jsonBootNotification);
                             jsonPoint.Object().AddPair("StatusNotification", jsonStatusNotification);
 
