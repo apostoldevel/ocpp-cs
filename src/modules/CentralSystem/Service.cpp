@@ -109,10 +109,9 @@ namespace Apostol {
         }
         //--------------------------------------------------------------------------------------------------------------
 
-        void CCSService::ExceptionToJson(int ErrorCode, Delphi::Exception::Exception *AException, CString& Json) {
-
+        void CCSService::ExceptionToJson(int ErrorCode, const std::exception &AException, CString& Json) {
             TCHAR ch;
-            LPCTSTR lpMessage = AException->what();
+            LPCTSTR lpMessage = AException.what();
             CString Message;
 
             while ((ch = *lpMessage++) != 0) {
@@ -133,103 +132,12 @@ namespace Apostol {
 
                 CReply::status_type LStatus = CReply::internal_server_error;
 
-                ExceptionToJson(0, AException, LReply->Content);
+                ExceptionToJson(0, *AException, LReply->Content);
 
                 LConnection->SendReply(LStatus);
             }
 
             Log()->Error(APP_LOG_EMERG, 0, AException->what());
-        }
-        //--------------------------------------------------------------------------------------------------------------
-
-        void CCSService::PQResultToJson(CPQResult *Result, CString &Json) {
-            Json = "{";
-
-            for (int I = 0; I < Result->nFields(); ++I) {
-                if (I > 0) {
-                    Json += ", ";
-                }
-
-                Json += "\"";
-                Json += Result->fName(I);
-                Json += "\"";
-
-                if (SameText(Result->fName(I),_T("session"))) {
-                    Json += ": ";
-                    if (Result->GetIsNull(0, I)) {
-                        Json += _T("null");
-                    } else {
-                        Json += "\"";
-                        Json += Result->GetValue(0, I);
-                        Json += "\"";
-                    }
-                } else if (SameText(Result->fName(I),_T("result"))) {
-                    Json += ": ";
-                    if (SameText(Result->GetValue(0, I), _T("t"))) {
-                        Json += _T("true");
-                    } else {
-                        Json += _T("false");
-                    }
-                } else {
-                    Json += ": \"";
-                    Json += Result->GetValue(0, I);
-                    Json += "\"";
-                }
-            }
-
-            Json += "}";
-        }
-        //--------------------------------------------------------------------------------------------------------------
-
-        void CCSService::QueryToJson(CPQPollQuery *Query, CString& Json) {
-
-            CPQResult *Run;
-            CPQResult *Login;
-            CPQResult *Result;
-
-            for (int I = 0; I < Query->Count(); I++) {
-                Result = Query->Results(I);
-                if (Result->ExecStatus() != PGRES_TUPLES_OK)
-                    throw Delphi::Exception::EDBError(Result->GetErrorMessage());
-            }
-
-            if (Query->Count() == 3) {
-                Login = Query->Results(0);
-
-                if (SameText(Login->GetValue(0, 1), "f")) {
-                    Log()->Error(APP_LOG_EMERG, 0, Login->GetValue(0, 2));
-                    PQResultToJson(Login, Json);
-                    return;
-                }
-
-                Run = Query->Results(1);
-            } else {
-                Run = Query->Results(0);
-            }
-
-            Json = "{\"result\": ";
-
-            if (Run->nTuples() > 0) {
-
-                Json += "[";
-                for (int Row = 0; Row < Run->nTuples(); ++Row) {
-                    for (int Col = 0; Col < Run->nFields(); ++Col) {
-                        if (Row != 0)
-                            Json += ", ";
-                        if (Run->GetIsNull(Row, Col)) {
-                            Json += "null";
-                        } else {
-                            Json += Run->GetValue(Row, Col);
-                        }
-                    }
-                }
-                Json += "]";
-
-            } else {
-                Json += "{}";
-            }
-
-            Json += "}";
         }
         //--------------------------------------------------------------------------------------------------------------
 
@@ -239,20 +147,53 @@ namespace Apostol {
             auto LConnection = dynamic_cast<CHTTPServerConnection *> (APollQuery->PollConnection());
 
             if (LConnection != nullptr) {
+                CPQResult *Result;
 
-                auto LReply = LConnection->Reply();
+                auto LWSRequest = LConnection->WSRequest();
+                auto LWSReply = LConnection->WSReply();
 
-                CReply::status_type LStatus = CReply::internal_server_error;
+                const CString LRequest(LWSRequest->Payload());
+
+                CJSONMessage jmRequest;
+                CJSONProtocol::Request(LRequest, jmRequest);
+
+                CJSONMessage jmResponse;
+                CString LResponse;
+
+                CJSON LResult;
+
+                CJSONProtocol::PrepareResponse(jmRequest, jmResponse);
 
                 try {
-                    QueryToJson(APollQuery, LReply->Content);
-                    LStatus = CReply::ok;
+                    for (int I = 0; I < APollQuery->Count(); I++) {
+                        Result = APollQuery->Results(I);
+
+                        if (Result->ExecStatus() != PGRES_TUPLES_OK)
+                            throw Delphi::Exception::EDBError(Result->GetErrorMessage());
+
+                        LResult << Result->GetValue(0, 0);
+
+                        const auto& Response = LResult["response"];
+
+                        if (!LResult["result"].AsBoolean())
+                            throw Delphi::Exception::EDBError(Response["error"].AsSiring().c_str());
+
+                        jmResponse.Payload << Response.ToString();
+                    }
                 } catch (Delphi::Exception::Exception &E) {
-                    ExceptionToJson(0, &E, LReply->Content);
+                    jmResponse.MessageTypeId = mtCallError;
+                    jmResponse.ErrorCode = "InternalError";
+                    jmResponse.ErrorDescription = E.what();
+
                     Log()->Error(APP_LOG_EMERG, 0, E.what());
                 }
 
-                LConnection->SendReply(LStatus, nullptr, true);
+                CJSONProtocol::Response(jmResponse, LResponse);
+
+                DebugMessage("WS Response:\n%s\n", LResponse.c_str());
+
+                LWSReply->SetPayload(LResponse);
+                LConnection->SendWebSocket(true);
             }
 
             log_debug1(APP_LOG_DEBUG_CORE, Log(), 0, _T("Query executed runtime: %.2f ms."), (double) ((clock() - start) / (double) CLOCKS_PER_SEC * 1000));
@@ -262,18 +203,13 @@ namespace Apostol {
         bool CCSService::QueryStart(CHTTPServerConnection *AConnection, const CStringList& SQL) {
             auto LQuery = GetQuery(AConnection);
 
-            if (LQuery == nullptr) {
-                Log()->Error(APP_LOG_ALERT, 0, "QueryStart: GetQuery() failed!");
-                AConnection->SendStockReply(CReply::internal_server_error);
-                return false;
-            }
+            if (LQuery == nullptr)
+                throw Delphi::Exception::Exception("QueryStart: GetQuery() failed!");
 
             LQuery->SQL() = SQL;
 
             if (LQuery->QueryStart() != POLL_QUERY_START_ERROR) {
-                // Wait query result...
                 AConnection->CloseConnection(false);
-
                 return true;
             } else {
                 delete LQuery;
@@ -283,29 +219,14 @@ namespace Apostol {
         }
         //--------------------------------------------------------------------------------------------------------------
 
-        bool CCSService::APIRun(CHTTPServerConnection *AConnection, const CString &Route, const CString &jsonString,
-                const CDataBase &DataBase) {
+        bool CCSService::DBParse(CHTTPServerConnection *AConnection, const CString &Identity, const CString &Action,
+                const CJSON &Payload) {
 
             CStringList SQL;
 
             SQL.Add(CString());
-
-            if (Route == "/login") {
-                SQL.Last().Format("SELECT * FROM api.run('%s', '%s'::jsonb);",
-                                            Route.c_str(), jsonString.IsEmpty() ? "{}" : jsonString.c_str());
-            } else if (!DataBase.Session.IsEmpty()) {
-                SQL.Last().Format("SELECT * FROM api.run('%s', '%s'::jsonb, '%s');",
-                                            Route.c_str(), jsonString.IsEmpty() ? "{}" : jsonString.c_str(), DataBase.Session.c_str());
-            } else {
-                SQL.Last().Format("SELECT * FROM api.login('%s', '%s');",
-                                            DataBase.Username.c_str(), DataBase.Password.c_str());
-
-                SQL.Add(CString());
-                SQL.Last().Format("SELECT * FROM api.run('%s', '%s'::jsonb);",
-                                            Route.c_str(), jsonString.IsEmpty() ? "{}" : jsonString.c_str());
-
-                SQL.Add("SELECT * FROM api.logout();");
-            }
+            SQL.Last().Format("SELECT * FROM ocpp.Parse('%s', '%s', '%s'::jsonb);",
+                       Identity.c_str(), Action.c_str(), Payload.ToString().c_str());
 
             return QueryStart(AConnection, SQL);
         }
@@ -417,8 +338,8 @@ namespace Apostol {
                         for (int i = 0; i < m_CPManager->Count(); i++) {
                             CJSONValue jsonPoint(jvtObject);
                             CJSONValue jsonConnection(jvtObject);
-                            CJSONValue jsonBootNotification(jvtObject);
-                            CJSONValue jsonStatusNotification(jvtObject);
+                            //CJSONValue jsonBootNotification(jvtObject);
+                            //CJSONValue jsonStatusNotification(jvtObject);
 
                             auto LPoint = m_CPManager->Points(i);
                             jsonPoint.Object().AddPair("Identity", LPoint->Identity());
@@ -430,11 +351,11 @@ namespace Apostol {
                                 jsonPoint.Object().AddPair("Connection", jsonConnection);
                             }
 
-                            LPoint->BootNotificationRequest() >> jsonBootNotification;
-                            LPoint->StatusNotificationRequest() >> jsonStatusNotification;
+                            //LPoint->BootNotificationRequest() >> jsonBootNotification;
+                            //LPoint->StatusNotificationRequest() >> jsonStatusNotification;
 
-                            jsonPoint.Object().AddPair("BootNotification", jsonBootNotification);
-                            jsonPoint.Object().AddPair("StatusNotification", jsonStatusNotification);
+                            //jsonPoint.Object().AddPair("BootNotification", jsonBootNotification);
+                            //jsonPoint.Object().AddPair("StatusNotification", jsonStatusNotification);
 
                             jsonArray.Array().Add(jsonPoint);
                         }
@@ -739,25 +660,45 @@ namespace Apostol {
             auto LWSRequest = AConnection->WSRequest();
             auto LWSReply = AConnection->WSReply();
 
-            const CString Request(LWSRequest->Payload());
-            CString Response;
+            const CString LRequest(LWSRequest->Payload());
 
             DebugMessage("[%p][%s:%d][%d] WS Request:\n%s\n", AConnection, AConnection->Socket()->Binding()->PeerIP(),
-                         AConnection->Socket()->Binding()->PeerPort(), AConnection->Socket()->Binding()->Handle(), Request.c_str());
+                         AConnection->Socket()->Binding()->PeerPort(), AConnection->Socket()->Binding()->Handle(), LRequest.c_str());
 
             try {
                 auto LPoint = m_CPManager->FindPointByConnection(AConnection);
                 if (LPoint == nullptr)
                     throw Delphi::Exception::Exception("Not found charge point by connection.");
 
-                if (LPoint->Parse(ptJSON, Request, Response)) {
-                    if (!Response.IsEmpty()) {
-                        DebugMessage("WS Response:\n%s\n", Response.c_str());
-                        LWSReply->SetPayload(Response);
-                        AConnection->SendWebSocket();
+                if (!Config()->PostgresConnect()) {
+
+                    CString LResponse;
+
+                    if (LPoint->Parse(ptJSON, LRequest, LResponse)) {
+                        if (!LResponse.IsEmpty()) {
+                            DebugMessage("WS Response:\n%s\n", LResponse.c_str());
+                            LWSReply->SetPayload(LResponse);
+                            AConnection->SendWebSocket();
+                        }
+                    } else {
+                        Log()->Error(APP_LOG_EMERG, 0, "Unknown WebSocket request: %s", LRequest.c_str());
                     }
+
                 } else {
-                    Log()->Error(APP_LOG_EMERG, 0, "Unknown WebSocket request: %s", Request.c_str());
+
+                    CJSONMessage jmRequest;
+                    CJSONProtocol::Request(LRequest, jmRequest);
+
+                    if (jmRequest.MessageTypeId == mtCall) {
+                        // Обработаем запрос в СУБД
+                        DBParse(AConnection, LPoint->Identity(), jmRequest.Action, jmRequest.Payload);
+                    } else {
+                        // Ответ от зарядной станции отправим в обработчик
+                        auto LHandler = LPoint->Messages()->FindMessageById(jmRequest.UniqueId);
+                        if (Assigned(LHandler)) {
+                            LHandler->Handler(AConnection);
+                        }
+                    }
                 }
             } catch (std::exception &e) {
                 AConnection->SendWebSocketClose();

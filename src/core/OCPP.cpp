@@ -184,18 +184,6 @@ namespace Apostol {
 
         //--------------------------------------------------------------------------------------------------------------
 
-        //[2,"255d6f24-df2b-4174-b7ab-71d8a708eaae","BootNotification",{"chargePointVendor":"EV-BOX","chargePointModel":"G4-M5320E-F4017","chargePointSerialNumber":"18210114","firmwareVersion":"P0415B0415v0.190710_U5.0.1-002","iccid":"89462036051000106630","imsi":"240075810738432"}]
-        //[3,"255d6f24-df2b-4174-b7ab-71d8a708eaae",{"status": "Accepted", "currentTime": "2019-11-12T13:25:03.015Z", "interval": 60}]
-
-        //[2,"255d6f2f-df2b-4574-b7ab-71d8cddbefaf","DataTransfer",{"vendorId":"EV-BOX","messageId":"evbConnectorsNotification","data":"[{19170129,19170129,0415,20A,B23 112-10E,B1.25.0,000000000007ACE6,5006,L1,42017100000304}]"}]
-        //[3,"255d6f2f-df2b-4574-b7ab-71d8cddbefaf",{"status": "Accepted"}]
-
-        //[2,"255d6f31-df2b-4574-b7ab-71d83b11e5ba","StatusNotification",{"connectorId":19170129,"status":"Available","errorCode":"NoError","timestamp":"2019-11-12T13:25:05Z"}]
-        //[3,"255d6f31-df2b-4574-b7ab-71d83b11e5ba",{}]
-
-        //[2,"255d6fa6-df2b-4674-b7ab-71d837baa979","Heartbeat",{}]
-        //[3,"255d6fa6-df2b-4674-b7ab-71d837baa979",{"currentTime": "2019-11-12T13:27:02.889Z"}]
-
         bool CJSONProtocol::Request(const CString &String, CJSONMessage &Message) {
             bool Result = false;
 
@@ -1050,15 +1038,6 @@ namespace Apostol {
                 Point = Get(I);
                 if (Point->Connection() == Value)
                     return Point;
-/*
-                auto Connection = Point->Connection();
-                if (Assigned(Connection)) {
-                    if (SameText(Connection->Socket()->Binding()->PeerIP(), Value->Socket()->Binding()->PeerIP())) {
-                        if (Connection->Socket()->Binding()->PeerPort() == Value->Socket()->Binding()->PeerPort())
-                            return Point;
-                    }
-                }
-*/
             }
 
             return nullptr;

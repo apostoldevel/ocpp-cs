@@ -31,12 +31,6 @@ namespace Apostol {
 
     namespace CSService {
 
-        typedef struct CDataBase {
-            CString Username;
-            CString Password;
-            CString Session;
-        } CDataBase;
-
         //--------------------------------------------------------------------------------------------------------------
 
         //-- CCSService ------------------------------------------------------------------------------------------------
@@ -48,15 +42,11 @@ namespace Apostol {
 
             CChargingPointManager *m_CPManager;
 
-            static void PQResultToJson(CPQResult *Result, CString& Json);
-
-            void QueryToJson(CPQPollQuery *Query, CString& Json);
+            static void DebugRequest(CRequest *ARequest);
+            static void DebugReply(CReply *AReply);
 
             bool QueryStart(CHTTPServerConnection *AConnection, const CStringList& SQL);
-
-            static void DebugRequest(CRequest *ARequest);
-
-            static void DebugReply(CReply *AReply);
+            bool DBParse(CHTTPServerConnection *AConnection, const CString &Identity, const CString &Action, const CJSON &Payload);
 
         protected:
 
@@ -73,9 +63,7 @@ namespace Apostol {
             void DoPostgresQueryExecuted(CPQPollQuery *APollQuery) override;
             void DoPostgresQueryException(CPQPollQuery *APollQuery, Delphi::Exception::Exception *AException) override;
 
-            static void ExceptionToJson(int ErrorCode, Delphi::Exception::Exception *AException, CString& Json);
-
-            bool APIRun(CHTTPServerConnection *AConnection, const CString &Route, const CString &jsonString, const CDataBase &DataBase);
+            static void ExceptionToJson(int ErrorCode, const std::exception &AException, CString& Json);
 
         public:
 
