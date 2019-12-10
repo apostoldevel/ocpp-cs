@@ -130,12 +130,15 @@ namespace Apostol {
         private:
 
             CString m_AllowedMethods;
+            CString m_AllowedHeaders;
 
             const CString& GetAllowedMethods(CString& AllowedMethods) const;
+            const CString& GetAllowedHeaders(CString& AllowedHeaders) const;
 
         protected:
 
             CStringList m_Methods;
+            CStringList m_Headers;
 
             virtual void CORS(CHTTPServerConnection *AConnection);
 
@@ -165,6 +168,7 @@ namespace Apostol {
             virtual void Execute(CHTTPServerConnection *AConnection) abstract;
 
             const CString& AllowedMethods() { return GetAllowedMethods(m_AllowedMethods); };
+            const CString& AllowedHeaders() { return GetAllowedHeaders(m_AllowedHeaders); };
 
 #ifdef WITH_POSTGRESQL
 

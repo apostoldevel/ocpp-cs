@@ -137,7 +137,7 @@ namespace Apostol {
         //--------------------------------------------------------------------------------------------------------------
 
         CApostolModule::CApostolModule(CModuleManager *AManager): CCollectionItem(AManager), CGlobalComponent() {
-
+            m_Headers.Add("Content-Type");
         }
         //--------------------------------------------------------------------------------------------------------------
 
@@ -157,6 +157,19 @@ namespace Apostol {
                 }
             }
             return AllowedMethods;
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
+        const CString &CApostolModule::GetAllowedHeaders(CString &AllowedHeaders) const {
+            if (AllowedHeaders.IsEmpty()) {
+                for (int i = 0; i < m_Headers.Count(); ++i) {
+                    if (AllowedHeaders.IsEmpty())
+                        AllowedHeaders = m_Headers.Strings(i);
+                    else
+                        AllowedHeaders += _T(", ") + m_Headers.Strings(i);
+                }
+            }
+            return AllowedHeaders;
         }
         //--------------------------------------------------------------------------------------------------------------
 
@@ -200,10 +213,7 @@ namespace Apostol {
             if (!Origin.IsEmpty()) {
                 LReplyHeaders.AddPair("Access-Control-Allow-Origin", Origin);
                 LReplyHeaders.AddPair("Access-Control-Allow-Methods", AllowedMethods());
-
-                const CString& ControlRequestHeaders = LRequestHeaders.Values("Access-Control-Request-Headers");
-                if (!ControlRequestHeaders.IsEmpty())
-                    LReplyHeaders.AddPair("Access-Control-Allow-Headers", ControlRequestHeaders);
+                LReplyHeaders.AddPair("Access-Control-Allow-Headers", AllowedHeaders());
             }
         }
         //--------------------------------------------------------------------------------------------------------------
@@ -260,14 +270,11 @@ namespace Apostol {
                                      COnPQPollQueryExecutedEvent &&Executed) {
             auto LQuery = GetQuery(AConnection);
 
-            if (LQuery == nullptr) {
-                Log()->Error(APP_LOG_ALERT, 0, "ExecSQL: GetQuery() failed!");
-                return false;
-            }
+            if (LQuery == nullptr)
+                throw Delphi::Exception::Exception("ExecSQL: GetQuery() failed!");
 
-            if (Executed != nullptr) {
+            if (Executed != nullptr)
                 LQuery->OnPollExecuted(static_cast<COnPQPollQueryExecutedEvent &&>(Executed));
-            }
 
             LQuery->SQL() = SQL;
 
