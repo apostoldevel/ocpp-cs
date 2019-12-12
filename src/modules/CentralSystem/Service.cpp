@@ -338,11 +338,11 @@ namespace Apostol {
                         for (int i = 0; i < m_CPManager->Count(); i++) {
                             CJSONValue jsonPoint(jvtObject);
                             CJSONValue jsonConnection(jvtObject);
-                            //CJSONValue jsonBootNotification(jvtObject);
-                            //CJSONValue jsonStatusNotification(jvtObject);
 
                             auto LPoint = m_CPManager->Points(i);
+
                             jsonPoint.Object().AddPair("Identity", LPoint->Identity());
+                            jsonPoint.Object().AddPair("Address", LPoint->Address());
 
                             if (LPoint->Connection()->Connected()) {
                                 jsonConnection.Object().AddPair("Socket", LPoint->Connection()->Socket()->Binding()->Handle());
@@ -350,12 +350,6 @@ namespace Apostol {
                                 jsonConnection.Object().AddPair("Port", LPoint->Connection()->Socket()->Binding()->PeerPort());
                                 jsonPoint.Object().AddPair("Connection", jsonConnection);
                             }
-
-                            //LPoint->BootNotificationRequest() >> jsonBootNotification;
-                            //LPoint->StatusNotificationRequest() >> jsonStatusNotification;
-
-                            //jsonPoint.Object().AddPair("BootNotification", jsonBootNotification);
-                            //jsonPoint.Object().AddPair("StatusNotification", jsonStatusNotification);
 
                             jsonArray.Array().Add(jsonPoint);
                         }
@@ -467,6 +461,7 @@ namespace Apostol {
                 if (LPoint == nullptr) {
                     LPoint = m_CPManager->Add(AConnection);
                     LPoint->Identity() = LIdentity;
+                    LPoint->Address() = LRequest->Headers.Values("x-real-ip");
                     AConnection->OnDisconnected(std::bind(&CCSService::DoPointDisconnected, this, _1));
                 } else {
                     try {
@@ -620,7 +615,7 @@ namespace Apostol {
             int i = 0;
             auto LRequest = AConnection->Request();
             auto LReply = AConnection->Reply();
-
+#ifdef _DEBUG
             DebugMessage("[%p][%s:%d][%d]", AConnection, AConnection->Socket()->Binding()->PeerIP(),
                          AConnection->Socket()->Binding()->PeerPort(), AConnection->Socket()->Binding()->Handle());
 
@@ -632,7 +627,7 @@ namespace Apostol {
             };
 
             AConnection->OnReply(OnReply);
-
+#endif
             LReply->Clear();
             LReply->ContentType = CReply::html;
 

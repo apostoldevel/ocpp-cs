@@ -721,9 +721,6 @@ namespace Apostol {
                 auto LConnection = m_Connection;
                 m_Connection = Value;
                 if (Assigned(LConnection)) {
-//                    if (LConnection->Protocol() == pWebSocket)
-//                        LConnection->SendWebSocketClose(true);
-//                    LConnection->CloseConnection(true);
                     LConnection->CheckForDisconnect();
                 }
             }
