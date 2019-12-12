@@ -1,6 +1,7 @@
 .gitignore
 /cmake-build-*
 /.idea
+/www/.idea/*
 /src/.idea/*
 /sql/.idea/*
 /sql/pass.conf

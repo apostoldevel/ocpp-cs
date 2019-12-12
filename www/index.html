@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en" xmlns="http://www.w3.org/1999/html" xmlns="http://www.w3.org/1999/html">
+  <head>
+    <!-- Required meta tags -->
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+
+    <!-- Bootstrap CSS -->
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+
+    <title>OCPP Central System Service</title>
+  </head>
+
+  <body>
+    <div id="wrapper">
+      <div class="container shadow-sm p-3 mb-5 bg-white rounded">
+        <h2>OCPP Central System Service</h2>
+        <br>
+          <div class="tab-content">
+              <div id="tab-account" class="tab-pane active">
+                  <nav class="navbar navbar-expand-lg navbar-light bg-light">
+                      <a class="navbar-brand" href="#">API</a>
+                      <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                          <span class="navbar-toggler-icon"></span>
+                      </button>
+                      <div class="collapse navbar-collapse" id="navbarNav">
+                          <ul class="nav nav-tabs mr-auto">
+                              <li class="nav-item">
+                                  <a class="nav-link" href="#tab-charge-point-list">ChargePointList</a>
+                              </li>
+                              <li class="nav-item">
+                                  <a class="nav-link" href="#tab-get-configuration">GetConfiguration</a>
+                              </li>
+                              <li class="nav-item">
+                                  <a class="nav-link" href="#tab-change-configuration">ChangeConfiguration</a>
+                              </li>
+                              <li class="nav-item">
+                                  <a class="nav-link" href="#tab-get-charge-point">GetChargePoint</a>
+                              </li>
+                              <li class="nav-item dropdown">
+                                  <a class="nav-link dropdown-toggle" href="#" id="btnSettings" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">Other</a>
+                                  <div class="dropdown-menu" aria-labelledby="other">
+                                      <a class="dropdown-item" data-toggle="tab" href="#tab-settings">Settings</a>
+                                  </div>
+                              </li>
+                          </ul>
+                          <span class="navbar-text">
+                              Charge Point
+                          </span>
+                      </div>
+                  </nav>
+                  <!-- Tab panes -->
+                  <div class="tab-content">
+                      <div id="tab-charge-point-list" class="container tab-pane active">
+                          <div id="ChargePointListRequest" class="mt-3">
+                              <small class="form-text text-muted">Wait response...</small>
+                          </div>
+                      </div>
+                      <div id="tab-get-configuration" class="container tab-pane fade">
+                          <div class="mt-3">
+                              <form onsubmit="GetConfiguration()">
+                                  <div class="form-group row">
+                                      <label for="GetConfigurationKey" class="col-sm-2 col-form-label">Key</label>
+                                      <div class="col-sm-10">
+                                          <input type="text" class="form-control" id="GetConfigurationKey" placeholder="String50">
+                                      </div>
+                                  </div>
+                                  <button id="btnGetConfiguration" type="submit" class="btn btn-primary">Execute</button>
+                              </form>
+                              <hr>
+                              <div id="GetConfigurationRequest" class="mt-3">
+                                  <small class="form-text text-muted">Press "Execute" button...</small>
+                              </div>
+                          </div>
+                      </div>
+                      <div id="tab-change-configuration" class="container tab-pane fade">
+                          <div class="mt-3">
+                              <form onsubmit="ChangeConfiguration()">
+                                  <div class="form-group row">
+                                      <label for="ChangeConfigurationKey" class="col-sm-2 col-form-label">Key</label>
+                                      <div class="col-sm-10">
+                                          <input type="text" class="form-control" id="ChangeConfigurationKey" placeholder="String50" required>
+                                      </div>
+                                  </div>
+                                  <div class="form-group row">
+                                      <label for="ChangeConfigurationValue" class="col-sm-2 col-form-label">Value</label>
+                                      <div class="col-sm-10">
+                                          <input type="text" class="form-control" id="ChangeConfigurationValue" placeholder="String500" required>
+                                      </div>
+                                  </div>
+                                  <button id="btnChangeConfiguration" type="submit" class="btn btn-primary">Execute</button>
+                              </form>
+                              <hr>
+                              <div id="ChangeConfigurationRequest">
+                                  <small class="form-text text-muted">Press "Execute" button...</small>
+                              </div>
+                          </div>
+                      </div>
+                      <div id="tab-get-charge-point" class="container tab-pane fade">
+                          <div class="mt-3">
+                              <form onsubmit="GetChargePoint()">
+                                  <div class="form-group row">
+                                      <label for="Session" class="col-sm-2 col-form-label">Session</label>
+                                      <div class="col-sm-10">
+                                          <input type="text" class="form-control" id="Session" placeholder="String40" required>
+                                      </div>
+                                  </div>
+                                  <div class="form-group row">
+                                      <label for="ChargePointId" class="col-sm-2 col-form-label">Id</label>
+                                      <div class="col-sm-10">
+                                          <input type="text" class="form-control" id="ChargePointId" placeholder="Id">
+                                      </div>
+                                  </div>
+                                  <button id="btnGetChargePoint" type="submit" class="btn btn-primary">Execute</button>
+                              </form>
+                              <hr>
+                              <div id="GetChargePointRequest">
+                                  <small class="form-text text-muted">Press "Execute" button...</small>
+                              </div>
+                          </div>
+                      </div>
+                      <div id="tab-settings" class="container tab-pane fade">
+                          <div class="mt-3">
+                              <form>
+                                  <div class="form-row">
+                                      <div class="form-group col-md-6">
+                                          <label for="apiURL">API</label>
+                                          <input type="text" class="form-control" id="apiURL" aria-describedby="apiURLHelp" placeholder="Default: http://ocpp.epcelectro.ru/api/v1" value="http://ocpp.epcelectro.ru/api/v1" required>
+                                          <small id="serverHelp" class="form-text text-muted">API URL</small>
+                                      </div>
+                                      <div class="form-group col-md-6">
+                                          <label for="ChargePoint">Identity</label>
+                                          <input type="text" class="form-control" id="ChargePoint" value="EVB-P18210114">
+                                          <small id="ChargePointHelp" class="form-text text-muted">Charge Point Identity</small>
+                                      </div>
+                                  </div>
+                              </form>
+                          </div>
+                      </div>
+                  </div>
+              </div>
+          </div>
+      </div>
+    </div>
+
+    <div id="footer">
+      <div class="container">
+        <hr>
+        <p class="text-center small" >OCPP Central System Service</p>
+      </div>
+    </div>
+
+    <!-- Optional JavaScript -->
+    <!-- jQuery first, then Popper.js, then Bootstrap JS -->
+    <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js" integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js" integrity="sha384-UO2eT0CpHqdSJQ6hJty5KVphtPhzWj9WO1clHTMGa3JDZwrnQq4sF86dIHNDz0W1" crossorigin="anonymous"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js" integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM" crossorigin="anonymous"></script>
+    <script>
+      /**
+       * @return {string}
+       */
+      async function AsyncFetch (url, body, method = "GET", headers = {}) {
+          // await response of fetch call
+          let response = await fetch(url, {
+              method: method,
+              headers: headers,
+              body: body,
+              mode: "cors",
+              cache: "no-store"
+          });
+          // only proceed once promise is resolved
+          // only proceed once second promise is resolved
+          let data = await response.json();
+          const result = '<html lang="ru"><body><pre><code>' + JSON.stringify(data, undefined, 4) + '</code></pre></body></html>';
+          return result;
+      }
+
+      function empty(e) {
+        switch (e) {
+          case "":
+          case 0:
+          case "0":
+          case false:
+          case null:
+          case undefined:
+            return true;
+          default:
+            return false;
+        }
+      }
+
+      // Select tabs
+      $('.nav-tabs a[href="#tab-charge-point-list"]').click(function(){
+          ChargePointList();
+          $(this).tab('show');
+      });
+
+      // Select tabs
+      $('.nav-tabs a[href="#tab-get-configuration"]').click(function(){
+          $(this).tab('show');
+      });
+
+      // Select tabs
+      $('.nav-tabs a[href="#tab-change-configuration"]').click(function(){
+          $(this).tab('show');
+      });
+
+      // Select tabs
+      $('.nav-tabs a[href="#tab-get-charge-point"]').click(function(){
+          $(this).tab('show');
+      });
+
+      function ChargePointList() {
+          const url = $("input[id='apiURL']").val();
+
+          AsyncFetch(url + '/ChargePointList')
+              .then(result => $("#ChargePointListRequest").html(result))
+              .catch(reason => console.log(reason.message));
+      }
+
+      function GetConfiguration() {
+          const url = $("input[id='apiURL']").val();
+          const point = $("input[id='ChargePoint']").val();
+          const key = $("input[id='GetConfigurationKey']").val();
+
+          let route = '/ChargePoint/' + point + '/GetConfiguration';
+
+          if (!empty(key))
+              route = route + '?key=' + key;
+
+          let execute = $("button[id='btnGetConfiguration']");
+          execute.prop('disabled', true);
+
+          AsyncFetch(url + route)
+              .then(function(result) {
+                  $("#GetConfigurationRequest").html(result);
+                  execute.prop('disabled', false);
+              })
+              .catch(reason => console.log(reason.message));
+      }
+
+      function ChangeConfiguration() {
+          const url = $("input[id='apiURL']").val();
+          const point = $("input[id='ChargePoint']").val();
+          const key = $("input[id='ChangeConfigurationKey']").val();
+          const value = $("input[id='ChangeConfigurationValue']").val();
+
+          let route = '/ChargePoint/' + point + '/ChangeConfiguration?key=' + key + '&value=' + value;
+
+          let execute = $("button[id='btnChangeConfiguration']");
+          execute.prop('disabled', true);
+
+          AsyncFetch(url + route, null, 'POST')
+              .then(function(result) {
+                  $("#ChangeConfigurationRequest").html(result);
+                  execute.prop('disabled', false);
+              })
+              .catch(reason => console.log(reason.message));
+      }
+
+      function GetChargePoint() {
+          const url = 'http://api.epcelectro.ru/api/v1';
+          const Session = $("input[id='Session']").val();
+          const id = $("input[id='ChargePointId']").val();
+
+          let route = '/charge_point';
+          let body = '{}';
+
+          if (!empty(id)) {
+              route += '/get';
+              body = '{"id": "' + id + '"}';
+          } else {
+              route += '/lst';
+          }
+
+          let execute = $("button[id='btnGetChargePoint']");
+          execute.prop('disabled', true);
+
+          AsyncFetch(url + route, body, 'POST', {'Authorization': 'Session ' + Session, 'Content-Type': 'application/json'})
+              .then(function(result) {
+                  $("#GetChargePointRequest").html(result);
+                  execute.prop('disabled', false);
+              })
+              .catch(reason => console.log(reason.message));
+      }
+
+      $(document).ready(function(){
+          ChargePointList();
+      });
+    </script>
+
+  </body>
+</html>
