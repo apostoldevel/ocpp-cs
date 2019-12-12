@@ -1,6 +1,15 @@
 cmake_minimum_required(VERSION 3.13)
 project(apostol-ocpp)
 
+set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -static-libgcc -static-libstdc++")
+
+set(PROJECT_NAME "ocpp")
+set(PROJECT_DESCRIPTION "OCPP Central System Service")
+
+message(STATUS "Project name: ${PROJECT_NAME}")
+message(STATUS "Project description: ${PROJECT_DESCRIPTION}")
+
 # Settings
 # ----------------------------------------------------------------------------------------------------------------------
 set(INSTALL_AS_ROOT  ON  CACHE BOOL "Install as root")
@@ -17,15 +26,6 @@ else()
 endif()
 
 add_compile_options("$<$<CONFIG:DEBUG>:-D_DEBUG>")
-
-set(CMAKE_CXX_STANDARD 14)
-set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -static-libgcc -static-libstdc++")
-
-set(PROJECT_NAME "ocpp")
-set(PROJECT_DESCRIPTION "OCPP Central System Service")
-
-message(STATUS "Project name: ${PROJECT_NAME}")
-message(STATUS "Project description: ${PROJECT_DESCRIPTION}")
 
 set(CORE_LIB_NAME apostol-core)
 set(MODULES_LIB_NAME apostol-modules)
