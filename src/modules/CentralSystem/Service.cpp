@@ -81,7 +81,7 @@ namespace Apostol {
         //--------------------------------------------------------------------------------------------------------------
 
         void CCSService::DebugRequest(CRequest *ARequest) {
-            DebugMessage("\n[%p] Request:\n%s %s HTTP/%d.%d\n", ARequest, ARequest->Method.c_str(), ARequest->Uri.c_str(), ARequest->VMajor, ARequest->VMinor);
+            DebugMessage("[%p] Request:\n%s %s HTTP/%d.%d\n", ARequest, ARequest->Method.c_str(), ARequest->Uri.c_str(), ARequest->VMajor, ARequest->VMinor);
 
             for (int i = 0; i < ARequest->Headers.Count(); i++)
                 DebugMessage("%s: %s\n", ARequest->Headers[i].Name.c_str(), ARequest->Headers[i].Value.c_str());
@@ -92,20 +92,32 @@ namespace Apostol {
         //--------------------------------------------------------------------------------------------------------------
 
         void CCSService::DebugReply(CReply *AReply) {
-            TCHAR ch;
-            CString String;
-            CMemoryStream Stream;
+            DebugMessage("[%p] Reply:\nHTTP/%d.%d %d %s\n", AReply, AReply->VMajor, AReply->VMinor, AReply->Status, AReply->StatusText.c_str());
 
-            AReply->ToBuffers(&Stream);
-            Stream.Position(0);
+            for (int i = 0; i < AReply->Headers.Count(); i++)
+                DebugMessage("%s: %s\n", AReply->Headers[i].Name.c_str(), AReply->Headers[i].Value.c_str());
 
-            for (size_t i = 0; i < Stream.Size(); ++i) {
-                Stream.Read(&ch, 1);
-                if (ch != '\r')
-                    String.Append(ch);
-            }
+            if (!AReply->Content.IsEmpty())
+                DebugMessage("\n%s\n", AReply->Content.c_str());
+        }
+        //--------------------------------------------------------------------------------------------------------------
 
-            DebugMessage("\n[%p] Reply:\n%s\n", AReply, String.c_str());
+        void CCSService::DebugConnection(CHTTPServerConnection *AConnection) {
+            DebugMessage("\n[%p] [%s:%d] [%d] ", AConnection, AConnection->Socket()->Binding()->PeerIP(),
+                         AConnection->Socket()->Binding()->PeerPort(), AConnection->Socket()->Binding()->Handle());
+
+            DebugRequest(AConnection->Request());
+
+            static auto OnReply = [](CObject *Sender) {
+                auto LConnection = dynamic_cast<CHTTPServerConnection *> (Sender);
+
+                DebugMessage("\n[%p] [%s:%d] [%d] ", LConnection, LConnection->Socket()->Binding()->PeerIP(),
+                             LConnection->Socket()->Binding()->PeerPort(), LConnection->Socket()->Binding()->Handle());
+
+                DebugReply(LConnection->Reply());
+            };
+
+            AConnection->OnReply(OnReply);
         }
         //--------------------------------------------------------------------------------------------------------------
 
@@ -189,9 +201,10 @@ namespace Apostol {
                 }
 
                 CJSONProtocol::Response(jmResponse, LResponse);
-
-                DebugMessage("WS Response:\n%s\n", LResponse.c_str());
-
+#ifdef _DEBUG
+                DebugMessage("\n[%p] [%s:%d] [%d] [WebSocket] Response:\n%s\n", LConnection, LConnection->Socket()->Binding()->PeerIP(),
+                             LConnection->Socket()->Binding()->PeerPort(), LConnection->Socket()->Binding()->Handle(), LResponse.c_str());
+#endif
                 LWSReply->SetPayload(LResponse);
                 LConnection->SendWebSocket(true);
             }
@@ -616,17 +629,7 @@ namespace Apostol {
             auto LRequest = AConnection->Request();
             auto LReply = AConnection->Reply();
 #ifdef _DEBUG
-            DebugMessage("[%p][%s:%d][%d]", AConnection, AConnection->Socket()->Binding()->PeerIP(),
-                         AConnection->Socket()->Binding()->PeerPort(), AConnection->Socket()->Binding()->Handle());
-
-            DebugRequest(AConnection->Request());
-
-            static auto OnReply = [](CObject *Sender) {
-                auto LConnection = dynamic_cast<CHTTPServerConnection *> (Sender);
-                DebugReply(LConnection->Reply());
-            };
-
-            AConnection->OnReply(OnReply);
+            DebugConnection(AConnection);
 #endif
             LReply->Clear();
             LReply->ContentType = CReply::html;
@@ -656,10 +659,10 @@ namespace Apostol {
             auto LWSReply = AConnection->WSReply();
 
             const CString LRequest(LWSRequest->Payload());
-
-            DebugMessage("[%p][%s:%d][%d] WS Request:\n%s\n", AConnection, AConnection->Socket()->Binding()->PeerIP(),
+#ifdef _DEBUG
+            DebugMessage("\n[%p] [%s:%d] [%d] [WebSocket] Request:\n%s\n", AConnection, AConnection->Socket()->Binding()->PeerIP(),
                          AConnection->Socket()->Binding()->PeerPort(), AConnection->Socket()->Binding()->Handle(), LRequest.c_str());
-
+#endif
             try {
                 auto LPoint = m_CPManager->FindPointByConnection(AConnection);
                 if (LPoint == nullptr)
@@ -671,7 +674,10 @@ namespace Apostol {
 
                     if (LPoint->Parse(ptJSON, LRequest, LResponse)) {
                         if (!LResponse.IsEmpty()) {
-                            DebugMessage("WS Response:\n%s\n", LResponse.c_str());
+#ifdef _DEBUG
+                            DebugMessage("\n[%p] [%s:%d] [%d] [WebSocket] Response:\n%s\n", AConnection, AConnection->Socket()->Binding()->PeerIP(),
+                                         AConnection->Socket()->Binding()->PeerPort(), AConnection->Socket()->Binding()->Handle(), LResponse.c_str());
+#endif
                             LWSReply->SetPayload(LResponse);
                             AConnection->SendWebSocket();
                         }
