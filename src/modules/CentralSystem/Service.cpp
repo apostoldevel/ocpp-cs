@@ -626,6 +626,7 @@ namespace Apostol {
 
         void CCSService::DoHTTP(CHTTPServerConnection *AConnection) {
             int i = 0;
+
             auto LRequest = AConnection->Request();
             auto LReply = AConnection->Reply();
 #ifdef _DEBUG
