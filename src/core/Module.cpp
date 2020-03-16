@@ -42,9 +42,6 @@ namespace Apostol {
         }
         //--------------------------------------------------------------------------------------------------------------
 
-//      A0000-P0000-O0000-S0000-T0000-O0000-L00000
-//      012345678901234567890123456789012345678901
-//      0         1         2         3         4
         CString GetUID(unsigned int len) {
             CString S(len, ' ');
 
@@ -52,6 +49,17 @@ namespace Apostol {
                 unsigned char rc = random_char();
                 ByteToHexStr(S.Data() + i * 2 * sizeof(unsigned char), S.Size(), &rc, 1);
             }
+
+            return S;
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
+//      A0000-P0000-O0000-S0000-T0000-O0000-L00000
+//      012345678901234567890123456789012345678901
+//      0         1         2         3         4
+        CString ApostolUID() {
+
+            CString S(GetUID(APOSTOL_MODULE_UID_LENGTH));
 
             S[ 0] = 'A';
             S[ 5] = '-';
@@ -77,7 +85,7 @@ namespace Apostol {
         //--------------------------------------------------------------------------------------------------------------
 
         CJob::CJob(CCollection *ACCollection) : CCollectionItem(ACCollection) {
-            m_JobId = GetUID(APOSTOL_MODULE_UID_LENGTH);
+            m_JobId = ApostolUID();
             m_PollQuery = nullptr;
         }
 
@@ -232,12 +240,12 @@ namespace Apostol {
                         LFields.Add(LResult->fName(I));
                     }
 
-                    AResult.Add(TList<CStringList>());
+                    AResult.Add(TList<CStringPairs>());
                     for (int Row = 0; Row < LResult->nTuples(); ++Row) {
-                        AResult[i].Add(CStringList());
+                        AResult[i].Add(CStringPairs());
                         for (int Col = 0; Col < LResult->nFields(); ++Col) {
                             if (LResult->GetIsNull(Row, Col)) {
-                                AResult[i].Last().AddPair(LFields[Col].c_str(), "<null>");
+                                AResult[i].Last().AddPair(LFields[Col].c_str(), "");
                             } else {
                                 if (LResult->fFormat(Col) == 0) {
                                     AResult[i].Last().AddPair(LFields[Col].c_str(), LResult->GetValue(Row, Col));
@@ -267,14 +275,18 @@ namespace Apostol {
         //--------------------------------------------------------------------------------------------------------------
 
         bool CApostolModule::ExecSQL(CPollConnection *AConnection, const CStringList &SQL,
-                                     COnPQPollQueryExecutedEvent &&Executed) {
+                COnPQPollQueryExecutedEvent &&OnExecuted, COnPQPollQueryExceptionEvent &&OnException) {
+
             auto LQuery = GetQuery(AConnection);
 
             if (LQuery == nullptr)
                 throw Delphi::Exception::Exception("ExecSQL: GetQuery() failed!");
 
-            if (Executed != nullptr)
-                LQuery->OnPollExecuted(static_cast<COnPQPollQueryExecutedEvent &&>(Executed));
+            if (OnExecuted != nullptr)
+                LQuery->OnPollExecuted(static_cast<COnPQPollQueryExecutedEvent &&>(OnExecuted));
+
+            if (OnException != nullptr)
+                LQuery->OnException(static_cast<COnPQPollQueryExceptionEvent &&>(OnException));
 
             LQuery->SQL() = SQL;
 
