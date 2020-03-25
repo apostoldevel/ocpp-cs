@@ -285,6 +285,8 @@ namespace Apostol {
             CString m_sAccessLog;
             CString m_sPostgresLog;
 
+            CString m_sAPIPassphrase;
+
             CStringList m_LogFiles;
             CStringList m_PostgresConnInfo;
 
@@ -314,6 +316,8 @@ namespace Apostol {
             void SetErrorLog(LPCTSTR AValue);
             void SetAccessLog(LPCTSTR AValue);
             void SetPostgresLog(LPCTSTR AValue);
+
+            void SetAPIPassphrase(LPCTSTR AValue);
 
             bool CheckLogFiles();
 
@@ -422,6 +426,10 @@ namespace Apostol {
             const CString& DocRoot() const { return m_sDocRoot; };
             void DocRoot(const CString& AValue) { SetDocRoot(AValue.c_str()); };
             void DocRoot(LPCTSTR AValue) { SetDocRoot(AValue); };
+
+            const CString& APIPassphrase() const { return m_sAPIPassphrase; };
+            void APIPassphrase(const CString& AValue) { SetAPIPassphrase(AValue.c_str()); };
+            void APIPassphrase(LPCTSTR AValue) { SetAPIPassphrase(AValue); };
 
             CStringList& LogFiles() { return m_LogFiles; };
             const CStringList& LogFiles() const { return m_LogFiles; };

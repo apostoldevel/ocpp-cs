@@ -58,7 +58,7 @@ namespace Apostol {
 
         CCSService::CCSService(CModuleManager *AManager) : CApostolModule(AManager) {
             m_CPManager = new CChargingPointManager();
-            InitMethods();
+            m_Headers.Add("Authorization");
         }
         //--------------------------------------------------------------------------------------------------------------
 
@@ -540,153 +540,176 @@ namespace Apostol {
 
                 if (LVersion == "v1") {
 
+                    LReply->ContentType = CReply::json;
+
                     const CString &LContentType = LRequest->Headers.Values("content-type");
                     if (!LContentType.IsEmpty() && LRequest->ContentLength == 0) {
                         AConnection->SendStockReply(CReply::no_content);
                         return;
                     }
 
-                    LReply->ContentType = CReply::json;
+                    const auto &LAuthorization = LRequest->Headers.Values(_T("authorization"));
+                    if (LAuthorization.IsEmpty()) {
+                        AConnection->SendStockReply(CReply::unauthorized);
+                        return;
+                    }
 
-                    if (LCommand == "ChargePoint") {
+                    try {
+                        CAuthorization Authorization(LAuthorization);
 
-                        if (LUri.Count() < 5) {
-                            AConnection->SendStockReply(CReply::not_found);
+                        if (Authorization.Username != "ocpp" || Authorization.Password != Config()->APIPassphrase()) {
+                            AConnection->SendStockReply(CReply::unauthorized);
                             return;
                         }
 
-                        const auto& LIdentity = LUri[3];
-                        const auto& LAction = LUri[4];
+                        if (LCommand == "ChargePoint") {
 
-                        auto LPoint = m_CPManager->FindPointByIdentity(LIdentity);
-
-                        if (LPoint == nullptr) {
-                            LReply->Content.Format(R"({"error": {"code": %u, "message": "%s"}})", 300, "Charge point not found.");
-                            AConnection->SendReply(CReply::ok);
-                            return;
-                        }
-
-                        auto LConnection = LPoint->Connection();
-                        if (LConnection == nullptr) {
-                            LReply->Content.Format(R"({"error": {"code": %u, "message": "%s"}})", 301, "Charge point offline.");
-                            AConnection->SendReply(CReply::ok);
-                            return;
-                        }
-
-                        if (!LConnection->Connected()) {
-                            LReply->Content.Format(R"({"error": {"code": %u, "message": "%s"}})", 302, "Charge point not connected.");
-                            AConnection->SendReply(CReply::ok);
-                            return;
-                        }
-
-                        if (LConnection->Protocol() != pWebSocket) {
-                            LReply->Content.Format(R"({"error": {"code": %u, "message": "%s"}})", 303, "Incorrect charge point protocol version.");
-                            AConnection->SendReply(CReply::ok);
-                            return;
-                        }
-
-                        auto OnRequest = [AConnection](CMessageHandler *AHandler, CHTTPServerConnection *AWSConnection) {
-                            auto LWSRequest = AWSConnection->WSRequest();
-                            const CString LRequest(LWSRequest->Payload());
-
-                            CJSONMessage LMessage;
-                            CJSONProtocol::Request(LRequest, LMessage);
-
-                            try {
-                                auto LReply = AConnection->Reply();
-                                LReply->Content = LMessage.Payload.ToString();
-                                AConnection->SendReply(CReply::ok, nullptr, true);
-                            } catch (std::exception &e) {
-                                Log()->Error(APP_LOG_EMERG, 0, e.what());
+                            if (LUri.Count() < 5) {
+                                AConnection->SendStockReply(CReply::not_found);
+                                return;
                             }
 
-                            AWSConnection->ConnectionStatus(csReplySent);
-                        };
+                            const auto &LIdentity = LUri[3];
+                            const auto &LAction = LUri[4];
 
-                        if (LAction == "ChangeConfiguration") {
+                            auto LPoint = m_CPManager->FindPointByIdentity(LIdentity);
 
-                            CJSON LPayload(jvtObject);
-
-                            if (LContentType == "application/json") {
-
-                                LPayload << LRequest->Content;
-
-                            } else {
-                                const CString &LKey = LRequest->Params["key"];
-                                const CString &LValue = LRequest->Params["value"];
-
-                                if (LKey.IsEmpty()) {
-                                    AConnection->SendStockReply(CReply::bad_request);
-                                    return;
-                                }
-
-                                if (LValue.IsEmpty()) {
-                                    AConnection->SendStockReply(CReply::bad_request);
-                                    return;
-                                }
-
-                                LPayload.Object().AddPair("key", LKey);
-                                LPayload.Object().AddPair("value", LValue);
+                            if (LPoint == nullptr) {
+                                LReply->Content.Format(R"({"error": {"code": %u, "message": "%s"}})", 300,
+                                                       "Charge point not found.");
+                                AConnection->SendReply(CReply::ok);
+                                return;
                             }
 
-                            LPoint->Messages()->Add(OnRequest, LAction, LPayload);
-
-                            return;
-
-                        } else if (LAction == "RemoteStartTransaction") {
-
-                            CJSON LPayload(jvtObject);
-
-                            if (LContentType == "application/json") {
-
-                                LPayload << LRequest->Content;
-
-                            } else {
-                                const CString &LConnectorId = LRequest->Params["connectorId"];
-                                const CString &LIdTag = LRequest->Params["idTag"];
-
-                                if (LConnectorId.IsEmpty()) {
-                                    AConnection->SendStockReply(CReply::bad_request);
-                                    return;
-                                }
-
-                                if (LIdTag.IsEmpty()) {
-                                    AConnection->SendStockReply(CReply::bad_request);
-                                    return;
-                                }
-
-                                LPayload.Object().AddPair("connectorId", LConnectorId);
-                                LPayload.Object().AddPair("idTag", LIdTag);
+                            auto LConnection = LPoint->Connection();
+                            if (LConnection == nullptr) {
+                                LReply->Content.Format(R"({"error": {"code": %u, "message": "%s"}})", 301,
+                                                       "Charge point offline.");
+                                AConnection->SendReply(CReply::ok);
+                                return;
                             }
 
-                            LPoint->Messages()->Add(OnRequest, LAction, LPayload);
-
-                            return;
-
-                        } else if (LAction == "RemoteStopTransaction") {
-
-                            CJSON LPayload(jvtObject);
-
-                            if (LContentType == "application/json") {
-
-                                LPayload << LRequest->Content;
-
-                            } else {
-                                const CString &LTransactionId = LRequest->Params["transactionId"];
-
-                                if (LTransactionId.IsEmpty()) {
-                                    AConnection->SendStockReply(CReply::bad_request);
-                                    return;
-                                }
-
-                                LPayload.Object().AddPair("transactionId", LTransactionId);
+                            if (!LConnection->Connected()) {
+                                LReply->Content.Format(R"({"error": {"code": %u, "message": "%s"}})", 302,
+                                                       "Charge point not connected.");
+                                AConnection->SendReply(CReply::ok);
+                                return;
                             }
 
-                            LPoint->Messages()->Add(OnRequest, LAction, LPayload);
+                            if (LConnection->Protocol() != pWebSocket) {
+                                LReply->Content.Format(R"({"error": {"code": %u, "message": "%s"}})", 303,
+                                                       "Incorrect charge point protocol version.");
+                                AConnection->SendReply(CReply::ok);
+                                return;
+                            }
 
-                            return;
+                            auto OnRequest = [AConnection](CMessageHandler *AHandler,
+                                                           CHTTPServerConnection *AWSConnection) {
+                                auto LWSRequest = AWSConnection->WSRequest();
+                                const CString LRequest(LWSRequest->Payload());
 
+                                CJSONMessage LMessage;
+                                CJSONProtocol::Request(LRequest, LMessage);
+
+                                try {
+                                    auto LReply = AConnection->Reply();
+                                    LReply->Content = LMessage.Payload.ToString();
+                                    AConnection->SendReply(CReply::ok, nullptr, true);
+                                } catch (std::exception &e) {
+                                    Log()->Error(APP_LOG_EMERG, 0, e.what());
+                                }
+
+                                AWSConnection->ConnectionStatus(csReplySent);
+                            };
+
+                            if (LAction == "ChangeConfiguration") {
+
+                                CJSON LPayload(jvtObject);
+
+                                if (LContentType == "application/json") {
+
+                                    LPayload << LRequest->Content;
+
+                                } else {
+                                    const CString &LKey = LRequest->Params["key"];
+                                    const CString &LValue = LRequest->Params["value"];
+
+                                    if (LKey.IsEmpty()) {
+                                        AConnection->SendStockReply(CReply::bad_request);
+                                        return;
+                                    }
+
+                                    if (LValue.IsEmpty()) {
+                                        AConnection->SendStockReply(CReply::bad_request);
+                                        return;
+                                    }
+
+                                    LPayload.Object().AddPair("key", LKey);
+                                    LPayload.Object().AddPair("value", LValue);
+                                }
+
+                                LPoint->Messages()->Add(OnRequest, LAction, LPayload);
+
+                                return;
+
+                            } else if (LAction == "RemoteStartTransaction") {
+
+                                CJSON LPayload(jvtObject);
+
+                                if (LContentType == "application/json") {
+
+                                    LPayload << LRequest->Content;
+
+                                } else {
+                                    const CString &LConnectorId = LRequest->Params["connectorId"];
+                                    const CString &LIdTag = LRequest->Params["idTag"];
+
+                                    if (LConnectorId.IsEmpty()) {
+                                        AConnection->SendStockReply(CReply::bad_request);
+                                        return;
+                                    }
+
+                                    if (LIdTag.IsEmpty()) {
+                                        AConnection->SendStockReply(CReply::bad_request);
+                                        return;
+                                    }
+
+                                    LPayload.Object().AddPair("connectorId", LConnectorId);
+                                    LPayload.Object().AddPair("idTag", LIdTag);
+                                }
+
+                                LPoint->Messages()->Add(OnRequest, LAction, LPayload);
+
+                                return;
+
+                            } else if (LAction == "RemoteStopTransaction") {
+
+                                CJSON LPayload(jvtObject);
+
+                                if (LContentType == "application/json") {
+
+                                    LPayload << LRequest->Content;
+
+                                } else {
+                                    const CString &LTransactionId = LRequest->Params["transactionId"];
+
+                                    if (LTransactionId.IsEmpty()) {
+                                        AConnection->SendStockReply(CReply::bad_request);
+                                        return;
+                                    }
+
+                                    LPayload.Object().AddPair("transactionId", LTransactionId);
+                                }
+
+                                LPoint->Messages()->Add(OnRequest, LAction, LPayload);
+
+                                return;
+
+                            }
                         }
+                    } catch (Delphi::Exception::Exception &E) {
+                        AConnection->SendStockReply(CReply::bad_request);
+                        Log()->Error(APP_LOG_EMERG, 0, E.what());
                     }
                 }
 

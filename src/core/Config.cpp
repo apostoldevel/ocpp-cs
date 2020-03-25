@@ -367,6 +367,13 @@ namespace Apostol {
         }
         //--------------------------------------------------------------------------------------------------------------
 
+        void CConfig::SetAPIPassphrase(LPCTSTR AValue) {
+            if (m_sAPIPassphrase != AValue) {
+                m_sAPIPassphrase = AValue;
+            }
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
         void CConfig::SetDefault() {
             m_uErrorCount = 0;
 
@@ -384,6 +391,8 @@ namespace Apostol {
 
             m_nPostgresPollMin = 5;
             m_nPostgresPollMax = 10;
+
+            m_sAPIPassphrase = "ocpp";
 
             SetUser(m_sUser.empty() ? APP_DEFAULT_USER : m_sUser.c_str());
             SetGroup(m_sGroup.empty() ? APP_DEFAULT_GROUP : m_sGroup.c_str());
@@ -438,6 +447,8 @@ namespace Apostol {
 
             Add(new CConfigCommand(_T("postgres/poll"), _T("min"), &m_nPostgresPollMin));
             Add(new CConfigCommand(_T("postgres/poll"), _T("max"), &m_nPostgresPollMax));
+
+            Add(new CConfigCommand(_T("api"), _T("passphrase"), m_sAPIPassphrase.c_str(), std::bind(&CConfig::SetAPIPassphrase, this, _1)));
         }
         //--------------------------------------------------------------------------------------------------------------
 

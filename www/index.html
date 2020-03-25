@@ -179,12 +179,17 @@
                           <div class="mt-3">
                               <form>
                                   <div class="form-row">
-                                      <div class="form-group col-md-6">
+                                      <div class="form-group col-md-4">
                                           <label for="apiURL">API</label>
                                           <input type="text" class="form-control" id="apiURL" aria-describedby="apiURLHelp" placeholder="Default: http://ocpp.epcelectro.ru/api/v1" value="http://ocpp.epcelectro.ru/api/v1" required>
                                           <small id="serverHelp" class="form-text text-muted">API URL</small>
                                       </div>
-                                      <div class="form-group col-md-6">
+                                      <div class="form-group col-md-4">
+                                          <label for="APIPassphrase">Passphrase</label>
+                                          <input type="text" class="form-control" id="APIPassphrase" value="">
+                                          <small id="APIPassphraseHelp" class="form-text text-muted">API Passphrase for POST</small>
+                                      </div>
+                                      <div class="form-group col-md-4">
                                           <label for="ChargePoint">Identity</label>
                                           <input type="text" class="form-control" id="ChargePoint" value="EVB-P18240308">
                                           <small id="ChargePointHelp" class="form-text text-muted">Charge Point Identity</small>
@@ -224,8 +229,7 @@
               mode: "cors",
               cache: "no-store"
           });
-          // only proceed once promise is resolved
-          // only proceed once second promise is resolved
+
           let data = await response.json();
           const result = '<html lang="ru"><body><pre><code>' + JSON.stringify(data, undefined, 4) + '</code></pre></body></html>';
           return result;
@@ -288,6 +292,7 @@
           const url = $("input[id='apiURL']").val();
           const point = $("input[id='ChargePoint']").val();
           const key = $("input[id='GetConfigurationKey']").val();
+          const Request = $("#GetConfigurationRequest");
 
           let route = '/ChargePoint/' + point + '/GetConfiguration';
 
@@ -299,37 +304,56 @@
 
           AsyncFetch(url + route)
               .then(function(result) {
-                  $("#GetConfigurationRequest").html(result);
+                  Request.html(result);
                   execute.prop('disabled', false);
               })
-              .catch(reason => console.log(reason.message));
+              .catch((e) => {
+                  Request.html(e.message);
+                  execute.prop('disabled', false);
+              });
       }
 
       function ChangeConfiguration() {
           const url = $("input[id='apiURL']").val();
+          const passphrase = $("input[id='APIPassphrase']").val();
           const point = $("input[id='ChargePoint']").val();
           const key = $("input[id='ChangeConfigurationKey']").val();
           const value = $("input[id='ChangeConfigurationValue']").val();
+          const Request = $("#ChangeConfigurationRequest");
 
-          let route = '/ChargePoint/' + point + '/ChangeConfiguration?key=' + key + '&value=' + value;
+          const Basic = 'Basic ' + window.btoa('ocpp/' + passphrase);
+
+          let route = '/ChargePoint/' + point + '/ChangeConfiguration';
+
+          let body = {
+              key: key,
+              value: value
+          };
 
           let execute = $("button[id='btnChangeConfiguration']");
           execute.prop('disabled', true);
 
-          AsyncFetch(url + route, null, 'POST')
+          AsyncFetch(url + route, JSON.stringify(body), 'POST', {'Authorization': Basic, 'Content-Type': 'application/json'})
               .then(function(result) {
-                  $("#ChangeConfigurationRequest").html(result);
+                  Request.html(result);
                   execute.prop('disabled', false);
               })
-              .catch(reason => console.log(reason.message));
+              .catch((e) => {
+                  Request.html(e.message);
+                  execute.prop('disabled', false);
+              });
       }
 
       function RemoteStartTransaction() {
           const url = $("input[id='apiURL']").val();
+          const passphrase = $("input[id='APIPassphrase']").val();
           const point = $("input[id='ChargePoint']").val();
+          const Request = $("#RemoteStartTransactionRequest");
 
           const connectorId = $("input[id='RemoteStartTransactionConnectorId']").val();
           const idTag = $("input[id='RemoteStartTransactionIdTag']").val();
+
+          const Basic = 'Basic ' + window.btoa('ocpp/' + passphrase);
 
           let route = '/ChargePoint/' + point + '/RemoteStartTransaction';
 
@@ -341,19 +365,26 @@
           let execute = $("button[id='btnRemoteStartTransaction']");
           execute.prop('disabled', true);
 
-          AsyncFetch(url + route, body, 'POST', {'Content-Type': 'application/json'})
+          AsyncFetch(url + route, JSON.stringify(body), 'POST', {'Authorization': Basic, 'Content-Type': 'application/json'})
               .then(function(result) {
-                  $("#RemoteStartTransactionRequest").html(result);
+                  Request.html(result);
                   execute.prop('disabled', false);
               })
-              .catch(reason => console.log(reason.message));
+              .catch((e) => {
+                  Request.html(e.message);
+                  execute.prop('disabled', false);
+              });
       }
 
       function RemoteStopTransaction() {
           const url = $("input[id='apiURL']").val();
+          const passphrase = $("input[id='APIPassphrase']").val();
           const point = $("input[id='ChargePoint']").val();
+          const Request = $("#RemoteStopTransactionRequest");
 
           const transactionId = $("input[id='RemoteStopTransactionTransactionId']").val();
+
+          const Basic = 'Basic ' + window.btoa('ocpp/' + passphrase);
 
           let route = '/ChargePoint/' + point + '/RemoteStopTransaction';
 
@@ -364,18 +395,22 @@
           let execute = $("button[id='btnRemoteStopTransaction']");
           execute.prop('disabled', true);
 
-          AsyncFetch(url + route, JSON.stringify(body), 'POST', {'Content-Type': 'application/json'})
+          AsyncFetch(url + route, JSON.stringify(body), 'POST', {'Authorization': Basic, 'Content-Type': 'application/json'})
               .then(function(result) {
-                  $("#RemoteStopTransactionRequest").html(result);
+                  Request.html(result);
                   execute.prop('disabled', false);
               })
-              .catch(reason => console.log(reason.message));
+              .catch((e) => {
+                  Request.html(e.message);
+                  execute.prop('disabled', false);
+              });
       }
 
       function GetChargePoint() {
           const url = 'http://api.epcelectro.ru/api/v1';
           const Session = $("input[id='Session']").val();
           const id = $("input[id='ChargePointId']").val();
+          const Request = $("#GetChargePointRequest");
 
           let route = '/charge_point';
           let body = {};
@@ -392,10 +427,13 @@
 
           AsyncFetch(url + route, JSON.stringify(body), 'POST', {'Authorization': 'Session ' + Session, 'Content-Type': 'application/json'})
               .then(function(result) {
-                  $("#GetChargePointRequest").html(result);
+                  Request.html(result);
                   execute.prop('disabled', false);
               })
-              .catch(reason => console.log(reason.message));
+              .catch((e) => {
+                  Request.html(e.message);
+                  execute.prop('disabled', false);
+              });
       }
 
       $(document).ready(function(){
