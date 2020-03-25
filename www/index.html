@@ -321,7 +321,7 @@
           const value = $("input[id='ChangeConfigurationValue']").val();
           const Request = $("#ChangeConfigurationRequest");
 
-          const Basic = 'Basic ' + window.btoa('ocpp/' + passphrase);
+          const Basic = 'Basic ' + window.btoa('ocpp:' + passphrase);
 
           let route = '/ChargePoint/' + point + '/ChangeConfiguration';
 
@@ -353,7 +353,7 @@
           const connectorId = $("input[id='RemoteStartTransactionConnectorId']").val();
           const idTag = $("input[id='RemoteStartTransactionIdTag']").val();
 
-          const Basic = 'Basic ' + window.btoa('ocpp/' + passphrase);
+          const Basic = 'Basic ' + window.btoa('ocpp:' + passphrase);
 
           let route = '/ChargePoint/' + point + '/RemoteStartTransaction';
 
@@ -384,7 +384,7 @@
 
           const transactionId = $("input[id='RemoteStopTransactionTransactionId']").val();
 
-          const Basic = 'Basic ' + window.btoa('ocpp/' + passphrase);
+          const Basic = 'Basic ' + window.btoa('ocpp:' + passphrase);
 
           let route = '/ChargePoint/' + point + '/RemoteStopTransaction';
 
