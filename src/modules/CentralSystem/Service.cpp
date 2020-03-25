@@ -140,13 +140,32 @@ namespace Apostol {
             auto LConnection = dynamic_cast<CHTTPServerConnection *> (APollQuery->PollConnection());
 
             if (LConnection != nullptr) {
-                auto LReply = LConnection->Reply();
+                auto LWSRequest = LConnection->WSRequest();
+                auto LWSReply = LConnection->WSReply();
 
-                CReply::status_type LStatus = CReply::internal_server_error;
+                const CString LRequest(LWSRequest->Payload());
 
-                ExceptionToJson(0, *AException, LReply->Content);
+                CJSONMessage jmRequest;
+                CJSONProtocol::Request(LRequest, jmRequest);
 
-                LConnection->SendReply(LStatus);
+                CJSONMessage jmResponse;
+                CString LResponse;
+
+                CJSON LResult;
+
+                CJSONProtocol::PrepareResponse(jmRequest, jmResponse);
+
+                jmResponse.MessageTypeId = mtCallError;
+                jmResponse.ErrorCode = "InternalError";
+                jmResponse.ErrorDescription = AException->what();
+
+                CJSONProtocol::Response(jmResponse, LResponse);
+#ifdef _DEBUG
+                DebugMessage("\n[%p] [%s:%d] [%d] [WebSocket] Response:\n%s\n", LConnection, LConnection->Socket()->Binding()->PeerIP(),
+                             LConnection->Socket()->Binding()->PeerPort(), LConnection->Socket()->Binding()->Handle(), LResponse.c_str());
+#endif
+                LWSReply->SetPayload(LResponse);
+                LConnection->SendWebSocket(true);
             }
 
             Log()->Error(APP_LOG_EMERG, 0, AException->what());
@@ -521,6 +540,12 @@ namespace Apostol {
 
                 if (LVersion == "v1") {
 
+                    const CString &LContentType = LRequest->Headers.Values("content-type");
+                    if (!LContentType.IsEmpty() && LRequest->ContentLength == 0) {
+                        AConnection->SendStockReply(CReply::no_content);
+                        return;
+                    }
+
                     LReply->ContentType = CReply::json;
 
                     if (LCommand == "ChargePoint") {
@@ -580,27 +605,87 @@ namespace Apostol {
 
                         if (LAction == "ChangeConfiguration") {
 
-                            const CString& LKey = LRequest->Params["key"];
-                            const CString& LValue = LRequest->Params["value"];
-
-                            if (LKey.IsEmpty()) {
-                                AConnection->SendStockReply(CReply::bad_request);
-                                return;
-                            }
-
-                            if (LValue.IsEmpty()) {
-                                AConnection->SendStockReply(CReply::bad_request);
-                                return;
-                            }
-
                             CJSON LPayload(jvtObject);
 
-                            LPayload.Object().AddPair("key", LKey);
-                            LPayload.Object().AddPair("value", LValue);
+                            if (LContentType == "application/json") {
+
+                                LPayload << LRequest->Content;
+
+                            } else {
+                                const CString &LKey = LRequest->Params["key"];
+                                const CString &LValue = LRequest->Params["value"];
+
+                                if (LKey.IsEmpty()) {
+                                    AConnection->SendStockReply(CReply::bad_request);
+                                    return;
+                                }
+
+                                if (LValue.IsEmpty()) {
+                                    AConnection->SendStockReply(CReply::bad_request);
+                                    return;
+                                }
+
+                                LPayload.Object().AddPair("key", LKey);
+                                LPayload.Object().AddPair("value", LValue);
+                            }
 
                             LPoint->Messages()->Add(OnRequest, LAction, LPayload);
 
                             return;
+
+                        } else if (LAction == "RemoteStartTransaction") {
+
+                            CJSON LPayload(jvtObject);
+
+                            if (LContentType == "application/json") {
+
+                                LPayload << LRequest->Content;
+
+                            } else {
+                                const CString &LConnectorId = LRequest->Params["connectorId"];
+                                const CString &LIdTag = LRequest->Params["idTag"];
+
+                                if (LConnectorId.IsEmpty()) {
+                                    AConnection->SendStockReply(CReply::bad_request);
+                                    return;
+                                }
+
+                                if (LIdTag.IsEmpty()) {
+                                    AConnection->SendStockReply(CReply::bad_request);
+                                    return;
+                                }
+
+                                LPayload.Object().AddPair("connectorId", LConnectorId);
+                                LPayload.Object().AddPair("idTag", LIdTag);
+                            }
+
+                            LPoint->Messages()->Add(OnRequest, LAction, LPayload);
+
+                            return;
+
+                        } else if (LAction == "RemoteStopTransaction") {
+
+                            CJSON LPayload(jvtObject);
+
+                            if (LContentType == "application/json") {
+
+                                LPayload << LRequest->Content;
+
+                            } else {
+                                const CString &LTransactionId = LRequest->Params["transactionId"];
+
+                                if (LTransactionId.IsEmpty()) {
+                                    AConnection->SendStockReply(CReply::bad_request);
+                                    return;
+                                }
+
+                                LPayload.Object().AddPair("transactionId", LTransactionId);
+                            }
+
+                            LPoint->Messages()->Add(OnRequest, LAction, LPayload);
+
+                            return;
+
                         }
                     }
                 }
