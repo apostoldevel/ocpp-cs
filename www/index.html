@@ -26,16 +26,22 @@
                       <div class="collapse navbar-collapse" id="navbarNav">
                           <ul class="nav nav-tabs mr-auto">
                               <li class="nav-item">
-                                  <a class="nav-link" href="#tab-charge-point-list">ChargePointList</a>
+                                  <a class="nav-link" href="#tab-charge-point-list">List</a>
                               </li>
                               <li class="nav-item">
-                                  <a class="nav-link" href="#tab-get-configuration">GetConfiguration</a>
+                                  <a class="nav-link" href="#tab-get-configuration">Get</a>
                               </li>
                               <li class="nav-item">
-                                  <a class="nav-link" href="#tab-change-configuration">ChangeConfiguration</a>
+                                  <a class="nav-link" href="#tab-change-configuration">Change</a>
                               </li>
                               <li class="nav-item">
-                                  <a class="nav-link" href="#tab-get-charge-point">GetChargePoint</a>
+                                  <a class="nav-link" href="#tab-remote-start-transaction">StartTransaction</a>
+                              </li>
+                              <li class="nav-item">
+                                  <a class="nav-link" href="#tab-remote-stop-transaction">StopTransaction</a>
+                              </li>
+                              <li class="nav-item">
+                                  <a class="nav-link" href="#tab-get-charge-point">DataBase</a>
                               </li>
                               <li class="nav-item dropdown">
                                   <a class="nav-link dropdown-toggle" href="#" id="btnSettings" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">Other</a>
@@ -58,6 +64,8 @@
                       </div>
                       <div id="tab-get-configuration" class="container tab-pane fade">
                           <div class="mt-3">
+                              <small class="form-text text-muted">Get configuration:</small>
+                              <hr>
                               <form onsubmit="GetConfiguration()">
                                   <div class="form-group row">
                                       <label for="GetConfigurationKey" class="col-sm-2 col-form-label">Key</label>
@@ -75,6 +83,8 @@
                       </div>
                       <div id="tab-change-configuration" class="container tab-pane fade">
                           <div class="mt-3">
+                              <small class="form-text text-muted">Change configuration:</small>
+                              <hr>
                               <form onsubmit="ChangeConfiguration()">
                                   <div class="form-group row">
                                       <label for="ChangeConfigurationKey" class="col-sm-2 col-form-label">Key</label>
@@ -96,8 +106,54 @@
                               </div>
                           </div>
                       </div>
+                      <div id="tab-remote-start-transaction" class="container tab-pane fade">
+                          <div class="mt-3">
+                              <small class="form-text text-muted">Remote Start Transaction:</small>
+                              <hr>
+                              <form onsubmit="RemoteStartTransaction()">
+                                  <div class="form-group row">
+                                      <label for="RemoteStartTransactionConnectorId" class="col-sm-2 col-form-label">connectorId</label>
+                                      <div class="col-sm-10">
+                                          <input type="text" class="form-control" id="RemoteStartTransactionConnectorId" placeholder="Integer" required>
+                                      </div>
+                                  </div>
+                                  <div class="form-group row">
+                                      <label for="RemoteStartTransactionIdTag" class="col-sm-2 col-form-label">idTag</label>
+                                      <div class="col-sm-10">
+                                          <input type="text" class="form-control" id="RemoteStartTransactionIdTag" placeholder="String20" required>
+                                      </div>
+                                  </div>
+                                  <button id="btnRemoteStartTransaction" type="submit" class="btn btn-primary">Execute</button>
+                              </form>
+                              <hr>
+                              <div id="RemoteStartTransactionRequest">
+                                  <small class="form-text text-muted">Press "Execute" button...</small>
+                              </div>
+                          </div>
+                      </div>
+                      <div id="tab-remote-stop-transaction" class="container tab-pane fade">
+                          <div class="mt-3">
+                              <small class="form-text text-muted">Remote Stop Transaction:</small>
+                              <hr>
+                              <form onsubmit="RemoteStopTransaction()">
+                                  <div class="form-group row">
+                                      <label for="RemoteStopTransactionTransactionId" class="col-sm-2 col-form-label">transactionId</label>
+                                      <div class="col-sm-10">
+                                          <input type="text" class="form-control" id="RemoteStopTransactionTransactionId" placeholder="Integer" required>
+                                      </div>
+                                  </div>
+                                  <button id="btnRemoteStopTransaction" type="submit" class="btn btn-primary">Execute</button>
+                              </form>
+                              <hr>
+                              <div id="RemoteStopTransactionRequest">
+                                  <small class="form-text text-muted">Press "Execute" button...</small>
+                              </div>
+                          </div>
+                      </div>
                       <div id="tab-get-charge-point" class="container tab-pane fade">
                           <div class="mt-3">
+                              <small class="form-text text-muted">Get Charge Point from DataBase (api.epcelectro.ru):</small>
+                              <hr>
                               <form onsubmit="GetChargePoint()">
                                   <div class="form-group row">
                                       <label for="Session" class="col-sm-2 col-form-label">Session</label>
@@ -130,7 +186,7 @@
                                       </div>
                                       <div class="form-group col-md-6">
                                           <label for="ChargePoint">Identity</label>
-                                          <input type="text" class="form-control" id="ChargePoint" value="EVB-P18210114">
+                                          <input type="text" class="form-control" id="ChargePoint" value="EVB-P18240308">
                                           <small id="ChargePointHelp" class="form-text text-muted">Charge Point Identity</small>
                                       </div>
                                   </div>
@@ -201,12 +257,22 @@
       });
 
       // Select tabs
-      $('.nav-tabs a[href="#tab-change-configuration"]').click(function(){
+      $('.nav-tabs a[href="#tab-get-charge-point"]').click(function(){
           $(this).tab('show');
       });
 
       // Select tabs
-      $('.nav-tabs a[href="#tab-get-charge-point"]').click(function(){
+      $('.nav-tabs a[href="#tab-remote-start-transaction"]').click(function(){
+          $(this).tab('show');
+      });
+
+      // Select tabs
+      $('.nav-tabs a[href="#tab-remote-stop-transaction"]').click(function(){
+          $(this).tab('show');
+      });
+
+      // Select tabs
+      $('.nav-tabs a[href="#tab-change-configuration"]').click(function(){
           $(this).tab('show');
       });
 
@@ -258,25 +324,73 @@
               .catch(reason => console.log(reason.message));
       }
 
+      function RemoteStartTransaction() {
+          const url = $("input[id='apiURL']").val();
+          const point = $("input[id='ChargePoint']").val();
+
+          const connectorId = $("input[id='RemoteStartTransactionConnectorId']").val();
+          const idTag = $("input[id='RemoteStartTransactionIdTag']").val();
+
+          let route = '/ChargePoint/' + point + '/RemoteStartTransaction';
+
+          let body = {
+              connectorId: connectorId,
+              idTag: idTag
+          };
+
+          let execute = $("button[id='btnRemoteStartTransaction']");
+          execute.prop('disabled', true);
+
+          AsyncFetch(url + route, body, 'POST')
+              .then(function(result) {
+                  $("#RemoteStartTransactionRequest").html(result);
+                  execute.prop('disabled', false);
+              })
+              .catch(reason => console.log(reason.message));
+      }
+
+      function RemoteStopTransaction() {
+          const url = $("input[id='apiURL']").val();
+          const point = $("input[id='ChargePoint']").val();
+
+          const transactionId = $("input[id='RemoteStopTransactionTransactionId']").val();
+
+          let route = '/ChargePoint/' + point + '/RemoteStopTransaction';
+
+          let body = {
+              transactionId: transactionId
+          };
+
+          let execute = $("button[id='btnRemoteStopTransaction']");
+          execute.prop('disabled', true);
+
+          AsyncFetch(url + route, JSON.stringify(body), 'POST')
+              .then(function(result) {
+                  $("#RemoteStopTransactionRequest").html(result);
+                  execute.prop('disabled', false);
+              })
+              .catch(reason => console.log(reason.message));
+      }
+
       function GetChargePoint() {
           const url = 'http://api.epcelectro.ru/api/v1';
           const Session = $("input[id='Session']").val();
           const id = $("input[id='ChargePointId']").val();
 
           let route = '/charge_point';
-          let body = '{}';
+          let body = {};
 
           if (!empty(id)) {
               route += '/get';
-              body = '{"id": "' + id + '"}';
+              body = {id: id};
           } else {
-              route += '/lst';
+              route += '/list';
           }
 
           let execute = $("button[id='btnGetChargePoint']");
           execute.prop('disabled', true);
 
-          AsyncFetch(url + route, body, 'POST', {'Authorization': 'Session ' + Session, 'Content-Type': 'application/json'})
+          AsyncFetch(url + route, JSON.stringify(body), 'POST', {'Authorization': 'Session ' + Session, 'Content-Type': 'application/json'})
               .then(function(result) {
                   $("#GetChargePointRequest").html(result);
                   execute.prop('disabled', false);
@@ -285,6 +399,7 @@
       }
 
       $(document).ready(function(){
+          window.location.href = window.location.origin + window.location.pathname + '?#tab-charge-point-lis';
           ChargePointList();
       });
     </script>
