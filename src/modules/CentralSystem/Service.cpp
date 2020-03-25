@@ -708,7 +708,8 @@ namespace Apostol {
                             }
                         }
                     } catch (Delphi::Exception::Exception &E) {
-                        AConnection->SendStockReply(CReply::bad_request);
+                        ExceptionToJson(0, E, LReply->Content);
+                        AConnection->SendReply(CReply::bad_request);
                         Log()->Error(APP_LOG_EMERG, 0, E.what());
                     }
                 }
