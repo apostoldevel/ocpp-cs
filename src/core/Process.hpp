@@ -358,17 +358,17 @@ namespace Apostol {
 #ifdef WITH_POSTGRESQL
             CPQServer *m_pPQServer;
 #endif
-            void DoOptions(CCommand *ACommand);
-            void DoGet(CCommand *ACommand);
-            void DoHead(CCommand *ACommand);
-            void DoPost(CCommand *ACommand);
-            void DoPut(CCommand *ACommand);
-            void DoPatch(CCommand *ACommand);
-            void DoDelete(CCommand *ACommand);
-            void DoTrace(CCommand *ACommand);
-            void DoConnect(CCommand *ACommand);
-
         protected:
+
+            virtual void DoOptions(CCommand *ACommand);
+            virtual void DoGet(CCommand *ACommand);
+            virtual void DoHead(CCommand *ACommand);
+            virtual void DoPost(CCommand *ACommand);
+            virtual void DoPut(CCommand *ACommand);
+            virtual void DoPatch(CCommand *ACommand);
+            virtual void DoDelete(CCommand *ACommand);
+            virtual void DoTrace(CCommand *ACommand);
+            virtual void DoConnect(CCommand *ACommand);
 
             virtual bool DoExecute(CTCPConnection *AConnection) abstract;
 
@@ -381,6 +381,9 @@ namespace Apostol {
 
             virtual void DoServerConnected(CObject *Sender);
             virtual void DoServerDisconnected(CObject *Sender);
+
+            virtual void DoClientConnected(CObject *Sender);
+            virtual void DoClientDisconnected(CObject *Sender);
 
             virtual void DoNoCommandHandler(CSocketEvent *Sender, LPCTSTR AData, CTCPConnection *AConnection);
 
@@ -409,7 +412,7 @@ namespace Apostol {
 
             CServerProcess(CProcessType AType, CCustomProcess *AParent);
 
-            void InitializeServerHandlers();
+            void InitializeHandlers(CCommandHandlers *AHandlers, bool ADisconnect = false);
 
             CHTTPServer *Server() { return m_pServer; };
             void Server(CHTTPServer *Value) { SetServer(Value); };
@@ -418,7 +421,16 @@ namespace Apostol {
             void PQServer(CPQServer *Value) { SetPQServer(Value); };
 
             virtual CPQPollQuery *GetQuery(CPollConnection *AConnection);
+
+            bool ExecSQL(CPollConnection *AConnection, const CStringList &SQL,
+                         COnPQPollQueryExecutedEvent && OnExecuted = nullptr,
+                         COnPQPollQueryExceptionEvent && OnException = nullptr);
 #endif
+            CHTTPClient * GetClient(const CString &Host, uint16_t Port);
+
+            static void DebugRequest(CRequest *ARequest);
+            static void DebugReply(CReply *AReply);
+
         };
 
         //--------------------------------------------------------------------------------------------------------------

@@ -581,47 +581,48 @@ namespace Apostol {
         }
         //--------------------------------------------------------------------------------------------------------------
 #endif
-        void CServerProcess::InitializeServerHandlers() {
+        void CServerProcess::InitializeHandlers(CCommandHandlers *AHandlers, bool ADisconnect) {
 
-            if (Assigned(m_pServer)) {
+            if (Assigned(AHandlers)) {
 
                 CCommandHandler *LCommand;
 
-                m_pServer->CommandHandlers()->ParseParamsDefault(false);
+                AHandlers->ParseParamsDefault(false);
+                AHandlers->DisconnectDefault(ADisconnect);
 
-                LCommand = m_pServer->CommandHandlers()->Add();
+                LCommand =AHandlers->Add();
                 LCommand->Command(_T("GET"));
                 LCommand->OnCommand(std::bind(&CServerProcess::DoGet, this, _1));
 
-                LCommand = m_pServer->CommandHandlers()->Add();
+                LCommand = AHandlers->Add();
                 LCommand->Command(_T("POST"));
                 LCommand->OnCommand(std::bind(&CServerProcess::DoPost, this, _1));
 
-                LCommand = m_pServer->CommandHandlers()->Add();
-                LCommand->Command(_T("PUT"));
-                LCommand->OnCommand(std::bind(&CServerProcess::DoPut, this, _1));
-
-                LCommand = m_pServer->CommandHandlers()->Add();
-                LCommand->Command(_T("DELETE"));
-                LCommand->OnCommand(std::bind(&CServerProcess::DoDelete, this, _1));
-
-                LCommand = m_pServer->CommandHandlers()->Add();
+                LCommand = AHandlers->Add();
                 LCommand->Command(_T("OPTIONS"));
                 LCommand->OnCommand(std::bind(&CServerProcess::DoOptions, this, _1));
 
-                LCommand = m_pServer->CommandHandlers()->Add();
+                LCommand = AHandlers->Add();
+                LCommand->Command(_T("PUT"));
+                LCommand->OnCommand(std::bind(&CServerProcess::DoPut, this, _1));
+
+                LCommand = AHandlers->Add();
+                LCommand->Command(_T("DELETE"));
+                LCommand->OnCommand(std::bind(&CServerProcess::DoDelete, this, _1));
+
+                LCommand = AHandlers->Add();
                 LCommand->Command(_T("HEAD"));
                 LCommand->OnCommand(std::bind(&CServerProcess::DoHead, this, _1));
 
-                LCommand = m_pServer->CommandHandlers()->Add();
+                LCommand = AHandlers->Add();
                 LCommand->Command(_T("PATCH"));
                 LCommand->OnCommand(std::bind(&CServerProcess::DoPatch, this, _1));
 
-                LCommand = m_pServer->CommandHandlers()->Add();
+                LCommand = AHandlers->Add();
                 LCommand->Command(_T("TRACE"));
                 LCommand->OnCommand(std::bind(&CServerProcess::DoTrace, this, _1));
 
-                LCommand = m_pServer->CommandHandlers()->Add();
+                LCommand = AHandlers->Add();
                 LCommand->Command(_T("CONNECT"));
                 LCommand->OnCommand(std::bind(&CServerProcess::DoConnect, this, _1));
             }
@@ -642,6 +643,35 @@ namespace Apostol {
             }
 
             return LQuery;
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
+        bool CServerProcess::ExecSQL(CPollConnection *AConnection, const CStringList &SQL,
+                                     COnPQPollQueryExecutedEvent &&OnExecuted,
+                                     COnPQPollQueryExceptionEvent &&OnException) {
+
+            auto LQuery = GetQuery(AConnection);
+
+            if (LQuery == nullptr)
+                throw Delphi::Exception::Exception("ExecSQL: GetQuery() failed!");
+
+            if (OnExecuted != nullptr)
+                LQuery->OnPollExecuted(static_cast<COnPQPollQueryExecutedEvent &&>(OnExecuted));
+
+            if (OnException != nullptr)
+                LQuery->OnException(static_cast<COnPQPollQueryExceptionEvent &&>(OnException));
+
+            LQuery->SQL() = SQL;
+
+            if (LQuery->QueryStart() != POLL_QUERY_START_ERROR) {
+                return true;
+            } else {
+                delete LQuery;
+            }
+
+            Log()->Error(APP_LOG_ALERT, 0, "ExecSQL: QueryStart() failed!");
+
+            return false;
         }
         //--------------------------------------------------------------------------------------------------------------
 
@@ -780,6 +810,46 @@ namespace Apostol {
         }
         //--------------------------------------------------------------------------------------------------------------
 #endif
+        void CServerProcess::DebugRequest(CRequest *ARequest) {
+            DebugMessage("[%p] Request:\n%s %s HTTP/%d.%d\n", ARequest, ARequest->Method.c_str(), ARequest->Uri.c_str(), ARequest->VMajor, ARequest->VMinor);
+
+            for (int i = 0; i < ARequest->Headers.Count(); i++)
+                DebugMessage("%s: %s\n", ARequest->Headers[i].Name.c_str(), ARequest->Headers[i].Value.c_str());
+
+            if (!ARequest->Content.IsEmpty())
+                DebugMessage("\n%s\n", ARequest->Content.c_str());
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
+        void CServerProcess::DebugReply(CReply *AReply) {
+            DebugMessage("[%p] Reply:\nHTTP/%d.%d %d %s\n", AReply, AReply->VMajor, AReply->VMinor, AReply->Status, AReply->StatusText.c_str());
+
+            for (int i = 0; i < AReply->Headers.Count(); i++)
+                DebugMessage("%s: %s\n", AReply->Headers[i].Name.c_str(), AReply->Headers[i].Value.c_str());
+
+            if (!AReply->Content.IsEmpty())
+                DebugMessage("\n%s\n", AReply->Content.c_str());
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
+        CHTTPClient *CServerProcess::GetClient(const CString &Host, uint16_t Port) {
+            auto LClient = new CHTTPClient(Host.c_str(), Port);
+
+            LClient->ClientName() = Application::Application->Title();
+
+            LClient->PollStack(m_pServer->PollStack());
+
+            LClient->OnVerbose(std::bind(&CServerProcess::DoVerbose, this, _1, _2, _3, _4));
+            LClient->OnException(std::bind(&CServerProcess::DoServerException, this, _1, _2));
+            LClient->OnEventHandlerException(std::bind(&CServerProcess::DoServerEventHandlerException, this, _1, _2));
+            LClient->OnConnected(std::bind(&CServerProcess::DoClientConnected, this, _1));
+            LClient->OnDisconnected(std::bind(&CServerProcess::DoClientDisconnected, this, _1));
+            LClient->OnNoCommandHandler(std::bind(&CServerProcess::DoNoCommandHandler, this, _1, _2, _3));
+
+            return LClient;
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
         void CServerProcess::DoServerListenException(CSocketEvent *Sender, Delphi::Exception::Exception *AException) {
             Log()->Error(APP_LOG_EMERG, 0, AException->what());
         }
@@ -808,17 +878,34 @@ namespace Apostol {
 
         void CServerProcess::DoServerDisconnected(CObject *Sender) {
             auto LConnection = dynamic_cast<CHTTPServerConnection *>(Sender);
-#ifdef WITH_POSTGRESQL
             if (LConnection != nullptr) {
+#ifdef WITH_POSTGRESQL
                 auto LPollQuery = PQServer()->FindQueryByConnection(LConnection);
                 if (LPollQuery != nullptr) {
                     LPollQuery->PollConnection(nullptr);
                 }
-
+#endif
                 Log()->Message(_T("[%s:%d] Client closed connection."), LConnection->Socket()->Binding()->PeerIP(),
                                LConnection->Socket()->Binding()->PeerPort());
             }
-#endif
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
+        void CServerProcess::DoClientConnected(CObject *Sender) {
+            auto LConnection = dynamic_cast<CHTTPClientConnection *>(Sender);
+            if (LConnection != nullptr) {
+                Log()->Message(_T("[%s:%d] Client connected."), LConnection->Socket()->Binding()->PeerIP(),
+                               LConnection->Socket()->Binding()->PeerPort());
+            }
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
+        void CServerProcess::DoClientDisconnected(CObject *Sender) {
+            auto LConnection = dynamic_cast<CHTTPClientConnection *>(Sender);
+            if (LConnection != nullptr) {
+                Log()->Message(_T("[%s:%d] Client disconnected."), LConnection->Socket()->Binding()->PeerIP(),
+                               LConnection->Socket()->Binding()->PeerPort());
+            }
         }
         //--------------------------------------------------------------------------------------------------------------
 
@@ -833,10 +920,6 @@ namespace Apostol {
             auto LRequest = LConnection->Request();
             auto LReply = LConnection->Reply();
 
-            LPCTSTR lpReferer;
-            LPCTSTR lpUserAgent;
-            //LPCTSTR lpContentLength;
-
             TCHAR szTime[PATH_MAX / 4] = {0};
 
             time_t wtime = time(nullptr);
@@ -844,79 +927,70 @@ namespace Apostol {
 
             if ((wtm != nullptr) && (strftime(szTime, sizeof(szTime), "%d/%b/%Y:%T %z", wtm) != 0)) {
 
-                const CString &Referer = LRequest->Headers.Values(_T("referer"));
-                const CString &UserAgent = LRequest->Headers.Values(_T("user-agent"));
-                //const CString &ContentLength = LReply->Headers.Values(_T("content-length"));
+                const CString &LReferer = LRequest->Headers.Values(_T("referer"));
+                const CString &LUserAgent = LRequest->Headers.Values(_T("user-agent"));
 
-                if (!Referer.IsEmpty()) lpReferer = Referer.c_str(); else lpReferer = _T("-");
-                if (!UserAgent.IsEmpty()) lpUserAgent = UserAgent.c_str(); else lpUserAgent = _T("-");
-                //if (!ContentLength.IsEmpty()) lpContentLength = ContentLength.c_str(); else lpContentLength = _T("-");
-
-                if (LConnection->Socket()->Binding() != nullptr) {
+                auto LBinding = LConnection->Socket()->Binding();
+                if ( LBinding != nullptr) {
                     Log()->Access(_T("%s %d %8.2f ms [%s] \"%s %s HTTP/%d.%d\" %d %d \"%s\" \"%s\"\r\n"),
-                                  LConnection->Socket()->Binding()->PeerIP(),
-                                  LConnection->Socket()->Binding()->PeerPort(),
+                                  LBinding->PeerIP(), LBinding->PeerPort(),
                                   double((clock() - AConnection->Tag()) / (double) CLOCKS_PER_SEC * 1000), szTime,
                                   LRequest->Method.c_str(), LRequest->Uri.c_str(), LRequest->VMajor, LRequest->VMinor,
-                                  LReply->Status, LReply->Content.Size(), lpReferer, lpUserAgent);
+                                  LReply->Status, LReply->Content.Size(),
+                                  LReferer.IsEmpty() ? "-" : LReferer.c_str(),
+                                  LUserAgent.IsEmpty() ? "-" : LUserAgent.c_str());
                 }
             }
         }
         //--------------------------------------------------------------------------------------------------------------
 
         void CServerProcess::DoNoCommandHandler(CSocketEvent *Sender, LPCTSTR AData, CTCPConnection *AConnection) {
-            dynamic_cast<CHTTPServerConnection *> (AConnection)->SendStockReply(CReply::not_implemented);
-        }
-        //--------------------------------------------------------------------------------------------------------------
-
-        void CServerProcess::DoOptions(CCommand *ACommand) {
-            auto LConnection = dynamic_cast<CHTTPServerConnection *> (ACommand->Connection());
-            auto LRequest = LConnection->Request();
-#ifdef _DEBUG
-            if (LRequest->Uri == _T("/quit"))
-                SignalProcess()->Quit();
-#endif
-            LConnection->SendStockReply(CReply::ok);
+            Log()->Error(APP_LOG_EMERG, 0, "No command handler: %s", AData);
         }
         //--------------------------------------------------------------------------------------------------------------
 
         void CServerProcess::DoGet(CCommand *ACommand) {
-            dynamic_cast<CHTTPServerConnection *> (ACommand->Connection())->SendStockReply(CReply::not_implemented);
-        }
-        //--------------------------------------------------------------------------------------------------------------
 
-        void CServerProcess::DoHead(CCommand *ACommand) {
-            dynamic_cast<CHTTPServerConnection *> (ACommand->Connection())->SendStockReply(CReply::not_implemented);
         }
         //--------------------------------------------------------------------------------------------------------------
 
         void CServerProcess::DoPost(CCommand *ACommand) {
-            dynamic_cast<CHTTPServerConnection *> (ACommand->Connection())->SendStockReply(CReply::not_implemented);
+
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
+        void CServerProcess::DoOptions(CCommand *ACommand) {
+
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
+        void CServerProcess::DoHead(CCommand *ACommand) {
+
         }
         //--------------------------------------------------------------------------------------------------------------
 
         void CServerProcess::DoPut(CCommand *ACommand) {
-            dynamic_cast<CHTTPServerConnection *> (ACommand->Connection())->SendStockReply(CReply::not_implemented);
+
         }
         //--------------------------------------------------------------------------------------------------------------
 
         void CServerProcess::DoPatch(CCommand *ACommand) {
-            dynamic_cast<CHTTPServerConnection *> (ACommand->Connection())->SendStockReply(CReply::not_implemented);
+
         }
         //--------------------------------------------------------------------------------------------------------------
 
         void CServerProcess::DoDelete(CCommand *ACommand) {
-            dynamic_cast<CHTTPServerConnection *> (ACommand->Connection())->SendStockReply(CReply::not_implemented);
+
         }
         //--------------------------------------------------------------------------------------------------------------
 
         void CServerProcess::DoTrace(CCommand *ACommand) {
-            dynamic_cast<CHTTPServerConnection *> (ACommand->Connection())->SendStockReply(CReply::not_implemented);
+
         }
         //--------------------------------------------------------------------------------------------------------------
 
         void CServerProcess::DoConnect(CCommand *ACommand) {
-            dynamic_cast<CHTTPServerConnection *> (ACommand->Connection())->SendStockReply(CReply::not_implemented);
+
         }
 
         //--------------------------------------------------------------------------------------------------------------

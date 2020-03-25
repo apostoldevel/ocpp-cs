@@ -571,8 +571,6 @@ namespace Apostol {
             LServer->ActiveLevel(alBinding);
 
             SetServer(LServer);
-
-            InitializeServerHandlers();
         }
         //--------------------------------------------------------------------------------------------------------------
 
