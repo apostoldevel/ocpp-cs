@@ -341,7 +341,7 @@
           let execute = $("button[id='btnRemoteStartTransaction']");
           execute.prop('disabled', true);
 
-          AsyncFetch(url + route, body, 'POST')
+          AsyncFetch(url + route, body, 'POST', {'Content-Type': 'application/json'})
               .then(function(result) {
                   $("#RemoteStartTransactionRequest").html(result);
                   execute.prop('disabled', false);
@@ -364,7 +364,7 @@
           let execute = $("button[id='btnRemoteStopTransaction']");
           execute.prop('disabled', true);
 
-          AsyncFetch(url + route, JSON.stringify(body), 'POST')
+          AsyncFetch(url + route, JSON.stringify(body), 'POST', {'Content-Type': 'application/json'})
               .then(function(result) {
                   $("#RemoteStopTransactionRequest").html(result);
                   execute.prop('disabled', false);
