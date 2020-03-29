@@ -26,26 +26,30 @@
                       <div class="collapse navbar-collapse" id="navbarNav">
                           <ul class="nav nav-tabs mr-auto">
                               <li class="nav-item">
-                                  <a class="nav-link" href="#tab-charge-point-list">List</a>
+                                  <a class="nav-link active" data-toggle="tab" href="#tab-charge-point-list">List</a>
                               </li>
                               <li class="nav-item">
-                                  <a class="nav-link" href="#tab-get-configuration">Get</a>
+                                  <a class="nav-link" data-toggle="tab" href="#tab-get-configuration">Get</a>
                               </li>
                               <li class="nav-item">
-                                  <a class="nav-link" href="#tab-change-configuration">Change</a>
+                                  <a class="nav-link" data-toggle="tab" href="#tab-change-configuration">Change</a>
                               </li>
                               <li class="nav-item">
-                                  <a class="nav-link" href="#tab-remote-start-transaction">StartTransaction</a>
+                                  <a class="nav-link" data-toggle="tab" href="#tab-remote-start-transaction">Start</a>
                               </li>
                               <li class="nav-item">
-                                  <a class="nav-link" href="#tab-remote-stop-transaction">StopTransaction</a>
+                                  <a class="nav-link" data-toggle="tab" href="#tab-remote-stop-transaction">Stop</a>
                               </li>
                               <li class="nav-item">
-                                  <a class="nav-link" href="#tab-get-charge-point">DataBase</a>
+                                  <a class="nav-link" href="#tab-reserve-now">Reserve</a>
+                              </li>
+                              <li class="nav-item">
+                                  <a class="nav-link" data-toggle="tab" href="#tab-cancel-reservation">Cancel</a>
                               </li>
                               <li class="nav-item dropdown">
                                   <a class="nav-link dropdown-toggle" href="#" id="btnSettings" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">Other</a>
                                   <div class="dropdown-menu" aria-labelledby="other">
+                                      <a class="dropdown-item" data-toggle="tab" href="#tab-get-charge-point">DataBase</a>
                                       <a class="dropdown-item" data-toggle="tab" href="#tab-settings">Settings</a>
                                   </div>
                               </li>
@@ -112,15 +116,15 @@
                               <hr>
                               <form onsubmit="RemoteStartTransaction()">
                                   <div class="form-group row">
-                                      <label for="RemoteStartTransactionConnectorId" class="col-sm-2 col-form-label">connectorId</label>
+                                      <label for="RemoteStartTransaction-connectorId" class="col-sm-2 col-form-label">connectorId</label>
                                       <div class="col-sm-10">
-                                          <input type="text" class="form-control" id="RemoteStartTransactionConnectorId" placeholder="Integer" required>
+                                          <input type="text" class="form-control" id="RemoteStartTransaction-connectorId" placeholder="Integer" required>
                                       </div>
                                   </div>
                                   <div class="form-group row">
-                                      <label for="RemoteStartTransactionIdTag" class="col-sm-2 col-form-label">idTag</label>
+                                      <label for="RemoteStartTransaction-idTag" class="col-sm-2 col-form-label">idTag</label>
                                       <div class="col-sm-10">
-                                          <input type="text" class="form-control" id="RemoteStartTransactionIdTag" placeholder="String20" required>
+                                          <input type="text" class="form-control" id="RemoteStartTransaction-idTag" placeholder="IdToken (String20)" required>
                                       </div>
                                   </div>
                                   <button id="btnRemoteStartTransaction" type="submit" class="btn btn-primary">Execute</button>
@@ -137,15 +141,78 @@
                               <hr>
                               <form onsubmit="RemoteStopTransaction()">
                                   <div class="form-group row">
-                                      <label for="RemoteStopTransactionTransactionId" class="col-sm-2 col-form-label">transactionId</label>
+                                      <label for="RemoteStopTransaction-transactionId" class="col-sm-2 col-form-label">transactionId</label>
                                       <div class="col-sm-10">
-                                          <input type="text" class="form-control" id="RemoteStopTransactionTransactionId" placeholder="Integer" required>
+                                          <input type="text" class="form-control" id="RemoteStopTransaction-transactionId" placeholder="Integer" required>
                                       </div>
                                   </div>
                                   <button id="btnRemoteStopTransaction" type="submit" class="btn btn-primary">Execute</button>
                               </form>
                               <hr>
                               <div id="RemoteStopTransactionRequest">
+                                  <small class="form-text text-muted">Press "Execute" button...</small>
+                              </div>
+                          </div>
+                      </div>
+                      <div id="tab-reserve-now" class="container tab-pane fade">
+                          <div class="mt-3">
+                              <small class="form-text text-muted">Reserve Now:</small>
+                              <hr>
+                              <form onsubmit="ReserveNow()">
+                                  <div class="form-group row">
+                                      <label for="ReserveNow-connectorId" class="col-sm-2 col-form-label">connectorId</label>
+                                      <div class="col-sm-10">
+                                          <input type="text" class="form-control" id="ReserveNow-connectorId" placeholder="Integer" required>
+                                      </div>
+                                  </div>
+                                  <div class="form-group row">
+                                      <label for="ReserveNow-expiryDate" class="col-sm-2 col-form-label">expiryDate</label>
+                                      <div class="col-sm-10">
+                                          <input type="text" class="form-control" id="ReserveNow-expiryDate" placeholder="DateTime" required>
+                                          <small id="ReserveNow-expiryDate-Help" class="form-text text-muted">UTC date time + 15 minutes</small>
+                                      </div>
+                                  </div>
+                                  <div class="form-group row">
+                                      <label for="ReserveNow-idTag" class="col-sm-2 col-form-label">idTag</label>
+                                      <div class="col-sm-10">
+                                          <input type="text" class="form-control" id="ReserveNow-idTag" placeholder="IdToken (String20)" required>
+                                      </div>
+                                  </div>
+                                  <div class="form-group row">
+                                      <label for="ReserveNow-parentIdTag" class="col-sm-2 col-form-label">parentIdTag</label>
+                                      <div class="col-sm-10">
+                                          <input type="text" class="form-control" id="ReserveNow-parentIdTag" placeholder="IdToken (String20)">
+                                      </div>
+                                  </div>
+                                  <div class="form-group row">
+                                      <label for="ReserveNow-reservationId" class="col-sm-2 col-form-label">reservationId</label>
+                                      <div class="col-sm-10">
+                                          <input type="text" class="form-control" id="ReserveNow-reservationId" placeholder="Integer" required>
+                                      </div>
+                                  </div>
+                                  <button id="btnReserveNow" type="submit" class="btn btn-primary">Execute</button>
+                              </form>
+                              <hr>
+                              <div id="ReserveNowRequest">
+                                  <small class="form-text text-muted">Press "Execute" button...</small>
+                              </div>
+                          </div>
+                      </div>
+                      <div id="tab-cancel-reservation" class="container tab-pane fade">
+                          <div class="mt-3">
+                              <small class="form-text text-muted">Cancel Reservation:</small>
+                              <hr>
+                              <form onsubmit="CancelReservation()">
+                                  <div class="form-group row">
+                                      <label for="CancelReservation-reservationId" class="col-sm-2 col-form-label">reservationId</label>
+                                      <div class="col-sm-10">
+                                          <input type="text" class="form-control" id="CancelReservation-reservationId" placeholder="Integer" required>
+                                      </div>
+                                  </div>
+                                  <button id="btnCancelReservation" type="submit" class="btn btn-primary">Execute</button>
+                              </form>
+                              <hr>
+                              <div id="CancelReservationRequest">
                                   <small class="form-text text-muted">Press "Execute" button...</small>
                               </div>
                           </div>
@@ -187,7 +254,7 @@
                                       <div class="form-group col-md-4">
                                           <label for="APIPassphrase">Passphrase</label>
                                           <input type="text" class="form-control" id="APIPassphrase" value="">
-                                          <small id="APIPassphraseHelp" class="form-text text-muted">API Passphrase for POST</small>
+                                          <small id="APIPassphraseHelp" class="form-text text-muted">API Passphrase for POST requests</small>
                                       </div>
                                       <div class="form-group col-md-4">
                                           <label for="ChargePoint">Identity</label>
@@ -249,34 +316,29 @@
         }
       }
 
-      // Select tabs
-      $('.nav-tabs a[href="#tab-charge-point-list"]').click(function(){
-          ChargePointList();
-          $(this).tab('show');
-      });
+      function getFormattedDateTime(date) {
+          const year = date.getFullYear();
 
-      // Select tabs
-      $('.nav-tabs a[href="#tab-get-configuration"]').click(function(){
-          $(this).tab('show');
-      });
+          let month = (1 + date.getMonth()).toString();
+          month = month.length > 1 ? month : '0' + month;
 
-      // Select tabs
-      $('.nav-tabs a[href="#tab-get-charge-point"]').click(function(){
-          $(this).tab('show');
-      });
+          let day = date.getDate().toString();
+          day = day.length > 1 ? day : '0' + day;
 
-      // Select tabs
-      $('.nav-tabs a[href="#tab-remote-start-transaction"]').click(function(){
-          $(this).tab('show');
-      });
+          let hours = date.getUTCHours().toString();
+          hours = hours.length > 1 ? hours : '0' + hours;
 
-      // Select tabs
-      $('.nav-tabs a[href="#tab-remote-stop-transaction"]').click(function(){
-          $(this).tab('show');
-      });
+          let minutes = date.getMinutes().toString();
+          minutes = minutes.length > 1 ? minutes : '0' + minutes;
 
-      // Select tabs
-      $('.nav-tabs a[href="#tab-change-configuration"]').click(function(){
+          let seconds = date.getSeconds().toString();
+          seconds = seconds.length > 1 ? seconds : '0' + seconds;
+
+          return year + '-' + month + '-' + day + ' ' + hours + ':' + minutes + ':' + seconds;
+      }
+
+      $('.nav-tabs a[href="#tab-reserve-now"]').click(function(){
+          $("input[id='ReserveNow-expiryDate']").val(getFormattedDateTime(new Date(Date.now() + 15 * 60 * 1000)));
           $(this).tab('show');
       });
 
@@ -350,8 +412,8 @@
           const point = $("input[id='ChargePoint']").val();
           const Request = $("#RemoteStartTransactionRequest");
 
-          const connectorId = $("input[id='RemoteStartTransactionConnectorId']").val();
-          const idTag = $("input[id='RemoteStartTransactionIdTag']").val();
+          const connectorId = $("input[id='RemoteStartTransaction-connectorId']").val();
+          const idTag = $("input[id='RemoteStartTransaction-idTag']").val();
 
           const Basic = 'Basic ' + window.btoa('ocpp:' + passphrase);
 
@@ -382,7 +444,7 @@
           const point = $("input[id='ChargePoint']").val();
           const Request = $("#RemoteStopTransactionRequest");
 
-          const transactionId = $("input[id='RemoteStopTransactionTransactionId']").val();
+          const transactionId = $("input[id='RemoteStopTransaction-transactionId']").val();
 
           const Basic = 'Basic ' + window.btoa('ocpp:' + passphrase);
 
@@ -393,6 +455,73 @@
           };
 
           let execute = $("button[id='btnRemoteStopTransaction']");
+          execute.prop('disabled', true);
+
+          AsyncFetch(url + route, JSON.stringify(body), 'POST', {'Authorization': Basic, 'Content-Type': 'application/json'})
+              .then(function(result) {
+                  Request.html(result);
+                  execute.prop('disabled', false);
+              })
+              .catch((e) => {
+                  Request.html(e.message);
+                  execute.prop('disabled', false);
+              });
+      }
+
+      function ReserveNow() {
+          const url = $("input[id='apiURL']").val();
+          const passphrase = $("input[id='APIPassphrase']").val();
+          const point = $("input[id='ChargePoint']").val();
+          const Request = $("#ReserveNowRequest");
+
+          const connectorId = $("input[id='ReserveNow-connectorId']").val();
+          const expiryDate = $("input[id='ReserveNow-expiryDate']").val();
+          const idTag = $("input[id='ReserveNow-idTag']").val();
+          const parentIdTag = $("input[id='ReserveNow-parentIdTag']").val();
+          const reservationId = $("input[id='ReserveNow-reservationId']").val();
+
+          const Basic = 'Basic ' + window.btoa('ocpp:' + passphrase);
+
+          let route = '/ChargePoint/' + point + '/ReserveNow';
+
+          let body = {
+              connectorId: connectorId,
+              expiryDate: expiryDate,
+              idTag: idTag,
+              reservationId: reservationId
+          };
+
+          let execute = $("button[id='btnReserveNow']");
+          execute.prop('disabled', true);
+
+          AsyncFetch(url + route, JSON.stringify(body), 'POST', {'Authorization': Basic, 'Content-Type': 'application/json'})
+              .then(function(result) {
+                  Request.html(result);
+                  execute.prop('disabled', false);
+              })
+              .catch((e) => {
+                  Request.html(e.message);
+                  execute.prop('disabled', false);
+              });
+      }
+
+      function CancelReservation() {
+          const url = $("input[id='apiURL']").val();
+          const passphrase = $("input[id='APIPassphrase']").val();
+          const point = $("input[id='ChargePoint']").val();
+          const Request = $("#CancelReservationRequest");
+
+          const reservationId = $("input[id='CancelReservation-reservationId']").val();
+
+          const Basic = 'Basic ' + window.btoa('ocpp:' + passphrase);
+
+          let route = '/ChargePoint/' + point + '/CancelReservation';
+
+          let body = {
+              reservationId: reservationId
+          };
+
+          let execute = $("button[id='btnCancelReservation']");
           execute.prop('disabled', true);
 
           AsyncFetch(url + route, JSON.stringify(body), 'POST', {'Authorization': Basic, 'Content-Type': 'application/json'})

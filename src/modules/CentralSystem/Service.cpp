@@ -631,21 +631,21 @@ namespace Apostol {
                                     LPayload << LRequest->Content;
 
                                 } else {
-                                    const CString &LKey = LRequest->Params["key"];
-                                    const CString &LValue = LRequest->Params["value"];
+                                    const CString &key = LRequest->Params["key"];
+                                    const CString &value = LRequest->Params["value"];
 
-                                    if (LKey.IsEmpty()) {
+                                    if (key.IsEmpty()) {
                                         AConnection->SendStockReply(CReply::bad_request);
                                         return;
                                     }
 
-                                    if (LValue.IsEmpty()) {
+                                    if (value.IsEmpty()) {
                                         AConnection->SendStockReply(CReply::bad_request);
                                         return;
                                     }
 
-                                    LPayload.Object().AddPair("key", LKey);
-                                    LPayload.Object().AddPair("value", LValue);
+                                    LPayload.Object().AddPair("key", key);
+                                    LPayload.Object().AddPair("value", value);
                                 }
 
                                 LPoint->Messages()->Add(OnRequest, LAction, LPayload);
@@ -661,21 +661,21 @@ namespace Apostol {
                                     LPayload << LRequest->Content;
 
                                 } else {
-                                    const CString &LConnectorId = LRequest->Params["connectorId"];
-                                    const CString &LIdTag = LRequest->Params["idTag"];
+                                    const CString &connectorId = LRequest->Params["connectorId"];
+                                    const CString &idTag = LRequest->Params["idTag"];
 
-                                    if (LConnectorId.IsEmpty()) {
+                                    if (connectorId.IsEmpty()) {
                                         AConnection->SendStockReply(CReply::bad_request);
                                         return;
                                     }
 
-                                    if (LIdTag.IsEmpty()) {
+                                    if (idTag.IsEmpty()) {
                                         AConnection->SendStockReply(CReply::bad_request);
                                         return;
                                     }
 
-                                    LPayload.Object().AddPair("connectorId", LConnectorId);
-                                    LPayload.Object().AddPair("idTag", LIdTag);
+                                    LPayload.Object().AddPair("connectorId", connectorId);
+                                    LPayload.Object().AddPair("idTag", idTag);
                                 }
 
                                 LPoint->Messages()->Add(OnRequest, LAction, LPayload);
@@ -691,20 +691,91 @@ namespace Apostol {
                                     LPayload << LRequest->Content;
 
                                 } else {
-                                    const CString &LTransactionId = LRequest->Params["transactionId"];
+                                    const CString &transactionId = LRequest->Params["transactionId"];
 
-                                    if (LTransactionId.IsEmpty()) {
+                                    if (transactionId.IsEmpty()) {
                                         AConnection->SendStockReply(CReply::bad_request);
                                         return;
                                     }
 
-                                    LPayload.Object().AddPair("transactionId", LTransactionId);
+                                    LPayload.Object().AddPair("transactionId", transactionId);
                                 }
 
                                 LPoint->Messages()->Add(OnRequest, LAction, LPayload);
 
                                 return;
 
+                            } else if (LAction == "ReserveNow") {
+
+                                CJSON LPayload(jvtObject);
+
+                                if (LContentType == "application/json") {
+
+                                    LPayload << LRequest->Content;
+
+                                } else {
+                                    const CString &connectorId = LRequest->Params["connectorId"];
+                                    const CString &expiryDate = LRequest->Params["expiryDate"];
+                                    const CString &idTag = LRequest->Params["idTag"];
+                                    const CString &parentIdTag = LRequest->Params["parentIdTag"];
+                                    const CString &reservationId = LRequest->Params["reservationId"];
+
+                                    if (connectorId.IsEmpty()) {
+                                        AConnection->SendStockReply(CReply::bad_request);
+                                        return;
+                                    }
+
+                                    if (expiryDate.IsEmpty()) {
+                                        AConnection->SendStockReply(CReply::bad_request);
+                                        return;
+                                    }
+
+                                    if (idTag.IsEmpty()) {
+                                        AConnection->SendStockReply(CReply::bad_request);
+                                        return;
+                                    }
+
+                                    if (reservationId.IsEmpty()) {
+                                        AConnection->SendStockReply(CReply::bad_request);
+                                        return;
+                                    }
+
+                                    LPayload.Object().AddPair("connectorId", connectorId);
+                                    LPayload.Object().AddPair("expiryDate", expiryDate);
+                                    LPayload.Object().AddPair("idTag", idTag);
+
+                                    if (!parentIdTag.IsEmpty())
+                                        LPayload.Object().AddPair("parentIdTag", parentIdTag);
+
+                                    LPayload.Object().AddPair("reservationId", reservationId);
+                                }
+
+                                LPoint->Messages()->Add(OnRequest, LAction, LPayload);
+
+                                return;
+
+                            } else if (LAction == "CancelReservation") {
+
+                                CJSON LPayload(jvtObject);
+
+                                if (LContentType == "application/json") {
+
+                                    LPayload << LRequest->Content;
+
+                                } else {
+                                    const CString &reservationId = LRequest->Params["reservationId"];
+
+                                    if (reservationId.IsEmpty()) {
+                                        AConnection->SendStockReply(CReply::bad_request);
+                                        return;
+                                    }
+
+                                    LPayload.Object().AddPair("reservationId", reservationId);
+                                }
+
+                                LPoint->Messages()->Add(OnRequest, LAction, LPayload);
+
+                                return;
                             }
                         }
                     } catch (Delphi::Exception::Exception &E) {
