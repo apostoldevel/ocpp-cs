@@ -32,7 +32,8 @@ namespace Apostol {
 
     namespace Module {
 
-        typedef TList<TList<CStringPairs>> CQueryResult;
+        typedef TList<CStringPairs> CQueryResult;
+        typedef TList<CQueryResult> CQueryResults;
         //--------------------------------------------------------------------------------------------------------------
 
         typedef std::function<void (CHTTPServerConnection *AConnection)> COnMethodHandlerEvent;
@@ -173,7 +174,8 @@ namespace Apostol {
 
 #ifdef WITH_POSTGRESQL
 
-            static void QueryToResult(CPQPollQuery *APollQuery, CQueryResult& AResult);
+            static void EnumQuery(CPQResult *APQResult, CQueryResult& AResult);
+            static void QueryToResults(CPQPollQuery *APollQuery, CQueryResults& AResults);
 
             CPQPollQuery *GetQuery(CPollConnection *AConnection);
 

@@ -226,35 +226,38 @@ namespace Apostol {
         }
         //--------------------------------------------------------------------------------------------------------------
 #ifdef WITH_POSTGRESQL
-        void CApostolModule::QueryToResult(CPQPollQuery *APollQuery, CQueryResult &AResult) {
-            CPQResult *LResult = nullptr;
+
+        void CApostolModule::EnumQuery(CPQResult *APQResult, CQueryResult& AResult) {
             CStringList LFields;
 
-            for (int i = 0; i < APollQuery->ResultCount(); ++i) {
-                LResult = APollQuery->Results(i);
+            for (int I = 0; I < APQResult->nFields(); ++I) {
+                LFields.Add(APQResult->fName(I));
+            }
 
-                if (LResult->ExecStatus() == PGRES_TUPLES_OK || LResult->ExecStatus() == PGRES_SINGLE_TUPLE) {
-
-                    LFields.Clear();
-                    for (int I = 0; I < LResult->nFields(); ++I) {
-                        LFields.Add(LResult->fName(I));
-                    }
-
-                    AResult.Add(TList<CStringPairs>());
-                    for (int Row = 0; Row < LResult->nTuples(); ++Row) {
-                        AResult[i].Add(CStringPairs());
-                        for (int Col = 0; Col < LResult->nFields(); ++Col) {
-                            if (LResult->GetIsNull(Row, Col)) {
-                                AResult[i].Last().AddPair(LFields[Col].c_str(), "");
-                            } else {
-                                if (LResult->fFormat(Col) == 0) {
-                                    AResult[i].Last().AddPair(LFields[Col].c_str(), LResult->GetValue(Row, Col));
-                                } else {
-                                    AResult[i].Last().AddPair(LFields[Col].c_str(), "<binary>");
-                                }
-                            }
+            for (int Row = 0; Row < APQResult->nTuples(); ++Row) {
+                AResult.Add(CStringPairs());
+                for (int Col = 0; Col < APQResult->nFields(); ++Col) {
+                    if (APQResult->GetIsNull(Row, Col)) {
+                        AResult.Last().AddPair(LFields[Col].c_str(), "");
+                    } else {
+                        if (APQResult->fFormat(Col) == 0) {
+                            AResult.Last().AddPair(LFields[Col].c_str(), APQResult->GetValue(Row, Col));
+                        } else {
+                            AResult.Last().AddPair(LFields[Col].c_str(), "<binary>");
                         }
                     }
+                }
+            }
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
+        void CApostolModule::QueryToResults(CPQPollQuery *APollQuery, CQueryResults& AResults) {
+            CPQResult *LResult = nullptr;
+            for (int i = 0; i < APollQuery->ResultCount(); ++i) {
+                LResult = APollQuery->Results(i);
+                if (LResult->ExecStatus() == PGRES_TUPLES_OK || LResult->ExecStatus() == PGRES_SINGLE_TUPLE) {
+                    AResults.Add(CQueryResult());
+                    EnumQuery(LResult, AResults[i]);
                 } else {
                     throw Delphi::Exception::EDBError(LResult->GetErrorMessage());
                 }
