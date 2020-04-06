@@ -144,7 +144,7 @@ namespace Apostol {
             }
 
             AuthorizeRequest& operator<< (const CJSON& Value) {
-                idTag = Value["idTag"].AsSiring();
+                idTag = Value["idTag"].AsString();
                 return *this;
             }
 
@@ -183,10 +183,10 @@ namespace Apostol {
                 if (!Value["connectorId"].IsEmpty())
                     connectorId = Value["connectorId"].AsInteger();
 
-                idTag = Value["idTag"].AsSiring();
+                idTag = Value["idTag"].AsString();
 
                 if (!Value["timestamp"].IsEmpty())
-                    timestamp = StrToDateTimeDef(Value["timestamp"].AsSiring().c_str(), 0, "%04d-%02d-%02dT%02d:%02d:%02d");
+                    timestamp = StrToDateTimeDef(Value["timestamp"].AsString().c_str(), 0, "%04d-%02d-%02dT%02d:%02d:%02d");
 
                 if (!Value["meterStart"].IsEmpty())
                     meterStart = Value["meterStart"].AsInteger();
@@ -224,13 +224,13 @@ namespace Apostol {
 
             SampledValue& operator<< (const CJSON& Value) {
 
-                value = Value["value"].AsSiring();
-                context = Value["context"].AsSiring();
-                format = Value["format"].AsSiring();
-                measurand = Value["measurand"].AsSiring();
-                phase = Value["phase"].AsSiring();
-                location = Value["location"].AsSiring();
-                unit = Value["unit"].AsSiring();
+                value = Value["value"].AsString();
+                context = Value["context"].AsString();
+                format = Value["format"].AsString();
+                measurand = Value["measurand"].AsString();
+                phase = Value["phase"].AsString();
+                location = Value["location"].AsString();
+                unit = Value["unit"].AsString();
 
                 return *this;
             }
@@ -281,18 +281,18 @@ namespace Apostol {
                 if (!Value["transactionId"].IsEmpty())
                     transactionId = Value["transactionId"].AsInteger();
 
-                idTag = Value["idTag"].AsSiring();
+                idTag = Value["idTag"].AsString();
 
                 if (!Value["timestamp"].IsEmpty())
-                    timestamp = StrToDateTimeDef(Value["timestamp"].AsSiring().c_str(), 0, "%04d-%02d-%02dT%02d:%02d:%02d");
+                    timestamp = StrToDateTimeDef(Value["timestamp"].AsString().c_str(), 0, "%04d-%02d-%02dT%02d:%02d:%02d");
 
                 if (!Value["meterStop"].IsEmpty())
                     meterStop = Value["meterStop"].AsInteger();
 
-                reason = Value["reason"].AsSiring();
+                reason = Value["reason"].AsString();
 
                 if (!Value["transactionData"].IsEmpty())
-                    XMLToMeterValue(Value["transactionData"].AsSiring(), transactionData);
+                    XMLToMeterValue(Value["transactionData"].AsString(), transactionData);
 
                 return *this;
             }
@@ -329,15 +329,15 @@ namespace Apostol {
 
             BootNotificationRequest& operator<< (const CJSON& Value) {
 
-                imsi = Value["imsi"].AsSiring();
-                iccid = Value["iccid"].AsSiring();
-                chargePointVendor = Value["chargePointVendor"].AsSiring();
-                chargePointModel = Value["chargePointModel"].AsSiring();
-                chargePointSerialNumber = Value["chargePointSerialNumber"].AsSiring();
-                chargeBoxSerialNumber = Value["chargeBoxSerialNumber"].AsSiring();
-                firmwareVersion = Value["firmwareVersion"].AsSiring();
-                meterType = Value["meterType"].AsSiring();
-                meterSerialNumber = Value["meterSerialNumber"].AsSiring();
+                imsi = Value["imsi"].AsString();
+                iccid = Value["iccid"].AsString();
+                chargePointVendor = Value["chargePointVendor"].AsString();
+                chargePointModel = Value["chargePointModel"].AsString();
+                chargePointSerialNumber = Value["chargePointSerialNumber"].AsString();
+                chargeBoxSerialNumber = Value["chargeBoxSerialNumber"].AsString();
+                firmwareVersion = Value["firmwareVersion"].AsString();
+                meterType = Value["meterType"].AsString();
+                meterSerialNumber = Value["meterSerialNumber"].AsString();
 
                 return *this;
             }
@@ -388,12 +388,12 @@ namespace Apostol {
             StatusNotificationRequest& operator<< (const CJSON& Value) {
 
                 connectorId = Value["connectorId"].AsInteger();
-                status = COCPPMessage::StringToChargePointStatus(Value["status"].AsSiring());
-                errorCode = COCPPMessage::StringToChargePointErrorCode(Value["errorCode"].AsSiring());
-                info = Value["info"].AsSiring();
-                timestamp = StrToDateTimeDef(Value["timestamp"].AsSiring().c_str(), 0, "%04d-%02d-%02dT%02d:%02d:%02d");
-                vendorId = Value["vendorId"].AsSiring();
-                vendorErrorCode = Value["vendorErrorCode"].AsSiring();
+                status = COCPPMessage::StringToChargePointStatus(Value["status"].AsString());
+                errorCode = COCPPMessage::StringToChargePointErrorCode(Value["errorCode"].AsString());
+                info = Value["info"].AsString();
+                timestamp = StrToDateTimeDef(Value["timestamp"].AsString().c_str(), 0, "%04d-%02d-%02dT%02d:%02d:%02d");
+                vendorId = Value["vendorId"].AsString();
+                vendorErrorCode = Value["vendorErrorCode"].AsString();
 
                 return *this;
             }
@@ -436,9 +436,9 @@ namespace Apostol {
 
             DataTransferRequest& operator<< (const CJSON& Value) {
 
-                vendorId = Value["vendorId"].AsSiring();
-                messageId = Value["messageId"].AsSiring();
-                data = Value["data"].AsSiring();
+                vendorId = Value["vendorId"].AsString();
+                messageId = Value["messageId"].AsString();
+                data = Value["data"].AsString();
 
                 return *this;
             }

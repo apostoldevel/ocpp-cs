@@ -132,6 +132,10 @@ namespace Apostol {
 
             CApplication *m_pApplication;
 
+            CEPollTimer *m_Timer;
+
+            int m_TimerInterval;
+
             typedef struct pwd_t {
                 const char *username;
                 const char *groupname;
@@ -142,6 +146,8 @@ namespace Apostol {
             CPasswd m_pwd;
 
             void SetPwd();
+
+            void UpdateTimer();
 
         protected:
 
@@ -158,6 +164,8 @@ namespace Apostol {
             pid_t ExecProcess(CExecuteContext *AContext);
 
             void ChildProcessGetStatus() override;
+
+            void SetTimerInterval(int Value);
 
         public:
 
@@ -180,6 +188,10 @@ namespace Apostol {
             void DeletePidFile();
 
             void SetUser(const char *AUserName, const char *AGroupName);
+            void SetUser(const CString& UserName, const CString& GroupName);
+
+            int TimerInterval() { return m_TimerInterval; }
+            void TimerInterval(int Value) { SetTimerInterval(Value); }
 
             void ServerStart();
             void ServerStop();
@@ -287,19 +299,21 @@ namespace Apostol {
             void BeforeRun() override;
             void AfterRun() override;
 
-            void Reload();
+        protected:
 
             void DoExit();
 
         public:
 
-            explicit CProcessSingle(CCustomProcess* AParent, CApplication *AApplication):
-                inherited(AParent, AApplication, ptSingle) {
+            CProcessSingle(CCustomProcess *AParent, CApplication *AApplication):
+                    inherited(AParent, AApplication, ptSingle) {
             };
 
             ~CProcessSingle() override = default;
 
             void Run() override;
+
+            void Reload();
 
         };
         //--------------------------------------------------------------------------------------------------------------
@@ -324,8 +338,8 @@ namespace Apostol {
 
         public:
 
-            explicit CProcessMaster(CCustomProcess* AParent, CApplication *AApplication):
-                inherited(AParent, AApplication, ptMaster) {
+            CProcessMaster(CCustomProcess* AParent, CApplication *AApplication):
+                    inherited(AParent, AApplication, ptMaster) {
             };
 
             ~CProcessMaster() override = default;
@@ -344,8 +358,8 @@ namespace Apostol {
 
         public:
 
-            explicit CProcessSignaller(CCustomProcess* AParent, CApplication *AApplication):
-                inherited(AParent, AApplication, ptSignaller) {
+            CProcessSignaller(CCustomProcess* AParent, CApplication *AApplication):
+                    inherited(AParent, AApplication, ptSignaller) {
             };
 
             ~CProcessSignaller() override = default;
@@ -359,7 +373,7 @@ namespace Apostol {
 
         public:
 
-            explicit CProcessNewBinary(CCustomProcess* AParent, CApplication *AApplication):
+            CProcessNewBinary(CCustomProcess* AParent, CApplication *AApplication):
                     inherited(AParent, AApplication, ptNewBinary) {
             };
 
@@ -377,17 +391,20 @@ namespace Apostol {
             void BeforeRun() override;
             void AfterRun() override;
 
+        protected:
+
             void DoExit();
 
         public:
 
-            explicit CProcessWorker(CCustomProcess* AParent, CApplication *AApplication):
-                inherited(AParent, AApplication, ptWorker) {
-            };
+            CProcessWorker(CCustomProcess *AParent, CApplication *AApplication):
+                    inherited(AParent, AApplication, ptWorker) {
+            }
 
             ~CProcessWorker() override = default;
 
             void Run() override;
+
         };
         //--------------------------------------------------------------------------------------------------------------
 
@@ -403,7 +420,7 @@ namespace Apostol {
 
         public:
 
-            explicit CProcessHelper(CCustomProcess* AParent, CApplication *AApplication):
+            CProcessHelper(CCustomProcess* AParent, CApplication *AApplication):
                     inherited(AParent, AApplication, ptHelper) {
             };
 

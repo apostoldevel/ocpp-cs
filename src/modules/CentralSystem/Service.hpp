@@ -124,6 +124,7 @@ namespace Apostol {
             void BeforeExecute(Pointer Data) override;
             void AfterExecute(Pointer Data) override;
 
+            void Heartbeat() override;
             void Execute(CHTTPServerConnection *AConnection) override;
 
             bool CheckUserAgent(const CString& Value) override;

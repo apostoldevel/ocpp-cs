@@ -31,7 +31,7 @@ Author:
 #include "CentralSystem/Service.hpp"
 //----------------------------------------------------------------------------------------------------------------------
 
-static void CreateModule(CModuleManager *AManager) {
+static void CreateModules(CModuleManager *AManager) {
     CCSService::CreateModule(AManager)->InitMethods();
 }
 

@@ -370,6 +370,7 @@ namespace Apostol {
             virtual void DoTrace(CCommand *ACommand);
             virtual void DoConnect(CCommand *ACommand);
 
+            virtual void DoTimer(CPollEventHandler *AHandler) abstract;
             virtual bool DoExecute(CTCPConnection *AConnection) abstract;
 
             virtual void DoVerbose(CSocketEvent *Sender, CTCPConnection *AConnection, LPCTSTR AFormat, va_list args);
@@ -445,6 +446,7 @@ namespace Apostol {
             void DoBeforeExecuteModule(CApostolModule *AModule) override;
             void DoAfterExecuteModule(CApostolModule *AModule) override;
 
+            void DoTimer(CPollEventHandler *AHandler) override;
             bool DoExecute(CTCPConnection *AConnection) override;
 
         public:

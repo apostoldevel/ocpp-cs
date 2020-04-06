@@ -207,7 +207,7 @@ namespace Apostol {
                         const auto& Response = LResult["response"];
 
                         if (!LResult["result"].AsBoolean())
-                            throw Delphi::Exception::EDBError(Response["error"].AsSiring().c_str());
+                            throw Delphi::Exception::EDBError(Response["error"].AsString().c_str());
 
                         jmResponse.Payload << Response.ToString();
                     }
@@ -303,22 +303,40 @@ namespace Apostol {
                 return;
             }
 
-            // If path ends in slash (i.e. is a directory) then add "index.html".
-            if (LRequestPath.back() == '/') {
-                LRequestPath += "index.html";
-            }
-
-            // Open the file to send back.
-            const CString LFullPath = LServer->DocRoot() + LRequestPath;
-            if (!FileExists(LFullPath.c_str())) {
-                AConnection->SendStockReply(CReply::not_found);
+            const auto& LAuthorization = LRequest->Headers.Values(_T("authorization"));
+            if (LAuthorization.IsEmpty()) {
+                AConnection->SendStockReply(CReply::unauthorized);
                 return;
             }
 
-            LReply->Content.LoadFromFile(LFullPath.c_str());
+            try {
+                CAuthorization Authorization(LAuthorization);
 
-            // Fill out the CReply to be sent to the client.
-            AConnection->SendReply(CReply::ok, Mapping::ExtToType(ExtractFileExt(szExt, LRequestPath.c_str())));
+                if (Authorization.Username != "ocpp" || Authorization.Password != Config()->APIPassphrase()) {
+                    AConnection->SendStockReply(CReply::unauthorized);
+                    return;
+                }
+
+                // If path ends in slash (i.e. is a directory) then add "index.html".
+                if (LRequestPath.back() == '/') {
+                    LRequestPath += "index.html";
+                }
+
+                // Open the file to send back.
+                const CString LFullPath = LServer->DocRoot() + LRequestPath;
+                if (!FileExists(LFullPath.c_str())) {
+                    AConnection->SendStockReply(CReply::not_found);
+                    return;
+                }
+
+                LReply->Content.LoadFromFile(LFullPath.c_str());
+
+                // Fill out the CReply to be sent to the client.
+                AConnection->SendReply(CReply::ok, Mapping::ExtToType(ExtractFileExt(szExt, LRequestPath.c_str())));
+            } catch (Delphi::Exception::Exception &E) {
+                AConnection->SendStockReply(CReply::bad_request);
+                Log()->Error(APP_LOG_EMERG, 0, E.what());
+            }
         }
         //--------------------------------------------------------------------------------------------------------------
 
@@ -887,6 +905,11 @@ namespace Apostol {
                 AConnection->CloseConnection(true);
                 Log()->Error(APP_LOG_EMERG, 0, e.what());
             }
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
+        void CCSService::Heartbeat() {
+
         }
         //--------------------------------------------------------------------------------------------------------------
 

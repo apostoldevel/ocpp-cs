@@ -50,7 +50,7 @@ namespace Apostol {
         public:
 
             COCPP(int argc, char *const *argv): CApplication(argc, argv) {
-                CreateModule(this);
+                CreateModules(this);
             };
 
             ~COCPP() override = default;
