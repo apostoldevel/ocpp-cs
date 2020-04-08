@@ -586,6 +586,20 @@ namespace Apostol {
         }
         //--------------------------------------------------------------------------------------------------------------
 
+        void CApplicationProcess::SetLimitNoFile(uint32_t value) {
+            if (value != static_cast<uint32_t>(-1)) {
+                struct rlimit rlmt = { 0, 0 };
+
+                rlmt.rlim_cur = (rlim_t) value;
+                rlmt.rlim_max = (rlim_t) value;
+
+                if (setrlimit(RLIMIT_NOFILE, &rlmt) == -1) {
+                    throw Delphi::Exception::ExceptionFrm("setrlimit(RLIMIT_NOFILE, %i) failed.", value);
+                }
+            }
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
         void CApplicationProcess::SetTimerInterval(int Value) {
             if (m_TimerInterval != Value) {
                 m_TimerInterval = Value;
@@ -972,6 +986,8 @@ namespace Apostol {
             Log()->Debug(0, MSG_PROCESS_START, GetProcessName(), Application()->Header().c_str());
 
             InitSignals();
+
+            SetLimitNoFile(Config()->LimitNoFile());
 
             ServerStart();
 #ifdef WITH_POSTGRESQL
@@ -1424,6 +1440,8 @@ namespace Apostol {
             InitSignals();
 
             Config()->Reload();
+
+            SetLimitNoFile(Config()->LimitNoFile());
 
             SetUser(Config()->User().c_str(), Config()->Group().c_str());
 

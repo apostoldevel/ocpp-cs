@@ -37,7 +37,7 @@ namespace Apostol {
         extern CConfig *GConfig;
         //--------------------------------------------------------------------------------------------------------------
 
-        enum CCommandType { ctInteger, ctDouble, ctBoolean, ctString, ctDateTime };
+        enum CCommandType { ctInteger, ctUInteger, ctDouble, ctBoolean, ctString, ctDateTime };
         //--------------------------------------------------------------------------------------------------------------
 
         typedef std::function<void (LPCTSTR lpValue)> COnConfigSetEvent;
@@ -80,6 +80,10 @@ namespace Apostol {
                         *((int *) m_pPtr) = m_Value.vasInteger;
                         break;
 
+                    case vtUnsigned:
+                        *((uint32_t *) m_pPtr) = m_Value.vasUnsigned;
+                        break;
+
                     case vtDouble:
                         *((double *) m_pPtr) = m_Value.vasDouble;
                         break;
@@ -115,6 +119,15 @@ namespace Apostol {
 
             CConfigCommand(LPCTSTR Section, LPCTSTR Ident, int *Value): CObject() {
                 m_Type = ctInteger;
+                m_lpszSection = Section;
+                m_lpszIdent = Ident;
+                m_Default = *Value;
+                m_Value = *Value;
+                m_pPtr = (Pointer) Value;
+            };
+
+            CConfigCommand(LPCTSTR Section, LPCTSTR Ident, uint32_t *Value): CObject() {
+                m_Type = ctUInteger;
                 m_lpszSection = Section;
                 m_lpszIdent = Ident;
                 m_Default = *Value;
@@ -250,13 +263,15 @@ namespace Apostol {
 
             CLog *m_pLog;
 
-            unsigned int m_uErrorCount;
+            uint32_t m_uErrorCount;
 
-            int m_nWorkers;
-            int m_nPort;
+            uint32_t m_nWorkers;
+            uint32_t m_nPort;
 
-            int m_nTimeOut;
-            int m_nConnectTimeOut;
+            uint32_t m_nTimeOut;
+            uint32_t m_nConnectTimeOut;
+
+            uint32_t m_nLimitNoFile;
 
             bool m_fMaster;
             bool m_fDaemon;
@@ -264,8 +279,8 @@ namespace Apostol {
             bool m_fPostgresConnect;
             bool m_fPostgresNotice;
 
-            int m_nPostgresPollMin;
-            int m_nPostgresPollMax;
+            uint32_t m_nPostgresPollMin;
+            uint32_t m_nPostgresPollMax;
 
             CString m_sUser;
             CString m_sGroup;
@@ -342,19 +357,21 @@ namespace Apostol {
 
             config_flag_t &Flags() { return m_Flags; };
 
-            unsigned int ErrorCount() { return m_uErrorCount; };
+            uint32_t ErrorCount() { return m_uErrorCount; };
 
-            int Workers() { return m_nWorkers; };
+            uint32_t Workers() { return m_nWorkers; };
 
             bool Master() { return m_fMaster; };
 
             bool Daemon() { return m_fDaemon; };
 
-            int Port() { return m_nPort; };
+            uint32_t Port() { return m_nPort; };
 
-            int TimeOut() { return m_nTimeOut; };
+            uint32_t TimeOut() { return m_nTimeOut; };
 
-            int ConnectTimeOut() { return m_nConnectTimeOut; };
+            uint32_t ConnectTimeOut() { return m_nConnectTimeOut; };
+
+            uint32_t LimitNoFile() { return m_nLimitNoFile; };
 
             bool PostgresConnect() { return m_fPostgresConnect; };
             bool PostgresNotice() { return m_fPostgresNotice; };

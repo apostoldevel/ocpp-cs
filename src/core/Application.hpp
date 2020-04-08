@@ -190,6 +190,8 @@ namespace Apostol {
             void SetUser(const char *AUserName, const char *AGroupName);
             void SetUser(const CString& UserName, const CString& GroupName);
 
+            static void SetLimitNoFile(uint32_t value);
+
             int TimerInterval() { return m_TimerInterval; }
             void TimerInterval(int Value) { SetTimerInterval(Value); }
 
