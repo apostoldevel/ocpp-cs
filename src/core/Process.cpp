@@ -711,7 +711,7 @@ namespace Apostol {
         //--------------------------------------------------------------------------------------------------------------
 
         void CServerProcess::DoPQPollingStatus(CPQConnection *AConnection) {
-            Log()->Postgres(APP_LOG_DEBUG, AConnection->StatusString());
+            Log()->Postgres(APP_LOG_DEBUG, AConnection->PollingStatusString());
         }
         //--------------------------------------------------------------------------------------------------------------
 
