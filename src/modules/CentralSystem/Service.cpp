@@ -59,6 +59,8 @@ namespace Apostol {
         CCSService::CCSService(CModuleManager *AManager) : CApostolModule(AManager) {
             m_CPManager = new CChargingPointManager();
             m_Headers.Add("Authorization");
+
+            CCSService::InitMethods();
         }
         //--------------------------------------------------------------------------------------------------------------
 
@@ -68,71 +70,58 @@ namespace Apostol {
         //--------------------------------------------------------------------------------------------------------------
 
         void CCSService::InitMethods() {
-            m_Methods.AddObject(_T("GET"), (CObject *) new CMethodHandler(true, std::bind(&CCSService::DoGet, this, _1)));
-            m_Methods.AddObject(_T("POST"), (CObject *) new CMethodHandler(true, std::bind(&CCSService::DoPost, this, _1)));
-            m_Methods.AddObject(_T("OPTIONS"), (CObject *) new CMethodHandler(true, std::bind(&CCSService::DoOptions, this, _1)));
-            m_Methods.AddObject(_T("PUT"), (CObject *) new CMethodHandler(false, std::bind(&CCSService::MethodNotAllowed, this, _1)));
-            m_Methods.AddObject(_T("DELETE"), (CObject *) new CMethodHandler(false, std::bind(&CCSService::MethodNotAllowed, this, _1)));
-            m_Methods.AddObject(_T("TRACE"), (CObject *) new CMethodHandler(false, std::bind(&CCSService::MethodNotAllowed, this, _1)));
-            m_Methods.AddObject(_T("HEAD"), (CObject *) new CMethodHandler(false, std::bind(&CCSService::MethodNotAllowed, this, _1)));
-            m_Methods.AddObject(_T("PATCH"), (CObject *) new CMethodHandler(false, std::bind(&CCSService::MethodNotAllowed, this, _1)));
-            m_Methods.AddObject(_T("CONNECT"), (CObject *) new CMethodHandler(false, std::bind(&CCSService::MethodNotAllowed, this, _1)));
+#if defined(_GLIBCXX_RELEASE) && (_GLIBCXX_RELEASE >= 9)
+            m_pMethods->AddObject(_T("GET")    , (CObject *) new CMethodHandler(true , [this](auto && Connection) { DoGet(Connection); }));
+            m_pMethods->AddObject(_T("POST")   , (CObject *) new CMethodHandler(true , [this](auto && Connection) { DoPost(Connection); }));
+            m_pMethods->AddObject(_T("OPTIONS"), (CObject *) new CMethodHandler(true , [this](auto && Connection) { DoOptions(Connection); }));
+            m_pMethods->AddObject(_T("PUT")    , (CObject *) new CMethodHandler(false, [this](auto && Connection) { MethodNotAllowed(Connection); }));
+            m_pMethods->AddObject(_T("DELETE") , (CObject *) new CMethodHandler(false, [this](auto && Connection) { MethodNotAllowed(Connection); }));
+            m_pMethods->AddObject(_T("TRACE")  , (CObject *) new CMethodHandler(false, [this](auto && Connection) { MethodNotAllowed(Connection); }));
+            m_pMethods->AddObject(_T("HEAD")   , (CObject *) new CMethodHandler(false, [this](auto && Connection) { MethodNotAllowed(Connection); }));
+            m_pMethods->AddObject(_T("PATCH")  , (CObject *) new CMethodHandler(false, [this](auto && Connection) { MethodNotAllowed(Connection); }));
+            m_pMethods->AddObject(_T("CONNECT"), (CObject *) new CMethodHandler(false, [this](auto && Connection) { MethodNotAllowed(Connection); }));
+#else
+            m_pMethods->AddObject(_T("GET"), (CObject *) new CMethodHandler(true, std::bind(&CWebService::DoGet, this, _1)));
+            m_pMethods->AddObject(_T("POST"), (CObject *) new CMethodHandler(true, std::bind(&CWebService::DoPost, this, _1)));
+            m_pMethods->AddObject(_T("OPTIONS"), (CObject *) new CMethodHandler(true, std::bind(&CWebService::DoOptions, this, _1)));
+            m_pMethods->AddObject(_T("PUT"), (CObject *) new CMethodHandler(false, std::bind(&CWebService::MethodNotAllowed, this, _1)));
+            m_pMethods->AddObject(_T("DELETE"), (CObject *) new CMethodHandler(false, std::bind(&CWebService::MethodNotAllowed, this, _1)));
+            m_pMethods->AddObject(_T("TRACE"), (CObject *) new CMethodHandler(false, std::bind(&CWebService::MethodNotAllowed, this, _1)));
+            m_pMethods->AddObject(_T("HEAD"), (CObject *) new CMethodHandler(false, std::bind(&CWebService::MethodNotAllowed, this, _1)));
+            m_pMethods->AddObject(_T("PATCH"), (CObject *) new CMethodHandler(false, std::bind(&CWebService::MethodNotAllowed, this, _1)));
+            m_pMethods->AddObject(_T("CONNECT"), (CObject *) new CMethodHandler(false, std::bind(&CWebService::MethodNotAllowed, this, _1)));
+#endif
         }
         //--------------------------------------------------------------------------------------------------------------
 
-        void CCSService::DebugRequest(CRequest *ARequest) {
-            DebugMessage("[%p] Request:\n%s %s HTTP/%d.%d\n", ARequest, ARequest->Method.c_str(), ARequest->Uri.c_str(), ARequest->VMajor, ARequest->VMinor);
-
-            for (int i = 0; i < ARequest->Headers.Count(); i++)
-                DebugMessage("%s: %s\n", ARequest->Headers[i].Name.c_str(), ARequest->Headers[i].Value.c_str());
-
-            if (!ARequest->Content.IsEmpty())
-                DebugMessage("\n%s\n", ARequest->Content.c_str());
+        void CCSService::InitRoots(const CSites &Sites) {
+            for (int i = 0; i < Sites.Count(); ++i) {
+                const auto& Site = Sites[i];
+                if (Site.Name != "default") {
+                    const auto& Hosts = Site.Config["hosts"];
+                    const auto& Root = Site.Config["root"].AsString();
+                    if (!Hosts.IsNull()) {
+                        for (int l = 0; l < Hosts.Count(); ++l)
+                            m_Roots.AddPair(Hosts[l].AsString(), Root);
+                    } else {
+                        m_Roots.AddPair(Site.Name, Root);
+                    }
+                }
+            }
+            m_Roots.AddPair("*", Sites.Default().Config["root"].AsString());
         }
         //--------------------------------------------------------------------------------------------------------------
 
-        void CCSService::DebugReply(CReply *AReply) {
-            DebugMessage("[%p] Reply:\nHTTP/%d.%d %d %s\n", AReply, AReply->VMajor, AReply->VMinor, AReply->Status, AReply->StatusText.c_str());
-
-            for (int i = 0; i < AReply->Headers.Count(); i++)
-                DebugMessage("%s: %s\n", AReply->Headers[i].Name.c_str(), AReply->Headers[i].Value.c_str());
-
-            if (!AReply->Content.IsEmpty())
-                DebugMessage("\n%s\n", AReply->Content.c_str());
-        }
-        //--------------------------------------------------------------------------------------------------------------
-
-        void CCSService::DebugConnection(CHTTPServerConnection *AConnection) {
-            DebugMessage("\n[%p] [%s:%d] [%d] ", AConnection, AConnection->Socket()->Binding()->PeerIP(),
-                         AConnection->Socket()->Binding()->PeerPort(), AConnection->Socket()->Binding()->Handle());
-
-            DebugRequest(AConnection->Request());
-
-            static auto OnReply = [](CObject *Sender) {
-                auto LConnection = dynamic_cast<CHTTPServerConnection *> (Sender);
-
-                DebugMessage("\n[%p] [%s:%d] [%d] ", LConnection, LConnection->Socket()->Binding()->PeerIP(),
-                             LConnection->Socket()->Binding()->PeerPort(), LConnection->Socket()->Binding()->Handle());
-
-                DebugReply(LConnection->Reply());
-            };
-
-            AConnection->OnReply(OnReply);
+        const CString &CCSService::GetRoot(const CString &Host) const {
+            auto Index = m_Roots.IndexOfName(Host);
+            if (Index == -1)
+                return m_Roots["*"].Value;
+            return m_Roots[Index].Value;
         }
         //--------------------------------------------------------------------------------------------------------------
 
         void CCSService::ExceptionToJson(int ErrorCode, const std::exception &AException, CString& Json) {
-            TCHAR ch;
-            LPCTSTR lpMessage = AException.what();
-            CString Message;
-
-            while ((ch = *lpMessage++) != 0) {
-                if ((ch == '"') || (ch == '\\'))
-                    Message.Append('\\');
-                Message.Append(ch);
-            }
-
-            Json.Format(R"({"error": {"code": %u, "message": "%s"}})", ErrorCode, Message.c_str());
+            Json.Format(R"({"error": {"code": %u, "message": "%s"}})", ErrorCode, Delphi::Json::EncodeJsonString(AException.what()).c_str());
         }
         //--------------------------------------------------------------------------------------------------------------
 
@@ -252,13 +241,13 @@ namespace Apostol {
         //--------------------------------------------------------------------------------------------------------------
 
         bool CCSService::DBParse(CHTTPServerConnection *AConnection, const CString &Identity, const CString &Action,
-                const CJSON &Payload) {
+                                 const CJSON &Payload) {
 
             CStringList SQL;
 
             SQL.Add(CString());
             SQL.Last().Format("SELECT * FROM ocpp.Parse('%s', '%s', '%s'::jsonb);",
-                       Identity.c_str(), Action.c_str(), Payload.ToString().c_str());
+                              Identity.c_str(), Action.c_str(), Payload.ToString().c_str());
 
             return QueryStart(AConnection, SQL);
         }
@@ -281,75 +270,70 @@ namespace Apostol {
         }
         //--------------------------------------------------------------------------------------------------------------
 
-        void CCSService::DoWWW(CHTTPServerConnection *AConnection) {
-            auto LServer = dynamic_cast<CHTTPServer *> (AConnection->Server());
-            auto LRequest = AConnection->Request();
+        void CCSService::Redirect(CHTTPServerConnection *AConnection, const CString& Location, bool SendNow) {
             auto LReply = AConnection->Reply();
 
-            TCHAR szExt[PATH_MAX] = {0};
+            LReply->AddHeader(_T("Location"), Location);
+            Log()->Message("Redirected to %s.", Location.c_str());
 
-            LReply->ContentType = CReply::html;
-
-            // Decode url to path.
-            CString LRequestPath;
-            if (!LServer->URLDecode(LRequest->Uri, LRequestPath)) {
-                AConnection->SendStockReply(CReply::bad_request);
-                return;
-            }
-
-            // Request path must be absolute and not contain "..".
-            if (LRequestPath.empty() || LRequestPath.front() != '/' || LRequestPath.find("..") != CString::npos) {
-                AConnection->SendStockReply(CReply::bad_request);
-                return;
-            }
-
-            const auto& LAuthorization = LRequest->Headers.Values(_T("authorization"));
-            if (LAuthorization.IsEmpty()) {
-                AConnection->SendStockReply(CReply::unauthorized);
-                return;
-            }
-
-            try {
-                CAuthorization Authorization(LAuthorization);
-
-                if (Authorization.Username != "ocpp" || Authorization.Password != Config()->APIPassphrase()) {
-                    AConnection->SendStockReply(CReply::unauthorized);
-                    return;
-                }
-
-                // If path ends in slash (i.e. is a directory) then add "index.html".
-                if (LRequestPath.back() == '/') {
-                    LRequestPath += "index.html";
-                }
-
-                // Open the file to send back.
-                const CString LFullPath = LServer->DocRoot() + LRequestPath;
-                if (!FileExists(LFullPath.c_str())) {
-                    AConnection->SendStockReply(CReply::not_found);
-                    return;
-                }
-
-                LReply->Content.LoadFromFile(LFullPath.c_str());
-
-                // Fill out the CReply to be sent to the client.
-                AConnection->SendReply(CReply::ok, Mapping::ExtToType(ExtractFileExt(szExt, LRequestPath.c_str())));
-            } catch (Delphi::Exception::Exception &E) {
-                AConnection->SendStockReply(CReply::bad_request);
-                Log()->Error(APP_LOG_EMERG, 0, E.what());
-            }
+            AConnection->SendStockReply(CReply::moved_temporarily, SendNow);
         }
         //--------------------------------------------------------------------------------------------------------------
 
-        void CCSService::DoGet(CHTTPServerConnection *AConnection) {
+        void CCSService::SendResource(CHTTPServerConnection *AConnection, const CString &Path, LPCTSTR AContentType, bool SendNow) {
+            auto LRequest = AConnection->Request();
+            auto LReply = AConnection->Reply();
+
+            const CString& LFullPath = GetRoot(LRequest->Location.Host()) + Path;
+            const CString& LResource = LFullPath.back() == '/' ? LFullPath + "index.html" : LFullPath;
+
+            if (!FileExists(LResource.c_str())) {
+                AConnection->SendStockReply(CReply::not_found, SendNow);
+                return;
+            }
+
+            if (AContentType == nullptr) {
+                TCHAR szFileExt[PATH_MAX] = {0};
+                auto fileExt = ExtractFileExt(szFileExt, LResource.c_str());
+                AContentType = Mapping::ExtToType(fileExt);
+            }
+
+            LReply->Content.LoadFromFile(LResource.c_str());
+            AConnection->SendReply(CReply::ok, AContentType, SendNow);
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
+        bool CCSService::CheckAuthorization(CHTTPServerConnection *AConnection, CAuthorization &Authorization) {
+            auto LRequest = AConnection->Request();
+            auto LReply = AConnection->Reply();
+
+            const auto& LAuthorization = LRequest->Headers.Values(_T("Authorization"));
+            if (LAuthorization.IsEmpty())
+                return false;
+
+            try {
+                Authorization << LAuthorization;
+                if (Authorization.Username == "ocpp" && Authorization.Password == Config()->APIPassphrase()) {
+                    return true;
+                }
+            } catch (std::exception &e) {
+                Log()->Error(APP_LOG_EMERG, 0, e.what());
+            }
+
+            return false;
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
+        void CCSService::DoAPI(CHTTPServerConnection *AConnection) {
 
             auto LRequest = AConnection->Request();
             auto LReply = AConnection->Reply();
 
             CStringList LUri;
-            SplitColumns(LRequest->Uri.c_str(), LRequest->Uri.Size(), &LUri, '/');
+            SplitColumns(LRequest->URI, LUri, '/');
 
             if (LUri.Count() == 0) {
-                DoWWW(AConnection);
+                AConnection->SendStockReply(CReply::not_found);
                 return;
             }
 
@@ -524,11 +508,49 @@ namespace Apostol {
 
                 return;
             } else {
-                DoWWW(AConnection);
+                AConnection->SendStockReply(CReply::not_found);
                 return;
             }
 
             AConnection->SendStockReply(CReply::not_found);
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
+        void CCSService::DoGet(CHTTPServerConnection *AConnection) {
+            auto LServer = dynamic_cast<CHTTPServer *> (AConnection->Server());
+            auto LRequest = AConnection->Request();
+
+            // Decode url to path.
+            CString url;
+            if (!CHTTPServer::URLDecode(LRequest->URI, url)) {
+                AConnection->SendStockReply(CReply::bad_request);
+                return;
+            }
+
+            CLocation Location(url);
+            auto& requestPath = Location.pathname;
+
+            // Request path must be absolute and not contain "..".
+            if (requestPath.empty() || requestPath.front() != '/' || requestPath.find("..") != CString::npos) {
+                AConnection->SendStockReply(CReply::bad_request);
+                return;
+            }
+
+            if (m_Roots.Count() == 0)
+                InitRoots(LServer->Sites());
+
+            CAuthorization Authorization;
+            if (!CheckAuthorization(AConnection, Authorization)) {
+                AConnection->SendStockReply(CReply::unauthorized);
+                return;
+            }
+
+            if (requestPath.SubString(0, 5) == "/api/") {
+                DoAPI(AConnection);
+                return;
+            }
+
+            SendResource(AConnection, requestPath);
         }
         //--------------------------------------------------------------------------------------------------------------
 
@@ -537,7 +559,7 @@ namespace Apostol {
             auto LReply = AConnection->Reply();
 
             CStringList LUri;
-            SplitColumns(LRequest->Uri.c_str(), LRequest->Uri.Size(), &LUri, '/');
+            SplitColumns(LRequest->URI.c_str(), LRequest->URI.Size(), &LUri, '/');
 
             if (LUri.Count() < 2) {
                 AConnection->SendStockReply(CReply::not_found);
@@ -566,16 +588,9 @@ namespace Apostol {
                         return;
                     }
 
-                    const auto &LAuthorization = LRequest->Headers.Values(_T("authorization"));
-                    if (LAuthorization.IsEmpty()) {
-                        AConnection->SendStockReply(CReply::unauthorized);
-                        return;
-                    }
-
                     try {
-                        CAuthorization Authorization(LAuthorization);
-
-                        if (Authorization.Username != "ocpp" || Authorization.Password != Config()->APIPassphrase()) {
+                        CAuthorization Authorization;
+                        if (!CheckAuthorization(AConnection, Authorization)) {
                             AConnection->SendStockReply(CReply::unauthorized);
                             return;
                         }
@@ -808,7 +823,11 @@ namespace Apostol {
                 auto LPoint = m_CPManager->FindPointByConnection(AConnection);
                 if (LPoint == nullptr) {
                     LPoint = m_CPManager->Add(AConnection);
+#if defined(_GLIBCXX_RELEASE) && (_GLIBCXX_RELEASE >= 9)
+                    AConnection->OnDisconnected([this](auto && Sender) { DoPointDisconnected(Sender); });
+#else
                     AConnection->OnDisconnected(std::bind(&CCSService::DoPointDisconnected, this, _1));
+#endif
                 }
 
                 LPoint->Parse(ptSOAP, LRequest->Content, LReply->Content);
@@ -828,16 +847,16 @@ namespace Apostol {
             auto LRequest = AConnection->Request();
             auto LReply = AConnection->Reply();
 #ifdef _DEBUG
-            DebugConnection(AConnection);
+            CApostolModule::DebugConnection(AConnection);
 #endif
             LReply->Clear();
             LReply->ContentType = CReply::html;
 
             CMethodHandler *Handler;
-            for (i = 0; i < m_Methods.Count(); ++i) {
-                Handler = (CMethodHandler *) m_Methods.Objects(i);
+            for (i = 0; i < m_pMethods->Count(); ++i) {
+                Handler = (CMethodHandler *) m_pMethods->Objects(i);
                 if (Handler->Allow()) {
-                    const CString& Method = m_Methods.Strings(i);
+                    const CString& Method = m_pMethods->Strings(i);
                     if (Method == LRequest->Method) {
                         CORS(AConnection);
                         Handler->Handler(AConnection);
@@ -846,7 +865,7 @@ namespace Apostol {
                 }
             }
 
-            if (i == m_Methods.Count()) {
+            if (i == m_pMethods->Count()) {
                 AConnection->SendStockReply(CReply::not_implemented);
             }
         }

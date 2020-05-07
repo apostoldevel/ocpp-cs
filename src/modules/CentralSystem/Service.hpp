@@ -31,49 +31,6 @@ namespace Apostol {
 
     namespace CSService {
 
-        enum CAuthorizationSchemes { asUnknown, asBasic };
-
-        typedef struct CAuthorization {
-
-            CAuthorizationSchemes Schema;
-
-            CString Username;
-            CString Password;
-
-            CAuthorization(): Schema(asUnknown) {
-
-            }
-
-            explicit CAuthorization(const CString& String): CAuthorization() {
-                Parse(String);
-            }
-
-            void Parse(const CString& String) {
-                if (String.SubString(0, 5).Lower() == "basic") {
-                    const CString LPassphrase(base64_decode(String.SubString(6)));
-
-                    const size_t LPos = LPassphrase.Find(':');
-                    if (LPos == CString::npos)
-                        throw Delphi::Exception::Exception("Authorization error: Incorrect passphrase.");
-
-                    Schema = asBasic;
-                    Username = LPassphrase.SubString(0, LPos);
-                    Password = LPassphrase.SubString(LPos + 1);
-
-                    if (Username.IsEmpty() || Password.IsEmpty())
-                        throw Delphi::Exception::Exception("Authorization error: Username and password has not be empty.");
-                } else {
-                    throw Delphi::Exception::Exception("Authorization error: Unknown schema.");
-                }
-            }
-
-            CAuthorization &operator << (const CString& String) {
-                Parse(String);
-                return *this;
-            }
-
-        } CAuthorization;
-
         //--------------------------------------------------------------------------------------------------------------
 
         //-- CCSService ------------------------------------------------------------------------------------------------
@@ -83,11 +40,14 @@ namespace Apostol {
         class CCSService: public CApostolModule {
         private:
 
+            CStringPairs m_Roots;
+
             CChargingPointManager *m_CPManager;
 
-            static void DebugRequest(CRequest *ARequest);
-            static void DebugReply(CReply *AReply);
-            static void DebugConnection(CHTTPServerConnection *AConnection);
+            void InitRoots(const CSites &Sites);
+            const CString& GetRoot(const CString &Host) const;
+
+            static bool CheckAuthorization(CHTTPServerConnection *AConnection, CAuthorization &Authorization);
 
             static void ExceptionToJson(int ErrorCode, const std::exception &AException, CString& Json);
 
@@ -96,7 +56,7 @@ namespace Apostol {
 
         protected:
 
-            static void DoWWW(CHTTPServerConnection *AConnection);
+            void DoAPI(CHTTPServerConnection *AConnection);
 
             void DoGet(CHTTPServerConnection *AConnection);
             void DoPost(CHTTPServerConnection *AConnection);
@@ -128,6 +88,10 @@ namespace Apostol {
             void Execute(CHTTPServerConnection *AConnection) override;
 
             bool CheckUserAgent(const CString& Value) override;
+
+            static void Redirect(CHTTPServerConnection *AConnection, const CString& Location, bool SendNow = false);
+
+            void SendResource(CHTTPServerConnection *AConnection, const CString &Path, LPCTSTR AContentType = nullptr, bool SendNow = false);
 
         };
     }

@@ -24,6 +24,10 @@ Author:
 #ifndef APOSTOL_CONFIG_HPP
 #define APOSTOL_CONFIG_HPP
 
+#define ConfMsgInvalidKey   _T("section \"%s\" invalid key \"%s\" in %s")
+#define ConfMsgInvalidValue _T("section \"%s\" key \"%s\" invalid value \"%s\" in %s:%d")
+#define ConfMsgEmpty        _T("section \"%s\" key \"%s\" value is empty in %s:%d")
+
 extern "C++" {
 
 namespace Apostol {

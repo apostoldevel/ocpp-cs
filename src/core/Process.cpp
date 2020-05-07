@@ -103,7 +103,7 @@ namespace Apostol {
         //--------------------------------------------------------------------------------------------------------------
 
         CCustomProcess::CCustomProcess(CProcessType AType, CCustomProcess *AParent): CObject(), CGlobalComponent(),
-            m_Type(AType), m_pParent(AParent) {
+                                                                                     m_Type(AType), m_pParent(AParent) {
 
             m_Pid = MainThreadID;
 
@@ -565,13 +565,7 @@ namespace Apostol {
 #ifdef WITH_POSTGRESQL
         void CServerProcess::SetPQServer(CPQServer *Value) {
             if (m_pPQServer != Value) {
-/*
-                if (Value != nullptr && m_pServer == nullptr)
-                    throw Delphi::Exception::Exception("Set, please, PQ Server after HTTP Server");
 
-                if (Value == nullptr && m_pServer != nullptr)
-                    throw Delphi::Exception::Exception("Unset, please, PQ Server after HTTP Server");
-*/
                 if (Value == nullptr) {
                     delete m_pPQServer;
                 }
@@ -634,11 +628,15 @@ namespace Apostol {
 
             if (PQServer()->Active()) {
                 LQuery = PQServer()->GetQuery();
-
+#if defined(_GLIBCXX_RELEASE) && (_GLIBCXX_RELEASE >= 9)
+                LQuery->OnSendQuery([this](auto && AQuery) { DoPQSendQuery(AQuery); });
+                LQuery->OnResultStatus([this](auto && AResult) { DoPQResultStatus(AResult); });
+                LQuery->OnResult([this](auto && AResult, auto && AExecStatus) { DoPQResult(AResult, AExecStatus); });
+#else
                 LQuery->OnSendQuery(std::bind(&CServerProcess::DoPQSendQuery, this, _1));
                 LQuery->OnResultStatus(std::bind(&CServerProcess::DoPQResultStatus, this, _1));
                 LQuery->OnResult(std::bind(&CServerProcess::DoPQResult, this, _1, _2));
-
+#endif
                 LQuery->PollConnection(AConnection);
             }
 
@@ -676,23 +674,23 @@ namespace Apostol {
         //--------------------------------------------------------------------------------------------------------------
 
         void CServerProcess::DoPQReceiver(CPQConnection *AConnection, const PGresult *AResult) {
-            CPQConnInfo &Info = AConnection->ConnInfo();
+            const auto& Info = AConnection->ConnInfo();
             if (Info.ConnInfo().IsEmpty()) {
                 Log()->Postgres(APP_LOG_INFO, _T("Receiver message: %s"), PQresultErrorMessage(AResult));
             } else {
-                Log()->Postgres(APP_LOG_INFO, "[%d] [postgresql://%s@%s:%s/%s] Receiver message: %s", AConnection->Socket(), Info["user"].c_str(),
-                                Info["host"].c_str(), Info["port"].c_str(), Info["dbname"].c_str(), PQresultErrorMessage(AResult));
+                Log()->Postgres(APP_LOG_INFO, "[%d] [postgresql://%s@%s:%s/%s] Receiver message: %s", AConnection->Socket(),
+                                Info["user"].c_str(), Info["host"].c_str(), Info["port"].c_str(), Info["dbname"].c_str(), PQresultErrorMessage(AResult));
             }
         }
         //--------------------------------------------------------------------------------------------------------------
 
         void CServerProcess::DoPQProcessor(CPQConnection *AConnection, LPCSTR AMessage) {
-            CPQConnInfo &Info = AConnection->ConnInfo();
+            const auto& Info = AConnection->ConnInfo();
             if (Info.ConnInfo().IsEmpty()) {
                 Log()->Postgres(APP_LOG_INFO, _T("Processor message: %s"), AMessage);
             } else {
-                Log()->Postgres(APP_LOG_INFO, "[%d] [postgresql://%s@%s:%s/%s] Processor message: %s", AConnection->Socket(), Info["user"].c_str(),
-                                Info["host"].c_str(), Info["port"].c_str(), Info["dbname"].c_str(), AMessage);
+                Log()->Postgres(APP_LOG_INFO, "[%d] [postgresql://%s@%s:%s/%s] Processor message: %s", AConnection->Socket(),
+                                Info["user"].c_str(), Info["host"].c_str(), Info["port"].c_str(), Info["dbname"].c_str(), AMessage);
             }
         }
         //--------------------------------------------------------------------------------------------------------------
@@ -787,11 +785,10 @@ namespace Apostol {
         void CServerProcess::DoPQConnect(CObject *Sender) {
             auto LConnection = dynamic_cast<CPQConnection *>(Sender);
             if (LConnection != nullptr) {
-                CPQConnInfo &Info = LConnection->ConnInfo();
+                const auto& Info = LConnection->ConnInfo();
                 if (!Info.ConnInfo().IsEmpty()) {
                     Log()->Postgres(APP_LOG_NOTICE, "[%d] [postgresql://%s@%s:%s/%s] Connected.", LConnection->PID(),
-                                    Info["user"].c_str(),
-                                    Info["host"].c_str(), Info["port"].c_str(), Info["dbname"].c_str());
+                                    Info["user"].c_str(), Info["host"].c_str(), Info["port"].c_str(), Info["dbname"].c_str());
                 }
             }
         }
@@ -800,18 +797,17 @@ namespace Apostol {
         void CServerProcess::DoPQDisconnect(CObject *Sender) {
             auto LConnection = dynamic_cast<CPQConnection *>(Sender);
             if (LConnection != nullptr) {
-                CPQConnInfo &Info = LConnection->ConnInfo();
+                const auto& Info = LConnection->ConnInfo();
                 if (!Info.ConnInfo().IsEmpty()) {
                     Log()->Postgres(APP_LOG_NOTICE, "[%d] [postgresql://%s@%s:%s/%s] Disconnected.", LConnection->PID(),
-                                    Info["user"].c_str(),
-                                    Info["host"].c_str(), Info["port"].c_str(), Info["dbname"].c_str());
+                                    Info["user"].c_str(), Info["host"].c_str(), Info["port"].c_str(), Info["dbname"].c_str());
                 }
             }
         }
         //--------------------------------------------------------------------------------------------------------------
 #endif
         void CServerProcess::DebugRequest(CRequest *ARequest) {
-            DebugMessage("[%p] Request:\n%s %s HTTP/%d.%d\n", ARequest, ARequest->Method.c_str(), ARequest->Uri.c_str(), ARequest->VMajor, ARequest->VMinor);
+            DebugMessage("[%p] Request:\n%s %s HTTP/%d.%d\n", ARequest, ARequest->Method.c_str(), ARequest->URI.c_str(), ARequest->VMajor, ARequest->VMinor);
 
             for (int i = 0; i < ARequest->Headers.Count(); i++)
                 DebugMessage("%s: %s\n", ARequest->Headers[i].Name.c_str(), ARequest->Headers[i].Value.c_str());
@@ -838,14 +834,21 @@ namespace Apostol {
             LClient->ClientName() = Application::Application->Title();
 
             LClient->PollStack(m_pServer->PollStack());
-
+#if defined(_GLIBCXX_RELEASE) && (_GLIBCXX_RELEASE >= 9)
+            LClient->OnVerbose([this](auto && Sender, auto && AConnection, auto && AFormat, auto && args) { DoVerbose(Sender, AConnection, AFormat, args); });
+            LClient->OnException([this](auto && AConnection, auto && AException) { DoServerException(AConnection, AException); });
+            LClient->OnEventHandlerException([this](auto && AHandler, auto && AException) { DoServerEventHandlerException(AHandler, AException); });
+            LClient->OnConnected([this](auto && Sender) { DoClientConnected(Sender); });
+            LClient->OnDisconnected([this](auto && Sender) { DoClientDisconnected(Sender); });
+            LClient->OnNoCommandHandler([this](auto && Sender, auto && AData, auto && AConnection) { DoNoCommandHandler(Sender, AData, AConnection); });
+#else
             LClient->OnVerbose(std::bind(&CServerProcess::DoVerbose, this, _1, _2, _3, _4));
             LClient->OnException(std::bind(&CServerProcess::DoServerException, this, _1, _2));
             LClient->OnEventHandlerException(std::bind(&CServerProcess::DoServerEventHandlerException, this, _1, _2));
             LClient->OnConnected(std::bind(&CServerProcess::DoClientConnected, this, _1));
             LClient->OnDisconnected(std::bind(&CServerProcess::DoClientDisconnected, this, _1));
             LClient->OnNoCommandHandler(std::bind(&CServerProcess::DoNoCommandHandler, this, _1, _2, _3));
-
+#endif
             return LClient;
         }
         //--------------------------------------------------------------------------------------------------------------
@@ -856,13 +859,13 @@ namespace Apostol {
         //--------------------------------------------------------------------------------------------------------------
 
         void CServerProcess::DoServerException(CTCPConnection *AConnection,
-                Delphi::Exception::Exception *AException) {
+                                               Delphi::Exception::Exception *AException) {
             Log()->Error(APP_LOG_EMERG, 0, AException->what());
         }
         //--------------------------------------------------------------------------------------------------------------
 
         void CServerProcess::DoServerEventHandlerException(CPollEventHandler *AHandler,
-                Delphi::Exception::Exception *AException) {
+                                                           Delphi::Exception::Exception *AException) {
             Log()->Error(APP_LOG_EMERG, 0, AException->what());
         }
         //--------------------------------------------------------------------------------------------------------------
@@ -910,7 +913,7 @@ namespace Apostol {
         //--------------------------------------------------------------------------------------------------------------
 
         void CServerProcess::DoVerbose(CSocketEvent *Sender, CTCPConnection *AConnection, LPCTSTR AFormat,
-                va_list args) {
+                                       va_list args) {
             Log()->Debug(0, AFormat, args);
         }
         //--------------------------------------------------------------------------------------------------------------
@@ -931,11 +934,11 @@ namespace Apostol {
                 const CString &LUserAgent = LRequest->Headers.Values(_T("user-agent"));
 
                 auto LBinding = LConnection->Socket()->Binding();
-                if ( LBinding != nullptr) {
+                if (LBinding != nullptr) {
                     Log()->Access(_T("%s %d %8.2f ms [%s] \"%s %s HTTP/%d.%d\" %d %d \"%s\" \"%s\"\r\n"),
                                   LBinding->PeerIP(), LBinding->PeerPort(),
                                   double((clock() - AConnection->Tag()) / (double) CLOCKS_PER_SEC * 1000), szTime,
-                                  LRequest->Method.c_str(), LRequest->Uri.c_str(), LRequest->VMajor, LRequest->VMinor,
+                                  LRequest->Method.c_str(), LRequest->URI.c_str(), LRequest->VMajor, LRequest->VMinor,
                                   LReply->Status, LReply->Content.Size(),
                                   LReferer.IsEmpty() ? "-" : LReferer.c_str(),
                                   LUserAgent.IsEmpty() ? "-" : LUserAgent.c_str());
@@ -1000,7 +1003,7 @@ namespace Apostol {
         //--------------------------------------------------------------------------------------------------------------
 
         CModuleProcess::CModuleProcess(CProcessType AType, CCustomProcess *AParent): CModuleManager(),
-            CServerProcess(AType, AParent) {
+                                                                                     CServerProcess(AType, AParent) {
         }
         //--------------------------------------------------------------------------------------------------------------
 

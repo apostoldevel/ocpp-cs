@@ -145,21 +145,27 @@ namespace Apostol {
         //--------------------------------------------------------------------------------------------------------------
 
         CApostolModule::CApostolModule(CModuleManager *AManager): CCollectionItem(AManager), CGlobalComponent() {
+            m_pMethods = CStringList::Create(true);
             m_Headers.Add("Content-Type");
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
+        CApostolModule::~CApostolModule() {
+            delete m_pMethods;
         }
         //--------------------------------------------------------------------------------------------------------------
 
         const CString &CApostolModule::GetAllowedMethods(CString &AllowedMethods) const {
             if (AllowedMethods.IsEmpty()) {
-                if (m_Methods.Count() > 0) {
+                if (m_pMethods->Count() > 0) {
                     CMethodHandler *Handler;
-                    for (int i = 0; i < m_Methods.Count(); ++i) {
-                        Handler = (CMethodHandler *) m_Methods.Objects(i);
+                    for (int i = 0; i < m_pMethods->Count(); ++i) {
+                        Handler = (CMethodHandler *) m_pMethods->Objects(i);
                         if (Handler->Allow()) {
                             if (AllowedMethods.IsEmpty())
-                                AllowedMethods = m_Methods.Strings(i);
+                                AllowedMethods = m_pMethods->Strings(i);
                             else
-                                AllowedMethods += _T(", ") + m_Methods.Strings(i);
+                                AllowedMethods += _T(", ") + m_pMethods->Strings(i);
                         }
                     }
                 }
@@ -204,7 +210,7 @@ namespace Apostol {
 
             AConnection->SendReply();
 #ifdef _DEBUG
-            if (LRequest->Uri == _T("/quit"))
+            if (LRequest->URI == _T("/quit"))
                 Application::Application->SignalProcess()->Quit();
 #endif
         }
@@ -269,15 +275,20 @@ namespace Apostol {
             CPQPollQuery *LQuery = Application::Application->GetQuery(AConnection);
 
             if (Assigned(LQuery)) {
+#if defined(_GLIBCXX_RELEASE) && (_GLIBCXX_RELEASE >= 9)
+                LQuery->OnPollExecuted([this](auto && APollQuery) { DoPostgresQueryExecuted(APollQuery); });
+                LQuery->OnException([this](auto && APollQuery, auto && AException) { DoPostgresQueryException(APollQuery, AException); });
+#else
                 LQuery->OnPollExecuted(std::bind(&CApostolModule::DoPostgresQueryExecuted, this, _1));
                 LQuery->OnException(std::bind(&CApostolModule::DoPostgresQueryException, this, _1, _2));
+#endif
             }
 
             return LQuery;
         }
         //--------------------------------------------------------------------------------------------------------------
 
-        bool CApostolModule::ExecSQL(CPollConnection *AConnection, const CStringList &SQL,
+        bool CApostolModule::ExecSQL(const CStringList &SQL, CPollConnection *AConnection,
                                      COnPQPollQueryExecutedEvent &&OnExecuted, COnPQPollQueryExceptionEvent &&OnException) {
 
             auto LQuery = GetQuery(AConnection);
@@ -303,7 +314,56 @@ namespace Apostol {
 
             return false;
         }
+        //--------------------------------------------------------------------------------------------------------------
 #endif
+        CHTTPClient *CApostolModule::GetClient(const CString &Host, uint16_t Port) {
+            return Application::Application->GetClient(Host.c_str(), Port);
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
+        void CApostolModule::DebugRequest(CRequest *ARequest) {
+            DebugMessage("[%p] Request:\n%s %s HTTP/%d.%d\n", ARequest, ARequest->Method.c_str(), ARequest->URI.c_str(), ARequest->VMajor, ARequest->VMinor);
+
+            for (int i = 0; i < ARequest->Headers.Count(); i++)
+                DebugMessage("%s: %s\n", ARequest->Headers[i].Name.c_str(), ARequest->Headers[i].Value.c_str());
+
+            if (!ARequest->Content.IsEmpty())
+                DebugMessage("\n%s\n", ARequest->Content.c_str());
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
+        void CApostolModule::DebugReply(CReply *AReply) {
+            DebugMessage("[%p] Reply:\nHTTP/%d.%d %d %s\n", AReply, AReply->VMajor, AReply->VMinor, AReply->Status, AReply->StatusText.c_str());
+
+            for (int i = 0; i < AReply->Headers.Count(); i++)
+                DebugMessage("%s: %s\n", AReply->Headers[i].Name.c_str(), AReply->Headers[i].Value.c_str());
+
+            if (!AReply->Content.IsEmpty())
+                DebugMessage("\n%s\n", AReply->Content.c_str());
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
+        void CApostolModule::DebugConnection(CHTTPServerConnection *AConnection) {
+            DebugMessage("\n[%p] [%s:%d] [%d] ", AConnection, AConnection->Socket()->Binding()->PeerIP(),
+                         AConnection->Socket()->Binding()->PeerPort(), AConnection->Socket()->Binding()->Handle());
+
+            DebugRequest(AConnection->Request());
+
+            static auto OnReply = [](CObject *Sender) {
+                auto LConnection = dynamic_cast<CHTTPServerConnection *> (Sender);
+                auto LBinding = LConnection->Socket()->Binding();
+
+                if (Assigned(LBinding)) {
+                    DebugMessage("\n[%p] [%s:%d] [%d] ", LConnection, LBinding->PeerIP(),
+                                 LBinding->PeerPort(), LBinding->Handle());
+                }
+
+                DebugReply(LConnection->Reply());
+            };
+
+            AConnection->OnReply(OnReply);
+        }
+
         //--------------------------------------------------------------------------------------------------------------
 
         //-- CModuleManager --------------------------------------------------------------------------------------------

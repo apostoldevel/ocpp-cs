@@ -32,7 +32,7 @@ Author:
 //----------------------------------------------------------------------------------------------------------------------
 
 static void CreateModules(CModuleManager *AManager) {
-    CCSService::CreateModule(AManager)->InitMethods();
+    CCSService::CreateModule(AManager);
 }
 
 #endif //APOSTOL_MODULES_HPP
