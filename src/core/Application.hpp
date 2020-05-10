@@ -44,81 +44,7 @@ namespace Apostol {
         class CApplication;
         //--------------------------------------------------------------------------------------------------------------
 
-        extern CApplication *Application;
-
-        //--------------------------------------------------------------------------------------------------------------
-
-        //-- CCustomApplication ----------------------------------------------------------------------------------------
-
-        //--------------------------------------------------------------------------------------------------------------
-
-        class CCustomApplication: public CObject {
-        private:
-
-            int                 m_argc;
-            CStringList         m_argv;
-
-            CString             m_cmdline;
-
-            CString             m_name;
-            CString             m_description;
-            CString             m_version;
-            CString             m_title;
-
-            CString             m_header;
-
-        protected:
-
-            int                 m_exitcode;
-
-            char              **m_os_argv;
-            char              **m_os_environ;
-            char               *m_os_argv_last;
-            char               *m_environ;
-
-            void Initialize();
-            void SetEnviron();
-
-            void SetHeader(LPCTSTR Value);
-
-        public:
-
-            CCustomApplication(int argc, char *const *argv);
-
-            ~CCustomApplication() override;
-
-            char *const *Environ() { return &m_environ; };
-
-            int ExitCode() const { return m_exitcode; };
-            void ExitCode(int Status) { m_exitcode = Status; };
-
-            const CStringList &argv() { return m_argv; };
-
-            int argc() const { return m_argc; };
-
-            char *const *os_argv() { return m_os_argv; };
-
-            const CString& CmdLine() { return m_cmdline; };
-
-            CString& Name() { return m_name; };
-            const CString& Name() const { return m_name; };
-
-            CString& Description() { return m_description; };
-            const CString& Description() const { return m_description; };
-
-            CString& Version() { return m_version; };
-            const CString& Version() const { return m_version; };
-
-            CString& Title() { return m_title; };
-            const CString& Title() const { return m_title; };
-
-            CString& Header() { return m_header; };
-
-            // Replace command name
-            void Header(const CString& Value) { SetHeader(Value.c_str()); };
-            void Header(LPCTSTR Value) { SetHeader(Value); };
-
-        }; // class CCustomApplication
+        extern CApplication *GApplication;
 
         //--------------------------------------------------------------------------------------------------------------
 
@@ -127,31 +53,34 @@ namespace Apostol {
         //--------------------------------------------------------------------------------------------------------------
 
         class CApplicationProcess: public CModuleProcess, public CCollectionItem {
-
         private:
 
             CApplication *m_pApplication;
 
-            CEPollTimer *m_Timer;
-
-            int m_TimerInterval;
-
-            typedef struct pwd_t {
+            struct pwd_t {
                 const char *username;
                 const char *groupname;
                 uid_t uid;
                 gid_t gid;
-            } CPasswd;
 
-            CPasswd m_pwd;
+                pwd_t () {
+                    username = nullptr;
+                    groupname = nullptr;
+                    uid = (uid_t) -1;
+                    gid = (gid_t) -1;
+                }
 
-            void SetPwd();
+            } m_pwd;
 
-            void UpdateTimer();
+            void SetPwd() const;
 
         protected:
 
-            CPollStack *m_PollStack;
+            CEPollTimer *m_pTimer;
+
+            CPollStack *m_pPollStack;
+
+            int m_TimerInterval;
 
             void CreateHTTPServer();
 #ifdef WITH_POSTGRESQL
@@ -166,6 +95,8 @@ namespace Apostol {
             void ChildProcessGetStatus() override;
 
             void SetTimerInterval(int Value);
+
+            virtual void UpdateTimer();
 
         public:
 
@@ -248,19 +179,14 @@ namespace Apostol {
         class CApplication: public CProcessManager, public CCustomApplication, public CApplicationProcess {
             friend CApostolModule;
 
-        private:
+        protected:
 
             CProcessType m_ProcessType;
 
-            void CreateLogFile();
+            static void CreateLogFile();
             void Daemonize();
 
-            void StartProcess();
-
-        protected:
-
-            void MkDir(const CString &Dir);
-            void CreateDirectories();
+            static void CreateDirectories();
 
             void DoBeforeStartProcess(CApplicationProcess *AProcess) override;
             void DoAfterStartProcess(CApplicationProcess *AProcess) override;
@@ -270,13 +196,15 @@ namespace Apostol {
             virtual void ParseCmdLine() abstract;
             virtual void ShowVersionInfo() abstract;
 
+            virtual void StartProcess();
+
         public:
 
             CApplication(int argc, char *const *argv);
 
-            inline void Destroy() override { delete this; };
+            ~CApplication() override;
 
-            ~CApplication() override = default;
+            inline void Destroy() override { delete this; };
 
             pid_t ExecNewBinary(char *const *argv);
 
@@ -286,6 +214,8 @@ namespace Apostol {
             void ProcessType(CProcessType Value) { SetProcessType(Value); };
 
             void Run() override;
+
+            static void MkDir(const CString &Dir);
 
         }; // class CApplication
 
@@ -337,8 +267,8 @@ namespace Apostol {
             void StartProcess(CProcessType Type, int Flag);
             void StartProcesses(int Flag);
 
-            void SignalToProcess(CProcessType Type, int Signo);
-            void SignalToProcesses(int Signo);
+            void SignalToProcess(CProcessType Type, int SigNo);
+            void SignalToProcesses(int SigNo);
 
         public:
 

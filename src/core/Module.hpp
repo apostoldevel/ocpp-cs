@@ -116,7 +116,7 @@ namespace Apostol {
         public:
 
             CMethodHandler(bool Allow, COnMethodHandlerEvent && Handler): CObject(),
-                                                                          m_Allow(Allow), m_Handler(Handler) {
+                m_Allow(Allow), m_Handler(Handler) {
 
             };
 
@@ -216,8 +216,6 @@ namespace Apostol {
             virtual void DoPostgresQueryException(CPQPollQuery *APollQuery, Delphi::Exception::Exception *AException) abstract;
 #endif
         public:
-
-            CApostolModule();
 
             explicit CApostolModule(CModuleManager *AManager);
 

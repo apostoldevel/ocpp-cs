@@ -21,7 +21,7 @@ Author:
 
 --*/
 
-#include "Ocpp.hpp"
+#include "ocpp.hpp"
 //----------------------------------------------------------------------------------------------------------------------
 
 #define exit_failure(msg) {                                 \
@@ -199,19 +199,19 @@ int main(int argc, char *argv[]) {
     int exitcode;
 
     DefaultLocale.SetLocale("");
+    
+    COCPP ocpp(argc, argv);
 
     try
     {
-        Application = COCPP::Create(argc, argv);
+        ocpp.Name() = APP_NAME;
+        ocpp.Description() = APP_DESCRIPTION;
+        ocpp.Version() = APP_VERSION;
+        ocpp.Title() = APP_VER;
 
-        Application->Name() = APP_NAME;
-        Application->Description() = APP_DESCRIPTION;
-        Application->Version() = APP_VERSION;
-        Application->Title() = APP_VER;
+        ocpp.Run();
 
-        Application->Run();
-
-        exitcode = Application->ExitCode();
+        exitcode = ocpp.ExitCode();
     }
     catch (std::exception& e)
     {
@@ -221,8 +221,6 @@ int main(int argc, char *argv[]) {
     {
         exit_failure("Unknown error...");
     }
-
-    Application->Destroy();
 
     exit(exitcode);
 }

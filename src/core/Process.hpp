@@ -32,33 +32,6 @@ Author:
 #define PROCESS_DETACHED      -5
 //----------------------------------------------------------------------------------------------------------------------
 
-//extern sig_atomic_t    sig_fatal;
-//----------------------------------------------------------------------------------------------------------------------
-
-#define INVALID_PID (-1)
-//----------------------------------------------------------------------------------------------------------------------
-
-#define signal_value_helper(n)      SIG##n
-#define signal_value(n)             signal_value_helper(n)
-
-#define sig_value_helper(n)             #n
-#define sig_value(n)                sig_value_helper(n)
-//----------------------------------------------------------------------------------------------------------------------
-
-#define SIG_SHUTDOWN_SIGNAL      QUIT
-#define SIG_TERMINATE_SIGNAL     TERM
-#define SIG_NOACCEPT_SIGNAL      WINCH
-#define SIG_RECONFIGURE_SIGNAL   HUP
-
-#if (LINUX_THREADS)
-#define SIG_REOPEN_SIGNAL        INFO
-#define SIG_CHANGEBIN_SIGNAL     XCPU
-#else
-#define SIG_REOPEN_SIGNAL        USR1
-#define SIG_CHANGEBIN_SIGNAL     USR2
-#endif
-//----------------------------------------------------------------------------------------------------------------------
-
 #define log_failure(msg) {                                  \
   if (GLog != nullptr)                                      \
     GLog->Error(APP_LOG_EMERG, 0, msg);                     \
@@ -66,9 +39,6 @@ Author:
     std::cerr << APP_NAME << ": " << (msg) << std::endl;    \
   exit(2);                                                  \
 }                                                           \
-//----------------------------------------------------------------------------------------------------------------------
-
-typedef void (* CSignalHandler) (int signo, siginfo_t *siginfo, void *ucontext);
 //----------------------------------------------------------------------------------------------------------------------
 
 void signal_handler(int signo, siginfo_t *siginfo, void *ucontext);
@@ -152,9 +122,11 @@ namespace Apostol {
         public:
 
             CCustomProcess(): CCustomProcess(ptMain, nullptr) {
+
             };
 
             explicit CCustomProcess(CProcessType AType): CCustomProcess(AType, nullptr) {
+
             };
 
             explicit CCustomProcess(CProcessType AType, CCustomProcess *AParent);
@@ -170,11 +142,11 @@ namespace Apostol {
 
             virtual void Assign(CCustomProcess *AProcess);
 
-            void ExecuteProcess(CExecuteContext *AContext);
+            static void ExecuteProcess(CExecuteContext *AContext);
 
-            CProcessType Type() { return m_Type; };
+            CProcessType Type() const { return m_Type; };
 
-            pid_t Pid() { return m_Pid; };
+            pid_t Pid() const { return m_Pid; };
             void Pid(pid_t Value) { SetPid(Value); };
 
             pid_t ParentId();
@@ -185,117 +157,36 @@ namespace Apostol {
             const CString& ProcessName() const { return m_ProcessName; };
             void ProcessName(LPCTSTR Value) { SetProcessName(Value); };
 
-            LPCTSTR GetProcessName() { return m_ProcessName.c_str(); };
+            LPCTSTR GetProcessName() const { return m_ProcessName.c_str(); };
 
             Pointer Data() { return m_pData; };
             void Data(Pointer Value) { SetData(Value); };
 
-            pid_t NewBinary() { return m_NewBinary; };
+            pid_t NewBinary() const { return m_NewBinary; };
             void NewBinary(pid_t Value) { m_NewBinary = Value; };
 
-            bool Daemonized() { return m_fDaemonized; };
+            bool Daemonized() const { return m_fDaemonized; };
             void Daemonized(bool Value) { m_fDaemonized = Value; };
 
-            bool Respawn() { return m_respawn; };
+            bool Respawn() const { return m_respawn; };
             void Respawn(bool Value) { SetRespawn(Value); };
 
-            bool JustSpawn() { return m_just_spawn; };
+            bool JustSpawn() const { return m_just_spawn; };
             void JustSpawn(bool Value) { SetJustSpawn(Value); };
 
-            bool Detached() { return m_detached; };
+            bool Detached() const { return m_detached; };
             void Detached(bool Value) { SetDetached(Value); };
 
-            bool Exited() { return m_exited; };
+            bool Exited() const { return m_exited; };
             void Exited(bool Value) { SetExited(Value); };
 
-            bool Exiting() { return m_exiting; };
+            bool Exiting() const { return m_exiting; };
             void Exiting(bool Value) { SetExiting(Value); };
 
-            int Status() { return m_Status; };
+            int Status() const { return m_Status; };
             void Status(int Value) { SetStatus(Value); };
 
         }; // class CCustomProcess
-
-        //--------------------------------------------------------------------------------------------------------------
-
-        //-- CSignal ---------------------------------------------------------------------------------------------------
-
-        //--------------------------------------------------------------------------------------------------------------
-
-        class CSignal: public CCollectionItem {
-        private:
-
-            int             m_signo;
-
-            LPCTSTR         m_code;
-            LPCTSTR         m_name;
-
-            CSignalHandler  m_handler;
-
-        protected:
-
-            void SetCode(LPCTSTR Value);
-            void SetName(LPCTSTR Value);
-
-            void SetHandler(CSignalHandler Value);
-
-        public:
-
-            CSignal(CCollection *ACollection, int ASigno);
-
-            int Signo() { return m_signo; };
-
-            LPCTSTR Code() { return m_code; };
-            void Code(LPCTSTR Value) { SetCode(Value); };
-
-            LPCTSTR Name() { return m_name; };
-            void Name(LPCTSTR Value) { SetName(Value); };
-
-            CSignalHandler Handler() { return m_handler; };
-            void Handler(CSignalHandler Value) { SetHandler(Value); };
-
-        };
-
-        //--------------------------------------------------------------------------------------------------------------
-
-        //-- CSignals --------------------------------------------------------------------------------------------------
-
-        //--------------------------------------------------------------------------------------------------------------
-
-        class CSignals: public CCollection {
-            typedef CCollection inherited;
-
-        private:
-
-            CSignal *Get(int Index);
-            void Put(int Index, CSignal *Signal);
-
-        public:
-
-            CSignals(): CCollection(this) {};
-
-            void AddSignal(int ASigno, LPCTSTR ACode, LPCTSTR AName, CSignalHandler AHandler);
-
-            inline static class CSignals *Create() { return new CSignals(); };
-
-            ~CSignals() override = default;
-
-            int IndexOfSigno(int Signo);
-
-            void InitSignals();
-
-            sigset_t *SigAddSet(sigset_t *set);
-
-            void SigProcMask(int How, const sigset_t *set, sigset_t *oset = nullptr);
-
-            int SignalsCount() { return Count(); };
-
-            CSignal *Signals(int Index) { return Get(Index); };
-
-            void Strings(int Index, CSignal *Value) { return Put(Index, Value); };
-
-            CSignal *operator[] (int Index) override { return Signals(Index); }
-        };
 
         //--------------------------------------------------------------------------------------------------------------
 
@@ -325,7 +216,7 @@ namespace Apostol {
             uint_t          sig_restart;
             uint_t          sig_noaccepting;
 
-            virtual void CreateSignals();
+            void CreateSignals();
 
             virtual void ChildProcessGetStatus() abstract;
 
@@ -337,9 +228,7 @@ namespace Apostol {
 
             virtual CSignalProcess *SignalProcess() { return m_pSignalProcess; };
 
-            virtual void SignalHandler(int signo, siginfo_t *siginfo, void *ucontext);
-
-            //virtual void Terminate();
+            void SignalHandler(int signo, siginfo_t *siginfo, void *ucontext) override;
 
             virtual void Quit();
 
@@ -394,6 +283,7 @@ namespace Apostol {
             virtual void DoPQServerException(CPQServer *AServer, Delphi::Exception::Exception *AException);
             virtual void DoPQConnectException(CPQConnection *AConnection, Delphi::Exception::Exception *AException);
 
+            virtual void DoPQError(CPQConnection *AConnection);
             virtual void DoPQStatus(CPQConnection *AConnection);
             virtual void DoPQPollingStatus(CPQConnection *AConnection);
 
@@ -423,7 +313,7 @@ namespace Apostol {
 
             virtual CPQPollQuery *GetQuery(CPollConnection *AConnection);
 
-            bool ExecSQL(CPollConnection *AConnection, const CStringList &SQL,
+            bool ExecSQL(const CStringList &SQL, CPollConnection *AConnection = nullptr,
                          COnPQPollQueryExecutedEvent && OnExecuted = nullptr,
                          COnPQPollQueryExceptionEvent && OnException = nullptr);
 #endif
