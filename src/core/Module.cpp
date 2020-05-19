@@ -34,6 +34,19 @@ namespace Apostol {
 
     namespace Module {
 
+        LPCTSTR StrWebTime(time_t Time, LPTSTR lpszBuffer, size_t Size) {
+            struct tm *gmt;
+
+            gmt = gmtime(&Time);
+
+            if ((gmt != nullptr) && (strftime(lpszBuffer, Size, "%a, %d %b %Y %T %Z", gmt) != 0)) {
+                return lpszBuffer;
+            }
+
+            return nullptr;
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
         unsigned char random_char() {
             std::random_device rd;
             std::mt19937 gen(rd());
@@ -140,12 +153,19 @@ namespace Apostol {
         //--------------------------------------------------------------------------------------------------------------
 
         CApostolModule::CApostolModule(CModuleManager *AManager): CCollectionItem(AManager), CGlobalComponent() {
+            m_Version = -1;
+#ifdef WITH_POSTGRESQL
+            m_pJobs = new CJobManager();
+#endif
             m_pMethods = CStringList::Create(true);
             m_Headers.Add("Content-Type");
         }
         //--------------------------------------------------------------------------------------------------------------
 
         CApostolModule::~CApostolModule() {
+#ifdef WITH_POSTGRESQL
+            delete m_pJobs;
+#endif
             delete m_pMethods;
         }
         //--------------------------------------------------------------------------------------------------------------
@@ -194,6 +214,188 @@ namespace Apostol {
         }
         //--------------------------------------------------------------------------------------------------------------
 
+        void CApostolModule::InitRoots(const CSites &Sites) {
+            for (int i = 0; i < Sites.Count(); ++i) {
+                const auto& Site = Sites[i];
+                if (Site.Name != "default") {
+                    const auto& Hosts = Site.Config["hosts"];
+                    const auto& Root = Site.Config["root"].AsString();
+                    if (!Hosts.IsNull()) {
+                        for (int l = 0; l < Hosts.Count(); ++l)
+                            m_Roots.AddPair(Hosts[l].AsString(), Root);
+                    } else {
+                        m_Roots.AddPair(Site.Name, Root);
+                    }
+                }
+            }
+            m_Roots.AddPair("*", Sites.Default().Config["root"].AsString());
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
+        const CString &CApostolModule::GetRoot(const CString &Host) const {
+            auto Index = m_Roots.IndexOfName(Host);
+            if (Index == -1)
+                return m_Roots["*"].Value;
+            return m_Roots[Index].Value;
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
+        CString CApostolModule::GetUserAgent(CHTTPServerConnection *AConnection) {
+            auto LServer = dynamic_cast<CHTTPServer *> (AConnection->Server());
+            auto LRequest = AConnection->Request();
+
+            const auto& LAgent = LRequest->Headers.Values(_T("User-Agent"));
+
+            return LAgent.IsEmpty() ? LServer->ServerName() : LAgent;
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
+        CString CApostolModule::GetHost(CHTTPServerConnection *AConnection) {
+            auto LRequest = AConnection->Request();
+            CString Host;
+
+            const auto& LRealIP = LRequest->Headers.Values(_T("X-Real-IP"));
+            if (!LRealIP.IsEmpty()) {
+                Host = LRealIP;
+            } else {
+                auto LBinding = AConnection->Socket()->Binding();
+                if (LBinding != nullptr) {
+                    Host = LBinding->PeerIP();
+                }
+            }
+
+            return Host;
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
+        void CApostolModule::ExceptionToJson(int ErrorCode, const std::exception &AException, CString& Json) {
+            Json.Format(R"({"error": {"code": %u, "message": "%s"}})", ErrorCode, Delphi::Json::EncodeJsonString(AException.what()).c_str());
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
+        void CApostolModule::ContentToJson(CRequest *ARequest, CJSON &Json) {
+
+            const auto& ContentType = ARequest->Headers.Values(_T("content-type"));
+
+            if (ContentType.IsEmpty())
+                return;
+
+            if (ContentType == "application/x-www-form-urlencoded") {
+
+                const CStringList &formData = ARequest->FormData;
+
+                auto& jsonObject = Json.Object();
+                for (int i = 0; i < formData.Count(); ++i) {
+                    jsonObject.AddPair(formData.Names(i), formData.ValueFromIndex(i));
+                }
+
+            } else if (ContentType.Find("multipart/form-data") != CString::npos) {
+
+                CFormData formData;
+                CRequestParser::ParseFormData(ARequest, formData);
+
+                auto& jsonObject = Json.Object();
+                for (int i = 0; i < formData.Count(); ++i) {
+                    jsonObject.AddPair(formData[i].Name, formData[i].Data);
+                }
+
+            } else if (ContentType == "application/json") {
+
+                Json << ARequest->Content;
+
+            } else {
+                throw Delphi::Exception::Exception("Invalid content type.");
+            }
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
+        void CApostolModule::Redirect(CHTTPServerConnection *AConnection, const CString& Location, bool SendNow) {
+            auto LReply = AConnection->Reply();
+
+            LReply->AddHeader(_T("Location"), Location);
+            Log()->Message("Redirected to %s.", Location.c_str());
+
+            AConnection->SendStockReply(CReply::moved_temporarily, SendNow);
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
+        void CApostolModule::SendResource(CHTTPServerConnection *AConnection, const CString &Path,
+                LPCTSTR AContentType, bool SendNow) const {
+
+            auto LRequest = AConnection->Request();
+            auto LReply = AConnection->Reply();
+
+            CString LResource(GetRoot(LRequest->Location.Host()));
+            LResource += Path;
+
+            if (LResource.back() == '/') {
+                LResource += "index.html";
+            }
+
+            if (!FileExists(LResource.c_str())) {
+                AConnection->SendStockReply(CReply::not_found, SendNow);
+                return;
+            }
+
+            TCHAR szBuffer[MAX_BUFFER_SIZE + 1] = {0};
+
+            if (AContentType == nullptr) {
+                auto fileExt = ExtractFileExt(szBuffer, LResource.c_str());
+                AContentType = Mapping::ExtToType(fileExt);
+            }
+
+            auto lastModified = StrWebTime(FileAge(LResource.c_str()), szBuffer, sizeof(szBuffer));
+            if (lastModified != nullptr)
+                LReply->AddHeader(_T("Last-Modified"), lastModified);
+
+            LReply->Content.LoadFromFile(LResource.c_str());
+            AConnection->SendReply(CReply::ok, AContentType, SendNow);
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
+        void CApostolModule::DoHead(CHTTPServerConnection *AConnection) {
+            auto LRequest = AConnection->Request();
+            auto LReply = AConnection->Reply();
+
+            CString LPath(LRequest->Location.pathname);
+
+            // Request path must be absolute and not contain "..".
+            if (LPath.empty() || LPath.front() != '/' || LPath.find("..") != CString::npos) {
+                AConnection->SendStockReply(CReply::bad_request);
+                return;
+            }
+
+            // If path ends in slash.
+            if (LPath.back() == '/') {
+                LPath += "index.html";
+            }
+
+            CString LResource(GetRoot(LRequest->Location.Host()));
+            LResource += LPath;
+
+            if (!FileExists(LResource.c_str())) {
+                AConnection->SendStockReply(CReply::not_found);
+                return;
+            }
+
+            TCHAR szBuffer[MAX_BUFFER_SIZE + 1] = {0};
+
+            auto contentType = Mapping::ExtToType(ExtractFileExt(szBuffer, LResource.c_str()));
+            if (contentType != nullptr) {
+                LReply->AddHeader(_T("Content-Type"), contentType);
+            }
+
+            auto fileSize = FileSize(LResource.c_str());
+            LReply->AddHeader(_T("Content-Length"), IntToStr((int) fileSize, szBuffer, sizeof(szBuffer)));
+
+            auto lastModified = StrWebTime(FileAge(LResource.c_str()), szBuffer, sizeof(szBuffer));
+            if (lastModified != nullptr)
+                LReply->AddHeader(_T("Last-Modified"), lastModified);
+
+            AConnection->SendReply(CReply::no_content);
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
         void CApostolModule::DoOptions(CHTTPServerConnection *AConnection) {
             auto LRequest = AConnection->Request();
             auto LReply = AConnection->Reply();
@@ -208,6 +410,21 @@ namespace Apostol {
             if (LRequest->URI == _T("/quit"))
                 GApplication->SignalProcess()->Quit();
 #endif
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
+        void CApostolModule::DoGet(CHTTPServerConnection *AConnection) {
+            auto LRequest = AConnection->Request();
+
+            CString LPath(LRequest->Location.pathname);
+
+            // Request path must be absolute and not contain "..".
+            if (LPath.empty() || LPath.front() != '/' || LPath.find("..") != CString::npos) {
+                AConnection->SendStockReply(CReply::bad_request);
+                return;
+            }
+
+            SendResource(AConnection, LPath);
         }
         //--------------------------------------------------------------------------------------------------------------
 
@@ -226,8 +443,12 @@ namespace Apostol {
             }
         }
         //--------------------------------------------------------------------------------------------------------------
-#ifdef WITH_POSTGRESQL
 
+        CHTTPClient *CApostolModule::GetClient(const CString &Host, uint16_t Port) {
+            return GApplication->GetClient(Host.c_str(), Port);
+        }
+        //--------------------------------------------------------------------------------------------------------------
+#ifdef WITH_POSTGRESQL
         void CApostolModule::EnumQuery(CPQResult *APQResult, CQueryResult& AResult) {
             CStringList LFields;
 
@@ -266,6 +487,36 @@ namespace Apostol {
         }
         //--------------------------------------------------------------------------------------------------------------
 
+        bool CApostolModule::StartQuery(CHTTPServerConnection *AConnection, const CStringList& SQL) {
+            auto LQuery = GetQuery(AConnection);
+
+            if (LQuery == nullptr)
+                throw Delphi::Exception::Exception("StartQuery: GetQuery() failed!");
+
+            LQuery->SQL() = SQL;
+
+            if (LQuery->Start() != POLL_QUERY_START_ERROR) {
+                if (m_Version == 2) {
+                    auto LJob = m_pJobs->Add(LQuery);
+                    auto LReply = AConnection->Reply();
+
+                    LReply->Content = "{\"jobid\":" "\"" + LJob->JobId() + "\"}";
+
+                    AConnection->SendReply(CReply::accepted);
+                } else {
+                    // Wait query result...
+                    AConnection->CloseConnection(false);
+                }
+
+                return true;
+            } else {
+                delete LQuery;
+            }
+
+            return false;
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
         CPQPollQuery *CApostolModule::GetQuery(CPollConnection *AConnection) {
             CPQPollQuery *LQuery = GApplication->GetQuery(AConnection);
 
@@ -284,7 +535,7 @@ namespace Apostol {
         //--------------------------------------------------------------------------------------------------------------
 
         bool CApostolModule::ExecSQL(const CStringList &SQL, CPollConnection *AConnection,
-                                     COnPQPollQueryExecutedEvent &&OnExecuted, COnPQPollQueryExceptionEvent &&OnException) {
+                COnPQPollQueryExecutedEvent &&OnExecuted, COnPQPollQueryExceptionEvent &&OnException) {
 
             auto LQuery = GetQuery(AConnection);
 
@@ -299,20 +550,65 @@ namespace Apostol {
 
             LQuery->SQL() = SQL;
 
-            if (LQuery->QueryStart() != POLL_QUERY_START_ERROR) {
+            if (LQuery->Start() != POLL_QUERY_START_ERROR) {
                 return true;
             } else {
                 delete LQuery;
             }
 
-            Log()->Error(APP_LOG_ALERT, 0, "ExecSQL: QueryStart() failed!");
+            Log()->Error(APP_LOG_ALERT, 0, "ExecSQL: StartQuery() failed!");
 
             return false;
         }
         //--------------------------------------------------------------------------------------------------------------
 #endif
-        CHTTPClient *CApostolModule::GetClient(const CString &Host, uint16_t Port) {
-            return GApplication->GetClient(Host.c_str(), Port);
+
+        void CApostolModule::BeforeExecute(Pointer Data) {
+
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
+        void CApostolModule::AfterExecute(Pointer Data) {
+
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
+        void CApostolModule::Execute(CHTTPServerConnection *AConnection) {
+            auto LServer = dynamic_cast<CHTTPServer *> (AConnection->Server());
+            auto LRequest = AConnection->Request();
+            auto LReply = AConnection->Reply();
+
+            if (m_Roots.Count() == 0)
+                InitRoots(LServer->Sites());
+
+#ifdef _DEBUG
+            DebugConnection(AConnection);
+#endif
+            LReply->Clear();
+            LReply->ContentType = CReply::html;
+
+            int i;
+            CMethodHandler *Handler;
+            for (i = 0; i < m_pMethods->Count(); ++i) {
+                Handler = (CMethodHandler *) m_pMethods->Objects(i);
+                if (Handler->Allow()) {
+                    const CString& Method = m_pMethods->Strings(i);
+                    if (Method == LRequest->Method) {
+                        CORS(AConnection);
+                        Handler->Handler(AConnection);
+                        break;
+                    }
+                }
+            }
+
+            if (i == m_pMethods->Count()) {
+                AConnection->SendStockReply(CReply::not_implemented);
+            }
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
+        void CApostolModule::Heartbeat() {
+
         }
         //--------------------------------------------------------------------------------------------------------------
 

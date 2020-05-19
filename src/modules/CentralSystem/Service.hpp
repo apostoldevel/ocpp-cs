@@ -40,16 +40,11 @@ namespace Apostol {
         class CCSService: public CApostolModule {
         private:
 
-            CStringPairs m_Roots;
-
             CChargingPointManager *m_CPManager;
 
-            void InitRoots(const CSites &Sites);
-            const CString& GetRoot(const CString &Host) const;
+            void InitMethods() override;
 
             static bool CheckAuthorization(CHTTPServerConnection *AConnection, CAuthorization &Authorization);
-
-            static void ExceptionToJson(int ErrorCode, const std::exception &AException, CString& Json);
 
             bool QueryStart(CHTTPServerConnection *AConnection, const CStringList& SQL);
             bool DBParse(CHTTPServerConnection *AConnection, const CString &Identity, const CString &Action, const CJSON &Payload);
@@ -58,10 +53,9 @@ namespace Apostol {
 
             void DoAPI(CHTTPServerConnection *AConnection);
 
-            void DoGet(CHTTPServerConnection *AConnection);
+            void DoGet(CHTTPServerConnection *AConnection) override;
             void DoPost(CHTTPServerConnection *AConnection);
 
-            void DoHTTP(CHTTPServerConnection *AConnection);
             void DoWebSocket(CHTTPServerConnection *AConnection);
 
             void DoPointDisconnected(CObject *Sender);
@@ -79,19 +73,10 @@ namespace Apostol {
                 return new CCSService(AManager);
             }
 
-            void InitMethods() override;
-
-            void BeforeExecute(Pointer Data) override;
-            void AfterExecute(Pointer Data) override;
-
             void Heartbeat() override;
             void Execute(CHTTPServerConnection *AConnection) override;
 
             bool CheckUserAgent(const CString& Value) override;
-
-            static void Redirect(CHTTPServerConnection *AConnection, const CString& Location, bool SendNow = false);
-
-            void SendResource(CHTTPServerConnection *AConnection, const CString &Path, LPCTSTR AContentType = nullptr, bool SendNow = false);
 
         };
     }

@@ -39,6 +39,9 @@ namespace Apostol {
         typedef std::function<void (CHTTPServerConnection *AConnection)> COnMethodHandlerEvent;
         //--------------------------------------------------------------------------------------------------------------
 
+        LPCTSTR StrWebTime(time_t Time, LPTSTR lpszBuffer, size_t Size);
+        //--------------------------------------------------------------------------------------------------------------
+
         CString GetUID(unsigned int len);
         CString ApostolUID();
 
@@ -48,7 +51,7 @@ namespace Apostol {
 
         //--------------------------------------------------------------------------------------------------------------
 
-        enum CAuthorizationSchemes { asUnknown, asBasic, asSession };
+        enum CAuthorizationSchemes { asUnknown, asBasic, asToken };
         //--------------------------------------------------------------------------------------------------------------
 
         typedef struct CAuthorization {
@@ -57,7 +60,6 @@ namespace Apostol {
 
             CString Username;
             CString Password;
-            CString Session;
 
             CAuthorization(): Schema(asUnknown) {
 
@@ -84,11 +86,21 @@ namespace Apostol {
 
                     if (Username.IsEmpty() || Password.IsEmpty())
                         throw Delphi::Exception::Exception("Authorization error: Username and password has not be empty.");
-                } else if (String.SubString(0, 7) == "Session") {
-                    Schema = asSession;
-                    Session = String.SubString(8);
-                    if (Session.Length() != 40)
-                        throw Delphi::Exception::Exception("Authorization error: Incorrect Session length.");
+
+                } else if (String.SubString(0, 5) == "Token") {
+                    const CString LPassphrase(String.SubString(6));
+
+                    const size_t LPos = LPassphrase.Find(':');
+                    if (LPos == CString::npos)
+                        throw Delphi::Exception::Exception("Authorization error: Incorrect token.");
+
+                    Schema = asToken;
+                    Username = LPassphrase.SubString(0, LPos);
+                    Password = LPassphrase.SubString(LPos + 1);
+
+                    if (Username.Length() != 40 || Password.Length() != 40)
+                        throw Delphi::Exception::Exception("Authorization error: Incorrect token.");
+
                 } else {
                     throw Delphi::Exception::Exception("Authorization error: Unknown schema.");
                 }
@@ -195,6 +207,8 @@ namespace Apostol {
         class CApostolModule: public CCollectionItem, public CGlobalComponent {
         private:
 
+            CStringPairs m_Roots;
+
             CString m_AllowedMethods;
             CString m_AllowedHeaders;
 
@@ -203,14 +217,26 @@ namespace Apostol {
 
         protected:
 
+            int m_Version;
+#ifdef WITH_POSTGRESQL
+            CJobManager *m_pJobs;
+#endif
             CStringList *m_pMethods;
+
             CStringList m_Headers;
+
+            void InitRoots(const CSites &Sites);
 
             virtual void CORS(CHTTPServerConnection *AConnection);
 
+            virtual void DoHead(CHTTPServerConnection *AConnection);
+            virtual void DoGet(CHTTPServerConnection *AConnection);
             virtual void DoOptions(CHTTPServerConnection *AConnection);
 
             virtual void MethodNotAllowed(CHTTPServerConnection *AConnection);
+
+            virtual void InitMethods() abstract;
+
 #ifdef WITH_POSTGRESQL
             virtual void DoPostgresQueryExecuted(CPQPollQuery *APollQuery) abstract;
             virtual void DoPostgresQueryException(CPQPollQuery *APollQuery, Delphi::Exception::Exception *AException) abstract;
@@ -221,33 +247,46 @@ namespace Apostol {
 
             ~CApostolModule() override;
 
-            virtual void InitMethods() abstract;
-
             virtual bool CheckUserAgent(const CString& Value) abstract;
 
-            virtual void BeforeExecute(Pointer Data) abstract;
-            virtual void AfterExecute(Pointer Data) abstract;
+            virtual void BeforeExecute(Pointer Data);
+            virtual void AfterExecute(Pointer Data);
 
-            virtual void Heartbeat() abstract;
-            virtual void Execute(CHTTPServerConnection *AConnection) abstract;
+            virtual void Heartbeat();
+            virtual void Execute(CHTTPServerConnection *AConnection);
 
-            const CString& AllowedMethods() { return GetAllowedMethods(m_AllowedMethods); };
-            const CString& AllowedHeaders() { return GetAllowedHeaders(m_AllowedHeaders); };
+            static void ContentToJson(CRequest *ARequest, CJSON& Json);
+
+            static CString GetUserAgent(CHTTPServerConnection *AConnection);
+            static CString GetHost(CHTTPServerConnection *AConnection);
+
+            const CString& GetRoot(const CString &Host) const;
+
+            static CHTTPClient * GetClient(const CString &Host, uint16_t Port);
 #ifdef WITH_POSTGRESQL
+            CPQPollQuery *GetQuery(CPollConnection *AConnection);
+
             static void EnumQuery(CPQResult *APQResult, CQueryResult& AResult);
             static void QueryToResults(CPQPollQuery *APollQuery, CQueryResults& AResults);
 
-            CPQPollQuery *GetQuery(CPollConnection *AConnection);
+            bool StartQuery(CHTTPServerConnection *AConnection, const CStringList& SQL);
 
             bool ExecSQL(const CStringList &SQL, CPollConnection *AConnection = nullptr,
                          COnPQPollQueryExecutedEvent && OnExecuted = nullptr,
                          COnPQPollQueryExceptionEvent && OnException = nullptr);
 #endif
-            static CHTTPClient * GetClient(const CString &Host, uint16_t Port);
+            static void ExceptionToJson(int ErrorCode, const std::exception &AException, CString& Json);
 
             static void DebugRequest(CRequest *ARequest);
             static void DebugReply(CReply *AReply);
             static void DebugConnection(CHTTPServerConnection *AConnection);
+
+            const CString& AllowedMethods() { return GetAllowedMethods(m_AllowedMethods); };
+            const CString& AllowedHeaders() { return GetAllowedHeaders(m_AllowedHeaders); };
+
+            static void Redirect(CHTTPServerConnection *AConnection, const CString& Location, bool SendNow = false);
+
+            void SendResource(CHTTPServerConnection *AConnection, const CString &Path, LPCTSTR AContentType = nullptr, bool SendNow = false) const;
 
         };
 

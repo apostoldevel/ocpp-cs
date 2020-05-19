@@ -74,54 +74,23 @@ namespace Apostol {
             m_pMethods->AddObject(_T("GET")    , (CObject *) new CMethodHandler(true , [this](auto && Connection) { DoGet(Connection); }));
             m_pMethods->AddObject(_T("POST")   , (CObject *) new CMethodHandler(true , [this](auto && Connection) { DoPost(Connection); }));
             m_pMethods->AddObject(_T("OPTIONS"), (CObject *) new CMethodHandler(true , [this](auto && Connection) { DoOptions(Connection); }));
+            m_pMethods->AddObject(_T("HEAD")   , (CObject *) new CMethodHandler(true , [this](auto && Connection) { DoHead(Connection); }));
             m_pMethods->AddObject(_T("PUT")    , (CObject *) new CMethodHandler(false, [this](auto && Connection) { MethodNotAllowed(Connection); }));
             m_pMethods->AddObject(_T("DELETE") , (CObject *) new CMethodHandler(false, [this](auto && Connection) { MethodNotAllowed(Connection); }));
             m_pMethods->AddObject(_T("TRACE")  , (CObject *) new CMethodHandler(false, [this](auto && Connection) { MethodNotAllowed(Connection); }));
-            m_pMethods->AddObject(_T("HEAD")   , (CObject *) new CMethodHandler(false, [this](auto && Connection) { MethodNotAllowed(Connection); }));
             m_pMethods->AddObject(_T("PATCH")  , (CObject *) new CMethodHandler(false, [this](auto && Connection) { MethodNotAllowed(Connection); }));
             m_pMethods->AddObject(_T("CONNECT"), (CObject *) new CMethodHandler(false, [this](auto && Connection) { MethodNotAllowed(Connection); }));
 #else
             m_pMethods->AddObject(_T("GET"), (CObject *) new CMethodHandler(true, std::bind(&CWebService::DoGet, this, _1)));
             m_pMethods->AddObject(_T("POST"), (CObject *) new CMethodHandler(true, std::bind(&CWebService::DoPost, this, _1)));
             m_pMethods->AddObject(_T("OPTIONS"), (CObject *) new CMethodHandler(true, std::bind(&CWebService::DoOptions, this, _1)));
+            m_pMethods->AddObject(_T("HEAD"), (CObject *) new CMethodHandler(true, std::bind(&CWebService::DoHead, this, _1)));
             m_pMethods->AddObject(_T("PUT"), (CObject *) new CMethodHandler(false, std::bind(&CWebService::MethodNotAllowed, this, _1)));
             m_pMethods->AddObject(_T("DELETE"), (CObject *) new CMethodHandler(false, std::bind(&CWebService::MethodNotAllowed, this, _1)));
             m_pMethods->AddObject(_T("TRACE"), (CObject *) new CMethodHandler(false, std::bind(&CWebService::MethodNotAllowed, this, _1)));
-            m_pMethods->AddObject(_T("HEAD"), (CObject *) new CMethodHandler(false, std::bind(&CWebService::MethodNotAllowed, this, _1)));
             m_pMethods->AddObject(_T("PATCH"), (CObject *) new CMethodHandler(false, std::bind(&CWebService::MethodNotAllowed, this, _1)));
             m_pMethods->AddObject(_T("CONNECT"), (CObject *) new CMethodHandler(false, std::bind(&CWebService::MethodNotAllowed, this, _1)));
 #endif
-        }
-        //--------------------------------------------------------------------------------------------------------------
-
-        void CCSService::InitRoots(const CSites &Sites) {
-            for (int i = 0; i < Sites.Count(); ++i) {
-                const auto& Site = Sites[i];
-                if (Site.Name != "default") {
-                    const auto& Hosts = Site.Config["hosts"];
-                    const auto& Root = Site.Config["root"].AsString();
-                    if (!Hosts.IsNull()) {
-                        for (int l = 0; l < Hosts.Count(); ++l)
-                            m_Roots.AddPair(Hosts[l].AsString(), Root);
-                    } else {
-                        m_Roots.AddPair(Site.Name, Root);
-                    }
-                }
-            }
-            m_Roots.AddPair("*", Sites.Default().Config["root"].AsString());
-        }
-        //--------------------------------------------------------------------------------------------------------------
-
-        const CString &CCSService::GetRoot(const CString &Host) const {
-            auto Index = m_Roots.IndexOfName(Host);
-            if (Index == -1)
-                return m_Roots["*"].Value;
-            return m_Roots[Index].Value;
-        }
-        //--------------------------------------------------------------------------------------------------------------
-
-        void CCSService::ExceptionToJson(int ErrorCode, const std::exception &AException, CString& Json) {
-            Json.Format(R"({"error": {"code": %u, "message": "%s"}})", ErrorCode, Delphi::Json::EncodeJsonString(AException.what()).c_str());
         }
         //--------------------------------------------------------------------------------------------------------------
 
@@ -229,7 +198,7 @@ namespace Apostol {
 
             LQuery->SQL() = SQL;
 
-            if (LQuery->QueryStart() != POLL_QUERY_START_ERROR) {
+            if (LQuery->Start() != POLL_QUERY_START_ERROR) {
                 AConnection->CloseConnection(false);
                 return true;
             } else {
@@ -270,39 +239,6 @@ namespace Apostol {
         }
         //--------------------------------------------------------------------------------------------------------------
 
-        void CCSService::Redirect(CHTTPServerConnection *AConnection, const CString& Location, bool SendNow) {
-            auto LReply = AConnection->Reply();
-
-            LReply->AddHeader(_T("Location"), Location);
-            Log()->Message("Redirected to %s.", Location.c_str());
-
-            AConnection->SendStockReply(CReply::moved_temporarily, SendNow);
-        }
-        //--------------------------------------------------------------------------------------------------------------
-
-        void CCSService::SendResource(CHTTPServerConnection *AConnection, const CString &Path, LPCTSTR AContentType, bool SendNow) {
-            auto LRequest = AConnection->Request();
-            auto LReply = AConnection->Reply();
-
-            const CString& LFullPath = GetRoot(LRequest->Location.Host()) + Path;
-            const CString& LResource = LFullPath.back() == '/' ? LFullPath + "index.html" : LFullPath;
-
-            if (!FileExists(LResource.c_str())) {
-                AConnection->SendStockReply(CReply::not_found, SendNow);
-                return;
-            }
-
-            if (AContentType == nullptr) {
-                TCHAR szFileExt[PATH_MAX] = {0};
-                auto fileExt = ExtractFileExt(szFileExt, LResource.c_str());
-                AContentType = Mapping::ExtToType(fileExt);
-            }
-
-            LReply->Content.LoadFromFile(LResource.c_str());
-            AConnection->SendReply(CReply::ok, AContentType, SendNow);
-        }
-        //--------------------------------------------------------------------------------------------------------------
-
         bool CCSService::CheckAuthorization(CHTTPServerConnection *AConnection, CAuthorization &Authorization) {
             auto LRequest = AConnection->Request();
             auto LReply = AConnection->Reply();
@@ -330,7 +266,7 @@ namespace Apostol {
             auto LReply = AConnection->Reply();
 
             CStringList LUri;
-            SplitColumns(LRequest->URI, LUri, '/');
+            SplitColumns(LRequest->Location.pathname, LUri, '/');
 
             if (LUri.Count() == 0) {
                 AConnection->SendStockReply(CReply::not_found);
@@ -536,9 +472,6 @@ namespace Apostol {
                 return;
             }
 
-            if (m_Roots.Count() == 0)
-                InitRoots(LServer->Sites());
-
             CAuthorization Authorization;
             if (!CheckAuthorization(AConnection, Authorization)) {
                 AConnection->SendStockReply(CReply::unauthorized);
@@ -559,7 +492,7 @@ namespace Apostol {
             auto LReply = AConnection->Reply();
 
             CStringList LUri;
-            SplitColumns(LRequest->URI.c_str(), LRequest->URI.Size(), &LUri, '/');
+            SplitColumns(LRequest->Location.pathname, LUri, '/');
 
             if (LUri.Count() < 2) {
                 AConnection->SendStockReply(CReply::not_found);
@@ -841,36 +774,6 @@ namespace Apostol {
         }
         //--------------------------------------------------------------------------------------------------------------
 
-        void CCSService::DoHTTP(CHTTPServerConnection *AConnection) {
-            int i = 0;
-
-            auto LRequest = AConnection->Request();
-            auto LReply = AConnection->Reply();
-#ifdef _DEBUG
-            CApostolModule::DebugConnection(AConnection);
-#endif
-            LReply->Clear();
-            LReply->ContentType = CReply::html;
-
-            CMethodHandler *Handler;
-            for (i = 0; i < m_pMethods->Count(); ++i) {
-                Handler = (CMethodHandler *) m_pMethods->Objects(i);
-                if (Handler->Allow()) {
-                    const CString& Method = m_pMethods->Strings(i);
-                    if (Method == LRequest->Method) {
-                        CORS(AConnection);
-                        Handler->Handler(AConnection);
-                        break;
-                    }
-                }
-            }
-
-            if (i == m_pMethods->Count()) {
-                AConnection->SendStockReply(CReply::not_implemented);
-            }
-        }
-        //--------------------------------------------------------------------------------------------------------------
-
         void CCSService::DoWebSocket(CHTTPServerConnection *AConnection) {
 
             auto LWSRequest = AConnection->WSRequest();
@@ -935,22 +838,12 @@ namespace Apostol {
         void CCSService::Execute(CHTTPServerConnection *AConnection) {
             switch (AConnection->Protocol()) {
                 case pHTTP:
-                    DoHTTP(AConnection);
+                    CApostolModule::Execute(AConnection);
                     break;
                 case pWebSocket:
                     DoWebSocket(AConnection);
                     break;
             }
-        }
-        //--------------------------------------------------------------------------------------------------------------
-
-        void CCSService::BeforeExecute(Pointer Data) {
-
-        }
-        //--------------------------------------------------------------------------------------------------------------
-
-        void CCSService::AfterExecute(Pointer Data) {
-
         }
         //--------------------------------------------------------------------------------------------------------------
 
