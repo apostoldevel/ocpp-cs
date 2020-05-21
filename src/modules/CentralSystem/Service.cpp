@@ -260,192 +260,201 @@ namespace Apostol {
         }
         //--------------------------------------------------------------------------------------------------------------
 
+        void CCSService::DoOCPP(CHTTPServerConnection *AConnection) {
+            auto LRequest = AConnection->Request();
+            auto LReply = AConnection->Reply();
+
+            LReply->ContentType = CReply::html;
+
+            CStringList LPath;
+            SplitColumns(LRequest->Location.pathname, LPath, '/');
+
+            if (LPath.Count() < 2) {
+                AConnection->SendStockReply(CReply::not_found);
+                return;
+            }
+
+            const CString& LSecWebSocketKey = LRequest->Headers.Values("sec-websocket-key");
+            if (LSecWebSocketKey.IsEmpty()) {
+                AConnection->SendStockReply(CReply::bad_request);
+                return;
+            }
+
+            const auto& LIdentity = LPath[1];
+            const CString LAccept(SHA1(LSecWebSocketKey + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"));
+            const auto& LSecWebSocketProtocol = LRequest->Headers.Values("sec-websocket-protocol");
+            const CString LProtocol(LSecWebSocketProtocol.IsEmpty() ? "" : LSecWebSocketProtocol.SubString(0, LSecWebSocketProtocol.Find(',')));
+
+            AConnection->SwitchingProtocols(LAccept, LProtocol);
+
+            auto LPoint = m_CPManager->FindPointByIdentity(LIdentity);
+            if (LPoint == nullptr) {
+                LPoint = m_CPManager->Add(AConnection);
+                LPoint->Identity() = LIdentity;
+                LPoint->Address() = LRequest->Headers.Values("x-real-ip");
+#if defined(_GLIBCXX_RELEASE) && (_GLIBCXX_RELEASE >= 9)
+                AConnection->OnDisconnected([this](auto && Sender) { DoPointDisconnected(Sender); });
+#else
+                AConnection->OnDisconnected(std::bind(&CCSService::DoPointDisconnected, this, _1));
+#endif
+            } else {
+                try {
+                    LPoint->SwitchConnection(AConnection);
+                } catch (std::exception &e) {
+                    Log()->Error(APP_LOG_EMERG, 0, e.what());
+                    delete LPoint;
+                }
+            }
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
         void CCSService::DoAPI(CHTTPServerConnection *AConnection) {
 
             auto LRequest = AConnection->Request();
             auto LReply = AConnection->Reply();
 
-            CStringList LUri;
-            SplitColumns(LRequest->Location.pathname, LUri, '/');
+            CStringList LPath;
+            SplitColumns(LRequest->Location.pathname, LPath, '/');
 
-            if (LUri.Count() == 0) {
+            if (LPath.Count() == 0) {
                 AConnection->SendStockReply(CReply::not_found);
                 return;
             }
 
-            const auto& LService = LUri[0];
+            const auto &LService = LPath[0];
 
-            if (LService == "api") {
-
-                if (LUri.Count() < 3) {
-                    AConnection->SendStockReply(CReply::not_found);
-                    return;
-                }
-
-                const auto& LVersion = LUri[1];
-                const auto& LCommand = LUri[2];
-
-                if (LVersion == "v1") {
-
-                    LReply->ContentType = CReply::json;
-
-                    if (LCommand == "ping") {
-
-                        AConnection->SendStockReply(CReply::ok);
-                        return;
-
-                    } else if (LCommand == "time") {
-
-                        LReply->Content << "{\"serverTime\": " << to_string(MsEpoch()) << "}";
-                        AConnection->SendReply(CReply::ok);
-                        return;
-
-                    } else  if (LCommand == "ChargePointList") {
-
-                        CJSONObject jsonObject;
-                        CJSONValue jsonArray(jvtArray);
-
-                        for (int i = 0; i < m_CPManager->Count(); i++) {
-                            CJSONValue jsonPoint(jvtObject);
-                            CJSONValue jsonConnection(jvtObject);
-
-                            auto LPoint = m_CPManager->Points(i);
-
-                            jsonPoint.Object().AddPair("Identity", LPoint->Identity());
-                            jsonPoint.Object().AddPair("Address", LPoint->Address());
-
-                            if (LPoint->Connection()->Connected()) {
-                                jsonConnection.Object().AddPair("Socket", LPoint->Connection()->Socket()->Binding()->Handle());
-                                jsonConnection.Object().AddPair("IP", LPoint->Connection()->Socket()->Binding()->PeerIP());
-                                jsonConnection.Object().AddPair("Port", LPoint->Connection()->Socket()->Binding()->PeerPort());
-                                jsonPoint.Object().AddPair("Connection", jsonConnection);
-                            }
-
-                            jsonArray.Array().Add(jsonPoint);
-                        }
-
-                        jsonObject.AddPair("ChargePointList", jsonArray);
-
-                        LReply->Content = jsonObject.ToString();
-
-                        AConnection->SendReply(CReply::ok);
-
-                        return;
-
-                    } else if (LCommand == "ChargePoint") {
-
-                        if (LUri.Count() < 5) {
-                            AConnection->SendStockReply(CReply::not_found);
-                            return;
-                        }
-
-                        const auto& LIdentity = LUri[3];
-                        const auto& LAction = LUri[4];
-
-                        auto LPoint = m_CPManager->FindPointByIdentity(LIdentity);
-
-                        if (LPoint == nullptr) {
-                            LReply->Content.Format(R"({"error": {"code": %u, "message": "%s"}})", 300, "Charge point not found.");
-                            AConnection->SendReply(CReply::ok);
-                            return;
-                        }
-
-                        auto LConnection = LPoint->Connection();
-                        if (LConnection == nullptr) {
-                            LReply->Content.Format(R"({"error": {"code": %u, "message": "%s"}})", 301, "Charge point offline.");
-                            AConnection->SendReply(CReply::ok);
-                            return;
-                        }
-
-                        if (!LConnection->Connected()) {
-                            LReply->Content.Format(R"({"error": {"code": %u, "message": "%s"}})", 302, "Charge point not connected.");
-                            AConnection->SendReply(CReply::ok);
-                            return;
-                        }
-
-                        if (LConnection->Protocol() != pWebSocket) {
-                            LReply->Content.Format(R"({"error": {"code": %u, "message": "%s"}})", 303, "Incorrect charge point protocol version.");
-                            AConnection->SendReply(CReply::ok);
-                            return;
-                        }
-
-                        auto OnRequest = [AConnection](CMessageHandler *AHandler, CHTTPServerConnection *AWSConnection) {
-                            auto LWSRequest = AWSConnection->WSRequest();
-                            const CString LRequest(LWSRequest->Payload());
-
-                            CJSONMessage LMessage;
-                            CJSONProtocol::Request(LRequest, LMessage);
-
-                            try {
-                                auto LReply = AConnection->Reply();
-                                LReply->Content = LMessage.Payload.ToString();
-                                AConnection->SendReply(CReply::ok, nullptr, true);
-                            } catch (std::exception &e) {
-                                Log()->Error(APP_LOG_EMERG, 0, e.what());
-                            }
-
-                            AWSConnection->ConnectionStatus(csReplySent);
-                        };
-
-                        if (LAction == "GetConfiguration") {
-
-                            CJSON LPayload(jvtObject);
-                            CJSONValue LArray(jvtArray);
-
-                            const CString& LKey = LRequest->Params["key"];
-                            if (!LKey.IsEmpty()) {
-                                LArray.Array().Add(LKey);
-                                LPayload.Object().AddPair("key", LArray);
-                            }
-
-                            LPoint->Messages()->Add(OnRequest, LAction, LPayload);
-
-                            return;
-                        }
-                    }
-                }
-
-            } else if (LService == "ocpp") {
-
-                LReply->ContentType = CReply::html;
-
-                if (LUri.Count() < 2) {
-                    AConnection->SendStockReply(CReply::not_found);
-                    return;
-                }
-
-                const CString& LSecWebSocketKey = LRequest->Headers.Values("sec-websocket-key");
-                if (LSecWebSocketKey.IsEmpty()) {
-                    AConnection->SendStockReply(CReply::bad_request);
-                    return;
-                }
-
-                const auto& LIdentity = LUri[1];
-                const CString LAccept(SHA1(LSecWebSocketKey + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"));
-                const auto& LSecWebSocketProtocol = LRequest->Headers.Values("sec-websocket-protocol");
-                const CString LProtocol(LSecWebSocketProtocol.IsEmpty() ? "" : LSecWebSocketProtocol.SubString(0, LSecWebSocketProtocol.Find(',')));
-
-                AConnection->SwitchingProtocols(LAccept, LProtocol);
-
-                auto LPoint = m_CPManager->FindPointByIdentity(LIdentity);
-                if (LPoint == nullptr) {
-                    LPoint = m_CPManager->Add(AConnection);
-                    LPoint->Identity() = LIdentity;
-                    LPoint->Address() = LRequest->Headers.Values("x-real-ip");
-                    AConnection->OnDisconnected(std::bind(&CCSService::DoPointDisconnected, this, _1));
-                } else {
-                    try {
-                        LPoint->SwitchConnection(AConnection);
-                    } catch (std::exception &e) {
-                        Log()->Error(APP_LOG_EMERG, 0, e.what());
-                        delete LPoint;
-                    }
-                }
-
-                return;
-            } else {
+            if (LPath.Count() < 3) {
                 AConnection->SendStockReply(CReply::not_found);
                 return;
+            }
+
+            const auto &LVersion = LPath[1];
+            const auto &LCommand = LPath[2];
+
+            if (LVersion == "v1") {
+
+                LReply->ContentType = CReply::json;
+
+                if (LCommand == "ping") {
+
+                    AConnection->SendStockReply(CReply::ok);
+                    return;
+
+                } else if (LCommand == "time") {
+
+                    LReply->Content << "{\"serverTime\": " << to_string(MsEpoch()) << "}";
+                    AConnection->SendReply(CReply::ok);
+                    return;
+
+                } else if (LCommand == "ChargePointList") {
+
+                    CJSONObject jsonObject;
+                    CJSONValue jsonArray(jvtArray);
+
+                    for (int i = 0; i < m_CPManager->Count(); i++) {
+                        CJSONValue jsonPoint(jvtObject);
+                        CJSONValue jsonConnection(jvtObject);
+
+                        auto LPoint = m_CPManager->Points(i);
+
+                        jsonPoint.Object().AddPair("Identity", LPoint->Identity());
+                        jsonPoint.Object().AddPair("Address", LPoint->Address());
+
+                        if (LPoint->Connection()->Connected()) {
+                            jsonConnection.Object().AddPair("Socket",
+                                                            LPoint->Connection()->Socket()->Binding()->Handle());
+                            jsonConnection.Object().AddPair("IP", LPoint->Connection()->Socket()->Binding()->PeerIP());
+                            jsonConnection.Object().AddPair("Port",
+                                                            LPoint->Connection()->Socket()->Binding()->PeerPort());
+                            jsonPoint.Object().AddPair("Connection", jsonConnection);
+                        }
+
+                        jsonArray.Array().Add(jsonPoint);
+                    }
+
+                    jsonObject.AddPair("ChargePointList", jsonArray);
+
+                    LReply->Content = jsonObject.ToString();
+
+                    AConnection->SendReply(CReply::ok);
+
+                    return;
+
+                } else if (LCommand == "ChargePoint") {
+
+                    if (LPath.Count() < 5) {
+                        AConnection->SendStockReply(CReply::not_found);
+                        return;
+                    }
+
+                    const auto &LIdentity = LPath[3];
+                    const auto &LAction = LPath[4];
+
+                    auto LPoint = m_CPManager->FindPointByIdentity(LIdentity);
+
+                    if (LPoint == nullptr) {
+                        LReply->Content.Format(R"({"error": {"code": %u, "message": "%s"}})", 300,
+                                               "Charge point not found.");
+                        AConnection->SendReply(CReply::ok);
+                        return;
+                    }
+
+                    auto LConnection = LPoint->Connection();
+                    if (LConnection == nullptr) {
+                        LReply->Content.Format(R"({"error": {"code": %u, "message": "%s"}})", 301,
+                                               "Charge point offline.");
+                        AConnection->SendReply(CReply::ok);
+                        return;
+                    }
+
+                    if (!LConnection->Connected()) {
+                        LReply->Content.Format(R"({"error": {"code": %u, "message": "%s"}})", 302,
+                                               "Charge point not connected.");
+                        AConnection->SendReply(CReply::ok);
+                        return;
+                    }
+
+                    if (LConnection->Protocol() != pWebSocket) {
+                        LReply->Content.Format(R"({"error": {"code": %u, "message": "%s"}})", 303,
+                                               "Incorrect charge point protocol version.");
+                        AConnection->SendReply(CReply::ok);
+                        return;
+                    }
+
+                    auto OnRequest = [AConnection](CMessageHandler *AHandler, CHTTPServerConnection *AWSConnection) {
+                        auto LWSRequest = AWSConnection->WSRequest();
+                        const CString LRequest(LWSRequest->Payload());
+
+                        CJSONMessage LMessage;
+                        CJSONProtocol::Request(LRequest, LMessage);
+
+                        try {
+                            auto LReply = AConnection->Reply();
+                            LReply->Content = LMessage.Payload.ToString();
+                            AConnection->SendReply(CReply::ok, nullptr, true);
+                        } catch (std::exception &e) {
+                            Log()->Error(APP_LOG_EMERG, 0, e.what());
+                        }
+
+                        AWSConnection->ConnectionStatus(csReplySent);
+                    };
+
+                    if (LAction == "GetConfiguration") {
+
+                        CJSON LPayload(jvtObject);
+                        CJSONValue LArray(jvtArray);
+
+                        const CString &LKey = LRequest->Params["key"];
+                        if (!LKey.IsEmpty()) {
+                            LArray.Array().Add(LKey);
+                            LPayload.Object().AddPair("key", LArray);
+                        }
+
+                        LPoint->Messages()->Add(OnRequest, LAction, LPayload);
+
+                        return;
+                    }
+                }
             }
 
             AConnection->SendStockReply(CReply::not_found);
@@ -472,6 +481,11 @@ namespace Apostol {
                 return;
             }
 
+            if (requestPath.SubString(0, 6) == "/ocpp/") {
+                DoOCPP(AConnection);
+                return;
+            }
+
             CAuthorization Authorization;
             if (!CheckAuthorization(AConnection, Authorization)) {
                 AConnection->SendStockReply(CReply::unauthorized);
@@ -491,25 +505,25 @@ namespace Apostol {
             auto LRequest = AConnection->Request();
             auto LReply = AConnection->Reply();
 
-            CStringList LUri;
-            SplitColumns(LRequest->Location.pathname, LUri, '/');
+            CStringList LPath;
+            SplitColumns(LRequest->Location.pathname, LPath, '/');
 
-            if (LUri.Count() < 2) {
+            if (LPath.Count() < 2) {
                 AConnection->SendStockReply(CReply::not_found);
                 return;
             }
 
-            const auto& LService = LUri[0];
+            const auto& LService = LPath[0];
 
             if (LService == "api") {
 
-                if (LUri.Count() < 3) {
+                if (LPath.Count() < 3) {
                     AConnection->SendStockReply(CReply::not_found);
                     return;
                 }
 
-                const auto& LVersion = LUri[1];
-                const auto& LCommand = LUri[2];
+                const auto& LVersion = LPath[1];
+                const auto& LCommand = LPath[2];
 
                 if (LVersion == "v1") {
 
@@ -530,13 +544,13 @@ namespace Apostol {
 
                         if (LCommand == "ChargePoint") {
 
-                            if (LUri.Count() < 5) {
+                            if (LPath.Count() < 5) {
                                 AConnection->SendStockReply(CReply::not_found);
                                 return;
                             }
 
-                            const auto &LIdentity = LUri[3];
-                            const auto &LAction = LUri[4];
+                            const auto &LIdentity = LPath[3];
+                            const auto &LAction = LPath[4];
 
                             auto LPoint = m_CPManager->FindPointByIdentity(LIdentity);
 
@@ -831,7 +845,7 @@ namespace Apostol {
         //--------------------------------------------------------------------------------------------------------------
 
         void CCSService::Heartbeat() {
-
+            CApostolModule::Heartbeat();
         }
         //--------------------------------------------------------------------------------------------------------------
 

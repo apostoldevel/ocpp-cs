@@ -51,6 +51,7 @@ namespace Apostol {
 
         protected:
 
+            void DoOCPP(CHTTPServerConnection *AConnection);
             void DoAPI(CHTTPServerConnection *AConnection);
 
             void DoGet(CHTTPServerConnection *AConnection) override;
