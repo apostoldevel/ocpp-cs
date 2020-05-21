@@ -465,23 +465,15 @@ namespace Apostol {
             auto LServer = dynamic_cast<CHTTPServer *> (AConnection->Server());
             auto LRequest = AConnection->Request();
 
-            // Decode url to path.
-            CString url;
-            if (!CHTTPServer::URLDecode(LRequest->URI, url)) {
-                AConnection->SendStockReply(CReply::bad_request);
-                return;
-            }
-
-            CLocation Location(url);
-            auto& requestPath = Location.pathname;
+            CString LPath(LRequest->Location.pathname);
 
             // Request path must be absolute and not contain "..".
-            if (requestPath.empty() || requestPath.front() != '/' || requestPath.find("..") != CString::npos) {
+            if (LPath.empty() || LPath.front() != '/' || LPath.find("..") != CString::npos) {
                 AConnection->SendStockReply(CReply::bad_request);
                 return;
             }
 
-            if (requestPath.SubString(0, 6) == "/ocpp/") {
+            if (LPath.SubString(0, 6) == "/ocpp/") {
                 DoOCPP(AConnection);
                 return;
             }
@@ -492,12 +484,12 @@ namespace Apostol {
                 return;
             }
 
-            if (requestPath.SubString(0, 5) == "/api/") {
+            if (LPath.SubString(0, 5) == "/api/") {
                 DoAPI(AConnection);
                 return;
             }
 
-            SendResource(AConnection, requestPath);
+            SendResource(AConnection, LPath);
         }
         //--------------------------------------------------------------------------------------------------------------
 
