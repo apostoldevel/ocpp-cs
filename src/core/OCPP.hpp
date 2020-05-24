@@ -527,7 +527,7 @@ namespace Apostol {
         class CChargingPoint: public CCollectionItem {
         private:
 
-            CHTTPServerConnection *m_Connection;
+            CHTTPServerConnection *m_pConnection;
 
             CMessageManager *m_Messages;
 
@@ -543,6 +543,9 @@ namespace Apostol {
             CStatusNotificationRequest m_StatusNotificationRequest;
             CDataTransferRequest m_DataTransferRequest;
 
+            void AddToConnection(CHTTPServerConnection *AConnection);
+            void DeleteFromConnection(CHTTPServerConnection *AConnection);
+
             bool ParseSOAP(const CString &Request, CString &Response);
             bool ParseJSON(const CString &Request, CString &Response);
 
@@ -554,9 +557,9 @@ namespace Apostol {
 
             void SwitchConnection(CHTTPServerConnection *Value);
 
-            CHTTPServerConnection *Connection() { return m_Connection; };
+            CHTTPServerConnection *Connection() { return m_pConnection; };
 
-            void Connection(CHTTPServerConnection *Value) { m_Connection = Value; };
+            void Connection(CHTTPServerConnection *Value) { m_pConnection = Value; };
 
             CMessageManager *Messages() { return m_Messages; };
 
@@ -595,6 +598,8 @@ namespace Apostol {
             void Heartbeat(const CJSONMessage &Request, CJSONMessage &Response);
 
             bool Parse(CProtocolType Protocol, const CString &Request, CString &Response);
+
+            static CChargingPoint *FindOfConnection(CHTTPServerConnection *AConnection, const CString &Name);
 
         };
 

@@ -704,26 +704,63 @@ namespace Apostol {
         //--------------------------------------------------------------------------------------------------------------
 
         CChargingPoint::CChargingPoint(CHTTPServerConnection *AConnection, CChargingPointManager *AManager) : CCollectionItem(AManager) {
-            m_Connection = AConnection;
+            m_pConnection = AConnection;
             m_TransactionId = 0;
             m_Messages = new CMessageManager(this);
+            AddToConnection(AConnection);
         }
         //--------------------------------------------------------------------------------------------------------------
 
         CChargingPoint::~CChargingPoint() {
-            m_Connection = nullptr;
+            DeleteFromConnection(m_pConnection);
+            m_pConnection = nullptr;
             FreeAndNil(m_Messages);
         }
         //--------------------------------------------------------------------------------------------------------------
 
-        void CChargingPoint::SwitchConnection(CHTTPServerConnection *Value) {
-            if (m_Connection != Value) {
-                auto LConnection = m_Connection;
-                m_Connection = Value;
-                if (Assigned(LConnection)) {
-                    LConnection->CheckForDisconnect();
+        void CChargingPoint::AddToConnection(CHTTPServerConnection *AConnection) {
+            CObject *Temp;
+            if (Assigned(AConnection)) {
+                int Index = AConnection->Data().IndexOfName("point");
+                if (Index == -1) {
+                    AConnection->Data().AddObject("point", this);
+                } else {
+                    Temp = AConnection->Data().Objects(Index);
+                    AConnection->Data().Objects(Index, this);
+                    delete Temp;
                 }
             }
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
+        void CChargingPoint::DeleteFromConnection(CHTTPServerConnection *AConnection) {
+            if (Assigned(AConnection)) {
+                int Index = AConnection->Data().IndexOfObject(this);
+                if (Index == -1)
+                    AConnection->Data().Delete(Index);
+            }
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
+        void CChargingPoint::SwitchConnection(CHTTPServerConnection *AConnection) {
+            if (m_pConnection != AConnection) {
+                DeleteFromConnection(m_pConnection);
+                m_pConnection = AConnection;
+                AddToConnection(m_pConnection);
+            }
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
+        CChargingPoint *CChargingPoint::FindOfConnection(CHTTPServerConnection *AConnection, const CString &Name) {
+            int Index = AConnection->Data().IndexOfName(Name);
+            if (Index == -1)
+                throw Delphi::Exception::ExceptionFrm("Not found \"%s\" in connection.", Name.c_str());
+
+            auto Point = dynamic_cast<CChargingPoint *> (AConnection->Data().Objects(Index));
+            if (Point == nullptr)
+                throw Delphi::Exception::Exception("Charging point is null.");
+
+            return Point;
         }
         //--------------------------------------------------------------------------------------------------------------
 
@@ -975,7 +1012,7 @@ namespace Apostol {
             } else {
                 auto LHandler = m_Messages->FindMessageById(LRequest.UniqueId);
                 if (Assigned(LHandler)) {
-                    LHandler->Handler(m_Connection);
+                    LHandler->Handler(m_pConnection);
                     return true;
                 }
             }

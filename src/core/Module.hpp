@@ -144,13 +144,15 @@ namespace Apostol {
         class CJob: CCollectionItem {
         private:
 
-            CString m_JobId;
-
-            CString m_Result;
+            CString m_Identity;
 
             CString m_CacheFile;
 
-            CPQPollQuery *m_PollQuery;
+            CReply m_Reply;
+
+            CPQPollQuery *m_pPollQuery;
+
+            CStringList m_Data;
 
         public:
 
@@ -158,17 +160,20 @@ namespace Apostol {
 
             ~CJob() override = default;
 
-            CString& JobId() { return m_JobId; };
-            const CString& JobId() const { return m_JobId; };
+            CString &Identity() { return m_Identity; };
+            const CString &Identity() const { return m_Identity; };
 
-            CString& CacheFile() { return m_CacheFile; };
-            const CString& CacheFile() const { return m_CacheFile; };
+            CString &CacheFile() { return m_CacheFile; };
+            const CString &CacheFile() const { return m_CacheFile; };
 
-            CString& Result() { return m_Result; }
-            const CString& Result() const { return m_Result; }
+            CPQPollQuery *PollQuery() { return m_pPollQuery; };
+            void PollQuery(CPQPollQuery *Value) { m_pPollQuery = Value; };
 
-            CPQPollQuery *PollQuery() { return m_PollQuery; };
-            void PollQuery(CPQPollQuery *Value) { m_PollQuery = Value; };
+            CReply &Reply() { return m_Reply; };
+            const CReply &Reply() const { return m_Reply; };
+
+            CStringList &Data() { return m_Data; }
+            const CStringList& Data() const { return m_Data; }
         };
         //--------------------------------------------------------------------------------------------------------------
 
@@ -275,7 +280,7 @@ namespace Apostol {
                          COnPQPollQueryExecutedEvent && OnExecuted = nullptr,
                          COnPQPollQueryExceptionEvent && OnException = nullptr);
 #endif
-            static void ExceptionToJson(int ErrorCode, const std::exception &AException, CString& Json);
+            static void ExceptionToJson(int ErrorCode, const std::exception &e, CString& Json);
 
             static void DebugRequest(CRequest *ARequest);
             static void DebugReply(CReply *AReply);
@@ -287,6 +292,9 @@ namespace Apostol {
             static void Redirect(CHTTPServerConnection *AConnection, const CString& Location, bool SendNow = false);
 
             void SendResource(CHTTPServerConnection *AConnection, const CString &Path, LPCTSTR AContentType = nullptr, bool SendNow = false) const;
+
+            static bool CheckToken(CRequest *ARequest, CAuthorization &Authorization);
+            static bool CheckAuthorization(CRequest *ARequest, CAuthorization &Authorization);
 
         };
 

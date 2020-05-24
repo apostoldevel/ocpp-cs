@@ -98,8 +98,8 @@ namespace Apostol {
         //--------------------------------------------------------------------------------------------------------------
 
         CJob::CJob(CCollection *ACCollection) : CCollectionItem(ACCollection) {
-            m_JobId = ApostolUID();
-            m_PollQuery = nullptr;
+            m_Identity = ApostolUID();
+            m_pPollQuery = nullptr;
         }
 
         //--------------------------------------------------------------------------------------------------------------
@@ -129,7 +129,7 @@ namespace Apostol {
             CJob *LJob = nullptr;
             for (int I = 0; I < Count(); ++I) {
                 LJob = Get(I);
-                if (LJob->JobId() == Id)
+                if (LJob->Identity() == Id)
                     return LJob;
             }
             return nullptr;
@@ -268,19 +268,19 @@ namespace Apostol {
         }
         //--------------------------------------------------------------------------------------------------------------
 
-        void CApostolModule::ExceptionToJson(int ErrorCode, const std::exception &AException, CString& Json) {
-            Json.Format(R"({"error": {"code": %u, "message": "%s"}})", ErrorCode, Delphi::Json::EncodeJsonString(AException.what()).c_str());
+        void CApostolModule::ExceptionToJson(int ErrorCode, const std::exception &e, CString& Json) {
+            Json.Format(R"({"error": {"code": %u, "message": "%s"}})", ErrorCode, Delphi::Json::EncodeJsonString(e.what()).c_str());
         }
         //--------------------------------------------------------------------------------------------------------------
 
         void CApostolModule::ContentToJson(CRequest *ARequest, CJSON &Json) {
 
-            const auto& ContentType = ARequest->Headers.Values(_T("content-type"));
+            const auto& ContentType = ARequest->Headers.Values(_T("content-type")).Lower();
 
             if (ContentType.IsEmpty())
                 return;
 
-            if (ContentType == "application/x-www-form-urlencoded") {
+            if (ContentType.Find("application/x-www-form-urlencoded") != CString::npos) {
 
                 const CStringList &formData = ARequest->FormData;
 
@@ -299,7 +299,7 @@ namespace Apostol {
                     jsonObject.AddPair(formData[i].Name, formData[i].Data);
                 }
 
-            } else if (ContentType == "application/json") {
+            } else if (ContentType.Find("application/json") != CString::npos) {
 
                 Json << ARequest->Content;
 
@@ -350,6 +350,54 @@ namespace Apostol {
 
             LReply->Content.LoadFromFile(LResource.c_str());
             AConnection->SendReply(CReply::ok, AContentType, SendNow);
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
+        bool CApostolModule::CheckToken(CRequest *ARequest, CAuthorization &Authorization) {
+
+            const auto& headerSession = ARequest->Headers.Values(_T("Session"));
+            const auto& cookieSession = ARequest->Cookies.Values(_T("AWS-Session"));
+
+            const auto& headerKey = ARequest->Headers.Values(_T("Key"));
+            const auto& cookieKey = ARequest->Cookies.Values(_T("API-Key"));
+
+            const auto& LSession = headerSession.IsEmpty() ? cookieSession : headerSession;
+            const auto& LKey = headerKey.IsEmpty() ? cookieKey : headerKey;
+
+            if (LSession.IsEmpty() || LKey.IsEmpty())
+                return false;
+
+            try {
+                CString Token(_T("Token "));
+
+                Token += LSession;
+                Token += _T(":");
+                Token += LKey;
+
+                Authorization << Token;
+                return Authorization.Schema != asUnknown;
+            } catch (std::exception &e) {
+                Log()->Error(APP_LOG_EMERG, 0, e.what());
+            }
+
+            return false;
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
+        bool CApostolModule::CheckAuthorization(CRequest *ARequest, CAuthorization &Authorization) {
+
+            const auto& LAuthorization = ARequest->Headers.Values(_T("Authorization"));
+            if (LAuthorization.IsEmpty())
+                return false;
+
+            try {
+                Authorization << LAuthorization;
+                return Authorization.Schema != asUnknown;
+            } catch (std::exception &e) {
+                Log()->Error(APP_LOG_EMERG, 0, e.what());
+            }
+
+            return false;
         }
         //--------------------------------------------------------------------------------------------------------------
 
@@ -419,7 +467,7 @@ namespace Apostol {
             CString LPath(LRequest->Location.pathname);
 
             // Request path must be absolute and not contain "..".
-            if (LPath.empty() || LPath.front() != '/' || LPath.find("..") != CString::npos) {
+            if (LPath.empty() || LPath.front() != '/' || LPath.find(_T("..")) != CString::npos) {
                 AConnection->SendStockReply(CReply::bad_request);
                 return;
             }
@@ -435,11 +483,11 @@ namespace Apostol {
             const CHeaders& LRequestHeaders = LRequest->Headers;
             CHeaders& LReplyHeaders = LReply->Headers;
 
-            const CString& Origin = LRequestHeaders.Values("origin");
+            const CString& Origin = LRequestHeaders.Values(_T("origin"));
             if (!Origin.IsEmpty()) {
-                LReplyHeaders.AddPair("Access-Control-Allow-Origin", Origin);
-                LReplyHeaders.AddPair("Access-Control-Allow-Methods", AllowedMethods());
-                LReplyHeaders.AddPair("Access-Control-Allow-Headers", AllowedHeaders());
+                LReplyHeaders.AddPair(_T("Access-Control-Allow-Origin"), Origin);
+                LReplyHeaders.AddPair(_T("Access-Control-Allow-Methods"), AllowedMethods());
+                LReplyHeaders.AddPair(_T("Access-Control-Allow-Headers"), AllowedHeaders());
             }
         }
         //--------------------------------------------------------------------------------------------------------------
@@ -460,12 +508,12 @@ namespace Apostol {
                 AResult.Add(CStringPairs());
                 for (int Col = 0; Col < APQResult->nFields(); ++Col) {
                     if (APQResult->GetIsNull(Row, Col)) {
-                        AResult.Last().AddPair(LFields[Col].c_str(), "");
+                        AResult.Last().AddPair(LFields[Col].c_str(), _T(""));
                     } else {
                         if (APQResult->fFormat(Col) == 0) {
                             AResult.Last().AddPair(LFields[Col].c_str(), APQResult->GetValue(Row, Col));
                         } else {
-                            AResult.Last().AddPair(LFields[Col].c_str(), "<binary>");
+                            AResult.Last().AddPair(LFields[Col].c_str(), _T("<binary>"));
                         }
                     }
                 }
@@ -488,21 +536,24 @@ namespace Apostol {
         //--------------------------------------------------------------------------------------------------------------
 
         bool CApostolModule::StartQuery(CHTTPServerConnection *AConnection, const CStringList& SQL) {
-            auto LQuery = GetQuery(AConnection);
+
+            auto LQuery = m_Version == 1 ? GetQuery(AConnection) : GetQuery(nullptr);
 
             if (LQuery == nullptr)
-                throw Delphi::Exception::Exception("StartQuery: GetQuery() failed!");
+                throw Delphi::Exception::Exception(_T("StartQuery: GetQuery() failed!"));
 
             LQuery->SQL() = SQL;
 
             if (LQuery->Start() != POLL_QUERY_START_ERROR) {
                 if (m_Version == 2) {
                     auto LJob = m_pJobs->Add(LQuery);
-                    auto LReply = AConnection->Reply();
+                    LJob->Data() = AConnection->Data();
 
-                    LReply->Content = "{\"jobid\":" "\"" + LJob->JobId() + "\"}";
+                    auto LReply = AConnection->Reply();
+                    LReply->Content = _T("{\"identity\":" "\"") + LJob->Identity() + _T("\"}");
 
                     AConnection->SendReply(CReply::accepted);
+                    AConnection->CloseConnection(true);
                 } else {
                     // Wait query result...
                     AConnection->CloseConnection(false);
@@ -540,7 +591,7 @@ namespace Apostol {
             auto LQuery = GetQuery(AConnection);
 
             if (LQuery == nullptr)
-                throw Delphi::Exception::Exception("ExecSQL: GetQuery() failed!");
+                throw Delphi::Exception::Exception(_T("ExecSQL: GetQuery() failed!"));
 
             if (OnExecuted != nullptr)
                 LQuery->OnPollExecuted(static_cast<COnPQPollQueryExecutedEvent &&>(OnExecuted));
@@ -556,7 +607,7 @@ namespace Apostol {
                 delete LQuery;
             }
 
-            Log()->Error(APP_LOG_ALERT, 0, "ExecSQL: StartQuery() failed!");
+            Log()->Error(APP_LOG_ALERT, 0, _T("ExecSQL: StartQuery() failed!"));
 
             return false;
         }
@@ -613,29 +664,29 @@ namespace Apostol {
         //--------------------------------------------------------------------------------------------------------------
 
         void CApostolModule::DebugRequest(CRequest *ARequest) {
-            DebugMessage("[%p] Request:\n%s %s HTTP/%d.%d\n", ARequest, ARequest->Method.c_str(), ARequest->URI.c_str(), ARequest->VMajor, ARequest->VMinor);
+            DebugMessage(_T("[%p] Request:\n%s %s HTTP/%d.%d\n"), ARequest, ARequest->Method.c_str(), ARequest->URI.c_str(), ARequest->VMajor, ARequest->VMinor);
 
             for (int i = 0; i < ARequest->Headers.Count(); i++)
-                DebugMessage("%s: %s\n", ARequest->Headers[i].Name.c_str(), ARequest->Headers[i].Value.c_str());
+                DebugMessage(_T("%s: %s\n"), ARequest->Headers[i].Name.c_str(), ARequest->Headers[i].Value.c_str());
 
             if (!ARequest->Content.IsEmpty())
-                DebugMessage("\n%s\n", ARequest->Content.c_str());
+                DebugMessage(_T("\n%s\n"), ARequest->Content.c_str());
         }
         //--------------------------------------------------------------------------------------------------------------
 
         void CApostolModule::DebugReply(CReply *AReply) {
-            DebugMessage("[%p] Reply:\nHTTP/%d.%d %d %s\n", AReply, AReply->VMajor, AReply->VMinor, AReply->Status, AReply->StatusText.c_str());
+            DebugMessage(_T("[%p] Reply:\nHTTP/%d.%d %d %s\n"), AReply, AReply->VMajor, AReply->VMinor, AReply->Status, AReply->StatusText.c_str());
 
             for (int i = 0; i < AReply->Headers.Count(); i++)
-                DebugMessage("%s: %s\n", AReply->Headers[i].Name.c_str(), AReply->Headers[i].Value.c_str());
+                DebugMessage(_T("%s: %s\n"), AReply->Headers[i].Name.c_str(), AReply->Headers[i].Value.c_str());
 
             if (!AReply->Content.IsEmpty())
-                DebugMessage("\n%s\n", AReply->Content.c_str());
+                DebugMessage(_T("\n%s\n"), AReply->Content.c_str());
         }
         //--------------------------------------------------------------------------------------------------------------
 
         void CApostolModule::DebugConnection(CHTTPServerConnection *AConnection) {
-            DebugMessage("\n[%p] [%s:%d] [%d] ", AConnection, AConnection->Socket()->Binding()->PeerIP(),
+            DebugMessage(_T("\n[%p] [%s:%d] [%d] "), AConnection, AConnection->Socket()->Binding()->PeerIP(),
                          AConnection->Socket()->Binding()->PeerPort(), AConnection->Socket()->Binding()->Handle());
 
             DebugRequest(AConnection->Request());
@@ -645,7 +696,7 @@ namespace Apostol {
                 auto LBinding = LConnection->Socket()->Binding();
 
                 if (Assigned(LBinding)) {
-                    DebugMessage("\n[%p] [%s:%d] [%d] ", LConnection, LBinding->PeerIP(),
+                    DebugMessage(_T("\n[%p] [%s:%d] [%d] "), LConnection, LBinding->PeerIP(),
                                  LBinding->PeerPort(), LBinding->Handle());
                 }
 
@@ -691,7 +742,7 @@ namespace Apostol {
             try {
                 LModule->Execute(LConnection);
             } catch (...) {
-                LConnection->SendStockReply(CReply::internal_server_error);
+                LConnection->SendStockReply(CReply::bad_request);
                 DoAfterExecuteModule(LModule);
                 throw;
             }

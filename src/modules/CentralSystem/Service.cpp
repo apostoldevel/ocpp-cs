@@ -224,17 +224,15 @@ namespace Apostol {
 
         void CCSService::DoPointDisconnected(CObject *Sender) {
             auto LConnection = dynamic_cast<CHTTPServerConnection *>(Sender);
-            if (LConnection != nullptr) {
-                auto LPoint = m_CPManager->FindPointByConnection(LConnection);
-                if (LPoint != nullptr) {
-                    Log()->Message(_T("[%s:%d] Point %s closed connection."), LConnection->Socket()->Binding()->PeerIP(),
-                                   LConnection->Socket()->Binding()->PeerPort(),
-                                   LPoint->Identity().IsEmpty() ? "(empty)" : LPoint->Identity().c_str());
-                    delete LPoint;
-                } else {
-                    Log()->Message(_T("[%s:%d] Point closed connection."), LConnection->Socket()->Binding()->PeerIP(),
-                                   LConnection->Socket()->Binding()->PeerPort());
-                }
+            try {
+                auto lpPoint = CChargingPoint::FindOfConnection(LConnection, _T("point"));
+                Log()->Message(_T("[%s:%d] Point %s closed connection."),
+                        LConnection->Socket()->Binding()->PeerIP(), LConnection->Socket()->Binding()->PeerPort(),
+                        lpPoint->Identity().IsEmpty() ? "(empty)" : lpPoint->Identity().c_str());
+                delete lpPoint;
+            } catch (Delphi::Exception::Exception &E) {
+                Log()->Message(_T("[%s:%d] Point closed connection."),
+                        LConnection->Socket()->Binding()->PeerIP(), LConnection->Socket()->Binding()->PeerPort());
             }
         }
         //--------------------------------------------------------------------------------------------------------------
@@ -287,23 +285,19 @@ namespace Apostol {
 
             AConnection->SwitchingProtocols(LAccept, LProtocol);
 
-            auto LPoint = m_CPManager->FindPointByIdentity(LIdentity);
-            if (LPoint == nullptr) {
-                LPoint = m_CPManager->Add(AConnection);
-                LPoint->Identity() = LIdentity;
-                LPoint->Address() = LRequest->Headers.Values("x-real-ip");
+            auto lpPoint = m_CPManager->FindPointByIdentity(LIdentity);
+            if (lpPoint == nullptr) {
+                lpPoint = m_CPManager->Add(AConnection);
+                lpPoint->Identity() = LIdentity;
+                lpPoint->Address() = GetHost(AConnection);
 #if defined(_GLIBCXX_RELEASE) && (_GLIBCXX_RELEASE >= 9)
                 AConnection->OnDisconnected([this](auto && Sender) { DoPointDisconnected(Sender); });
 #else
                 AConnection->OnDisconnected(std::bind(&CCSService::DoPointDisconnected, this, _1));
 #endif
             } else {
-                try {
-                    LPoint->SwitchConnection(AConnection);
-                } catch (std::exception &e) {
-                    Log()->Error(APP_LOG_EMERG, 0, e.what());
-                    delete LPoint;
-                }
+                lpPoint->SwitchConnection(AConnection);
+                lpPoint->Address() = GetHost(AConnection);
             }
         }
         //--------------------------------------------------------------------------------------------------------------
@@ -355,17 +349,17 @@ namespace Apostol {
                         CJSONValue jsonPoint(jvtObject);
                         CJSONValue jsonConnection(jvtObject);
 
-                        auto LPoint = m_CPManager->Points(i);
+                        auto lpPoint = m_CPManager->Points(i);
 
-                        jsonPoint.Object().AddPair("Identity", LPoint->Identity());
-                        jsonPoint.Object().AddPair("Address", LPoint->Address());
+                        jsonPoint.Object().AddPair("Identity", lpPoint->Identity());
+                        jsonPoint.Object().AddPair("Address", lpPoint->Address());
 
-                        if (LPoint->Connection()->Connected()) {
+                        if (lpPoint->Connection()->Connected()) {
                             jsonConnection.Object().AddPair("Socket",
-                                                            LPoint->Connection()->Socket()->Binding()->Handle());
-                            jsonConnection.Object().AddPair("IP", LPoint->Connection()->Socket()->Binding()->PeerIP());
+                                                            lpPoint->Connection()->Socket()->Binding()->Handle());
+                            jsonConnection.Object().AddPair("IP", lpPoint->Connection()->Socket()->Binding()->PeerIP());
                             jsonConnection.Object().AddPair("Port",
-                                                            LPoint->Connection()->Socket()->Binding()->PeerPort());
+                                                            lpPoint->Connection()->Socket()->Binding()->PeerPort());
                             jsonPoint.Object().AddPair("Connection", jsonConnection);
                         }
 
@@ -390,16 +384,16 @@ namespace Apostol {
                     const auto &LIdentity = LPath[3];
                     const auto &LAction = LPath[4];
 
-                    auto LPoint = m_CPManager->FindPointByIdentity(LIdentity);
+                    auto lpPoint = m_CPManager->FindPointByIdentity(LIdentity);
 
-                    if (LPoint == nullptr) {
+                    if (lpPoint == nullptr) {
                         LReply->Content.Format(R"({"error": {"code": %u, "message": "%s"}})", 300,
                                                "Charge point not found.");
                         AConnection->SendReply(CReply::ok);
                         return;
                     }
 
-                    auto LConnection = LPoint->Connection();
+                    auto LConnection = lpPoint->Connection();
                     if (LConnection == nullptr) {
                         LReply->Content.Format(R"({"error": {"code": %u, "message": "%s"}})", 301,
                                                "Charge point offline.");
@@ -450,7 +444,7 @@ namespace Apostol {
                             LPayload.Object().AddPair("key", LArray);
                         }
 
-                        LPoint->Messages()->Add(OnRequest, LAction, LPayload);
+                        lpPoint->Messages()->Add(OnRequest, LAction, LPayload);
 
                         return;
                     }
@@ -544,16 +538,16 @@ namespace Apostol {
                             const auto &LIdentity = LPath[3];
                             const auto &LAction = LPath[4];
 
-                            auto LPoint = m_CPManager->FindPointByIdentity(LIdentity);
+                            auto lpPoint = m_CPManager->FindPointByIdentity(LIdentity);
 
-                            if (LPoint == nullptr) {
+                            if (lpPoint == nullptr) {
                                 LReply->Content.Format(R"({"error": {"code": %u, "message": "%s"}})", 300,
                                                        "Charge point not found.");
                                 AConnection->SendReply(CReply::ok);
                                 return;
                             }
 
-                            auto LConnection = LPoint->Connection();
+                            auto LConnection = lpPoint->Connection();
                             if (LConnection == nullptr) {
                                 LReply->Content.Format(R"({"error": {"code": %u, "message": "%s"}})", 301,
                                                        "Charge point offline.");
@@ -620,7 +614,7 @@ namespace Apostol {
                                     LPayload.Object().AddPair("value", value);
                                 }
 
-                                LPoint->Messages()->Add(OnRequest, LAction, LPayload);
+                                lpPoint->Messages()->Add(OnRequest, LAction, LPayload);
 
                                 return;
 
@@ -650,7 +644,7 @@ namespace Apostol {
                                     LPayload.Object().AddPair("idTag", idTag);
                                 }
 
-                                LPoint->Messages()->Add(OnRequest, LAction, LPayload);
+                                lpPoint->Messages()->Add(OnRequest, LAction, LPayload);
 
                                 return;
 
@@ -673,7 +667,7 @@ namespace Apostol {
                                     LPayload.Object().AddPair("transactionId", transactionId);
                                 }
 
-                                LPoint->Messages()->Add(OnRequest, LAction, LPayload);
+                                lpPoint->Messages()->Add(OnRequest, LAction, LPayload);
 
                                 return;
 
@@ -722,7 +716,7 @@ namespace Apostol {
                                     LPayload.Object().AddPair("reservationId", reservationId);
                                 }
 
-                                LPoint->Messages()->Add(OnRequest, LAction, LPayload);
+                                lpPoint->Messages()->Add(OnRequest, LAction, LPayload);
 
                                 return;
 
@@ -745,7 +739,7 @@ namespace Apostol {
                                     LPayload.Object().AddPair("reservationId", reservationId);
                                 }
 
-                                LPoint->Messages()->Add(OnRequest, LAction, LPayload);
+                                lpPoint->Messages()->Add(OnRequest, LAction, LPayload);
 
                                 return;
                             }
@@ -759,9 +753,9 @@ namespace Apostol {
 
             } else if (LService == "Ocpp") {
 
-                auto LPoint = m_CPManager->FindPointByConnection(AConnection);
-                if (LPoint == nullptr) {
-                    LPoint = m_CPManager->Add(AConnection);
+                auto lpPoint = m_CPManager->FindPointByConnection(AConnection);
+                if (lpPoint == nullptr) {
+                    lpPoint = m_CPManager->Add(AConnection);
 #if defined(_GLIBCXX_RELEASE) && (_GLIBCXX_RELEASE >= 9)
                     AConnection->OnDisconnected([this](auto && Sender) { DoPointDisconnected(Sender); });
 #else
@@ -769,7 +763,7 @@ namespace Apostol {
 #endif
                 }
 
-                LPoint->Parse(ptSOAP, LRequest->Content, LReply->Content);
+                lpPoint->Parse(ptSOAP, LRequest->Content, LReply->Content);
 
                 AConnection->SendReply(CReply::ok, "application/soap+xml");
 
@@ -791,15 +785,13 @@ namespace Apostol {
                          AConnection->Socket()->Binding()->PeerPort(), AConnection->Socket()->Binding()->Handle(), LRequest.c_str());
 #endif
             try {
-                auto LPoint = m_CPManager->FindPointByConnection(AConnection);
-                if (LPoint == nullptr)
-                    throw Delphi::Exception::Exception("Not found charge point by connection.");
+                auto lpPoint = CChargingPoint::FindOfConnection(AConnection, _T("point"));
 
                 if (!Config()->PostgresConnect()) {
 
                     CString LResponse;
 
-                    if (LPoint->Parse(ptJSON, LRequest, LResponse)) {
+                    if (lpPoint->Parse(ptJSON, LRequest, LResponse)) {
                         if (!LResponse.IsEmpty()) {
 #ifdef _DEBUG
                             DebugMessage("\n[%p] [%s:%d] [%d] [WebSocket] Response:\n%s\n", AConnection, AConnection->Socket()->Binding()->PeerIP(),
@@ -819,10 +811,10 @@ namespace Apostol {
 
                     if (jmRequest.MessageTypeId == mtCall) {
                         // Обработаем запрос в СУБД
-                        DBParse(AConnection, LPoint->Identity(), jmRequest.Action, jmRequest.Payload);
+                        DBParse(AConnection, lpPoint->Identity(), jmRequest.Action, jmRequest.Payload);
                     } else {
                         // Ответ от зарядной станции отправим в обработчик
-                        auto LHandler = LPoint->Messages()->FindMessageById(jmRequest.UniqueId);
+                        auto LHandler = lpPoint->Messages()->FindMessageById(jmRequest.UniqueId);
                         if (Assigned(LHandler)) {
                             LHandler->Handler(AConnection);
                         }
