@@ -28,15 +28,16 @@ Author:
 #define BT_BUF_SIZE 255
 //----------------------------------------------------------------------------------------------------------------------
 
-void signal_error(int signo, siginfo_t *siginfo, void *ucontext)
-{
+void signal_error(int signo, siginfo_t *siginfo, void *ucontext) {
     void*       addr;
     void*       trace[BT_BUF_SIZE];
     int         i;
-    int         size;
+    int         count;
     char      **msg;
 
-    GLog->Error(APP_LOG_CRIT, 0, "signal: %d (%s), addr: 0x%xL", signo, sys_siglist[signo], siginfo->si_addr);
+    GLog->Error(APP_LOG_CRIT, 0, "-----BEGIN BACKTRACE LOG-----");
+    GLog->Error(APP_LOG_CRIT, 0, "Signal: %d (%s)", signo, sys_siglist[signo]);
+    GLog->Error(APP_LOG_CRIT, 0, "Addr  : %p", siginfo->si_addr);
 
 #ifdef __x86_64__
 
@@ -45,26 +46,21 @@ void signal_error(int signo, siginfo_t *siginfo, void *ucontext)
 #else
     addr = (void*)((ucontext_t*)ucontext)->uc_mcontext.gregs[REG_EIP];
 #endif
+    GLog->Error(APP_LOG_CRIT, 0, "addr  : %p", addr);
 
-    size = backtrace(trace, BT_BUF_SIZE);
+    count = backtrace(trace, BT_BUF_SIZE);
 
-    GLog->Error(APP_LOG_CRIT, 0, "backtrace() returned %d addresses", size);
+    GLog->Error(APP_LOG_CRIT, 0, "Count : %d", count);
 
-    //trace[0] = addr;
-
-    msg = backtrace_symbols(trace, size);
-    if (msg)
-    {
-        GLog->Error(APP_LOG_DEBUG, 0, "-= backtrace log =-");
-
-        for (i = 0; i < size; ++i)
-        {
-            GLog->Error(APP_LOG_DEBUG, 0, "%s", msg[i]);
+    msg = backtrace_symbols(trace, count);
+    if (msg) {
+        for (i = 0; i < count; ++i) {
+            GLog->Error(APP_LOG_CRIT, 0, "%s", msg[i]);
         }
 
-        GLog->Error(APP_LOG_DEBUG, 0, "-= backtrace log =-");
         free(msg);
     }
+    GLog->Error(APP_LOG_CRIT, 0, "-----END BACKTRACE LOG-----");
 #endif
     exit(3);
 }
@@ -800,6 +796,10 @@ namespace Apostol {
 
         void CServerProcess::DoAccessLog(CTCPConnection *AConnection) {
             auto LConnection = dynamic_cast<CHTTPServerConnection *> (AConnection);
+
+            if (LConnection == nullptr || LConnection->Protocol() == pWebSocket)
+                return;
+
             auto LRequest = LConnection->Request();
             auto LReply = LConnection->Reply();
 
