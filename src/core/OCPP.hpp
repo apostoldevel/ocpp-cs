@@ -599,7 +599,7 @@ namespace Apostol {
 
             bool Parse(CProtocolType Protocol, const CString &Request, CString &Response);
 
-            static CChargingPoint *FindOfConnection(CHTTPServerConnection *AConnection, const CString &Name);
+            static CChargingPoint *FindOfConnection(CHTTPServerConnection *AConnection);
 
         };
 

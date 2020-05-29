@@ -225,14 +225,15 @@ namespace Apostol {
         void CCSService::DoPointDisconnected(CObject *Sender) {
             auto LConnection = dynamic_cast<CHTTPServerConnection *>(Sender);
             try {
-                auto lpPoint = CChargingPoint::FindOfConnection(LConnection, _T("point"));
+                auto lpPoint = CChargingPoint::FindOfConnection(LConnection);
                 Log()->Message(_T("[%s:%d] Point %s closed connection."),
                         LConnection->Socket()->Binding()->PeerIP(), LConnection->Socket()->Binding()->PeerPort(),
                         lpPoint->Identity().IsEmpty() ? "(empty)" : lpPoint->Identity().c_str());
                 delete lpPoint;
             } catch (Delphi::Exception::Exception &E) {
-                Log()->Message(_T("[%s:%d] Point closed connection."),
-                        LConnection->Socket()->Binding()->PeerIP(), LConnection->Socket()->Binding()->PeerPort());
+                Log()->Message(_T("[%s:%d] Point closed connection (%s)."),
+                        LConnection->Socket()->Binding()->PeerIP(),
+                        LConnection->Socket()->Binding()->PeerPort(), E.what());
             }
         }
         //--------------------------------------------------------------------------------------------------------------
@@ -290,15 +291,15 @@ namespace Apostol {
                 lpPoint = m_CPManager->Add(AConnection);
                 lpPoint->Identity() = LIdentity;
                 lpPoint->Address() = GetHost(AConnection);
-#if defined(_GLIBCXX_RELEASE) && (_GLIBCXX_RELEASE >= 9)
-                AConnection->OnDisconnected([this](auto && Sender) { DoPointDisconnected(Sender); });
-#else
-                AConnection->OnDisconnected(std::bind(&CCSService::DoPointDisconnected, this, _1));
-#endif
             } else {
                 lpPoint->SwitchConnection(AConnection);
                 lpPoint->Address() = GetHost(AConnection);
             }
+#if defined(_GLIBCXX_RELEASE) && (_GLIBCXX_RELEASE >= 9)
+            AConnection->OnDisconnected([this](auto && Sender) { DoPointDisconnected(Sender); });
+#else
+            AConnection->OnDisconnected(std::bind(&CCSService::DoPointDisconnected, this, _1));
+#endif
         }
         //--------------------------------------------------------------------------------------------------------------
 
@@ -785,7 +786,7 @@ namespace Apostol {
                          AConnection->Socket()->Binding()->PeerPort(), AConnection->Socket()->Binding()->Handle(), LRequest.c_str());
 #endif
             try {
-                auto lpPoint = CChargingPoint::FindOfConnection(AConnection, _T("point"));
+                auto lpPoint = CChargingPoint::FindOfConnection(AConnection);
 
                 if (!Config()->PostgresConnect()) {
 

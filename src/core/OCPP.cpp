@@ -719,15 +719,13 @@ namespace Apostol {
         //--------------------------------------------------------------------------------------------------------------
 
         void CChargingPoint::AddToConnection(CHTTPServerConnection *AConnection) {
-            CObject *Temp;
             if (Assigned(AConnection)) {
                 int Index = AConnection->Data().IndexOfName("point");
                 if (Index == -1) {
                     AConnection->Data().AddObject("point", this);
                 } else {
-                    Temp = AConnection->Data().Objects(Index);
+                    delete AConnection->Data().Objects(Index);
                     AConnection->Data().Objects(Index, this);
-                    delete Temp;
                 }
             }
         }
@@ -736,7 +734,7 @@ namespace Apostol {
         void CChargingPoint::DeleteFromConnection(CHTTPServerConnection *AConnection) {
             if (Assigned(AConnection)) {
                 int Index = AConnection->Data().IndexOfObject(this);
-                if (Index == -1)
+                if (Index != -1)
                     AConnection->Data().Delete(Index);
             }
         }
@@ -745,20 +743,25 @@ namespace Apostol {
         void CChargingPoint::SwitchConnection(CHTTPServerConnection *AConnection) {
             if (m_pConnection != AConnection) {
                 DeleteFromConnection(m_pConnection);
+                m_pConnection->Disconnect();
                 m_pConnection = AConnection;
                 AddToConnection(m_pConnection);
             }
         }
         //--------------------------------------------------------------------------------------------------------------
 
-        CChargingPoint *CChargingPoint::FindOfConnection(CHTTPServerConnection *AConnection, const CString &Name) {
-            int Index = AConnection->Data().IndexOfName(Name);
+        CChargingPoint *CChargingPoint::FindOfConnection(CHTTPServerConnection *AConnection) {
+            int Index = AConnection->Data().IndexOfName("point");
             if (Index == -1)
-                throw Delphi::Exception::ExceptionFrm("Not found \"%s\" in connection.", Name.c_str());
+                throw Delphi::Exception::ExceptionFrm("Not found charging point in connection");
 
-            auto Point = dynamic_cast<CChargingPoint *> (AConnection->Data().Objects(Index));
+            auto Object = AConnection->Data().Objects(Index);
+            if (Object == nullptr)
+                throw Delphi::Exception::ExceptionFrm("Object in connection data is null");
+
+            auto Point = dynamic_cast<CChargingPoint *> (Object);
             if (Point == nullptr)
-                throw Delphi::Exception::Exception("Charging point is null.");
+                throw Delphi::Exception::Exception("Charging point is null");
 
             return Point;
         }
