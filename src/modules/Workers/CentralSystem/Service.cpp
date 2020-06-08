@@ -458,8 +458,8 @@ namespace Apostol {
         //--------------------------------------------------------------------------------------------------------------
 
         void CCSService::DoGet(CHTTPServerConnection *AConnection) {
-            auto LServer = dynamic_cast<CHTTPServer *> (AConnection->Server());
             auto LRequest = AConnection->Request();
+            auto LReply = AConnection->Reply();
 
             CString LPath(LRequest->Location.pathname);
 
@@ -476,7 +476,9 @@ namespace Apostol {
 
             CAuthorization Authorization;
             if (!CheckAuthorization(AConnection, Authorization)) {
-                AConnection->SendStockReply(CReply::unauthorized);
+                CReply::GetReply(LReply, CReply::unauthorized);
+                CReply::AddUnauthorized(LReply, false);
+                AConnection->SendReply();
                 return;
             }
 
