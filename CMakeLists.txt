@@ -14,7 +14,7 @@ message(STATUS "Project description: ${PROJECT_DESCRIPTION}")
 # ----------------------------------------------------------------------------------------------------------------------
 set(INSTALL_AS_ROOT  ON  CACHE BOOL "Install as root")
 set(WITH_POSTGRESQL  ON  CACHE BOOL "Build with PostgreSQL")
-set(WITH_CURL        ON  CACHE BOOL "Build with cURL")
+set(WITH_CURL        OFF CACHE BOOL "Build with cURL")
 set(WITH_SQLITE3     OFF CACHE BOOL "Build with Sqlite3")
 # ----------------------------------------------------------------------------------------------------------------------
 
