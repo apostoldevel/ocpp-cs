@@ -34,7 +34,7 @@ extern "C++" {
 
 namespace Apostol {
 
-    namespace CSService {
+    namespace Workers {
 
         CString to_string(unsigned long Value) {
             TCHAR szString[_INT_T_LEN + 1] = {0};
@@ -56,7 +56,7 @@ namespace Apostol {
 
         //--------------------------------------------------------------------------------------------------------------
 
-        CCSService::CCSService(CModuleManager *AManager) : CApostolModule(AManager) {
+        CCSService::CCSService(CModuleProcess *AProcess) : CApostolModule(AProcess, "ocpp central service") {
             m_CPManager = new CChargingPointManager();
             m_Headers.Add("Authorization");
 
@@ -113,7 +113,7 @@ namespace Apostol {
 
                 CJSONProtocol::PrepareResponse(jmRequest, jmResponse);
 
-                jmResponse.MessageTypeId = mtCallError;
+                jmResponse.MessageTypeId = OCPP::mtCallError;
                 jmResponse.ErrorCode = "InternalError";
                 jmResponse.ErrorDescription = AException->what();
 
@@ -170,7 +170,7 @@ namespace Apostol {
                         jmResponse.Payload << Response.ToString();
                     }
                 } catch (Delphi::Exception::Exception &E) {
-                    jmResponse.MessageTypeId = mtCallError;
+                    jmResponse.MessageTypeId = OCPP::mtCallError;
                     jmResponse.ErrorCode = "InternalError";
                     jmResponse.ErrorDescription = E.what();
 
@@ -247,8 +247,9 @@ namespace Apostol {
                 return false;
 
             try {
+                const auto& APIPassphrase = Config()->IniFile().ReadString("api", "passphrase", "ocpp");
                 Authorization << LAuthorization;
-                if (Authorization.Username == "ocpp" && Authorization.Password == Config()->APIPassphrase()) {
+                if (Authorization.Username == "ocpp" && Authorization.Password == APIPassphrase) {
                     return true;
                 }
             } catch (std::exception &e) {
@@ -416,7 +417,7 @@ namespace Apostol {
                         return;
                     }
 
-                    auto OnRequest = [AConnection](CMessageHandler *AHandler, CHTTPServerConnection *AWSConnection) {
+                    auto OnRequest = [AConnection](OCPP::CMessageHandler *AHandler, CHTTPServerConnection *AWSConnection) {
                         auto LWSRequest = AWSConnection->WSRequest();
                         const CString LRequest(LWSRequest->Payload());
 
@@ -570,7 +571,7 @@ namespace Apostol {
                                 return;
                             }
 
-                            auto OnRequest = [AConnection](CMessageHandler *AHandler,
+                            auto OnRequest = [AConnection](OCPP::CMessageHandler *AHandler,
                                                            CHTTPServerConnection *AWSConnection) {
                                 auto LWSRequest = AWSConnection->WSRequest();
                                 const CString LRequest(LWSRequest->Payload());
@@ -810,7 +811,7 @@ namespace Apostol {
                     CJSONMessage jmRequest;
                     CJSONProtocol::Request(LRequest, jmRequest);
 
-                    if (jmRequest.MessageTypeId == mtCall) {
+                    if (jmRequest.MessageTypeId == OCPP::mtCall) {
                         // Обработаем запрос в СУБД
                         DBParse(AConnection, lpPoint->Identity(), jmRequest.Action, jmRequest.Payload);
                     } else {
@@ -846,8 +847,15 @@ namespace Apostol {
         }
         //--------------------------------------------------------------------------------------------------------------
 
-        bool CCSService::CheckUserAgent(const CString& Value) {
-            return true;
+        bool CCSService::IsEnabled() {
+            if (m_ModuleStatus == msUnknown)
+                m_ModuleStatus = msEnabled;
+            return m_ModuleStatus == msEnabled;
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
+        bool CCSService::CheckUserAgent(const CString &Value) {
+            return IsEnabled();
         }
 
     }

@@ -14,6 +14,7 @@ message(STATUS "Project description: ${PROJECT_DESCRIPTION}")
 # ----------------------------------------------------------------------------------------------------------------------
 set(INSTALL_AS_ROOT  ON  CACHE BOOL "Install as root")
 set(WITH_POSTGRESQL  ON  CACHE BOOL "Build with PostgreSQL")
+set(WITH_CURL        ON  CACHE BOOL "Build with cURL")
 set(WITH_SQLITE3     OFF CACHE BOOL "Build with Sqlite3")
 # ----------------------------------------------------------------------------------------------------------------------
 
@@ -21,14 +22,16 @@ if (INSTALL_AS_ROOT)
     set(INSTALL_BIN_PATH "/usr/sbin")
     set(PROJECT_PREFIX "/etc/${PROJECT_NAME}")
 else()
-    set(INSTALL_BIN_PATH "/usr/bin")
-    set(PROJECT_PREFIX "$ENV{HOME}/.${PROJECT_NAME}")
+    set(INSTALL_BIN_PATH "/usr/local/sbin")
+    set(PROJECT_PREFIX "$ENV{HOME}/.config/${PROJECT_NAME}")
 endif()
+
+list( APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake-modules" )
 
 add_compile_options("$<$<CONFIG:DEBUG>:-D_DEBUG>")
 
 set(CORE_LIB_NAME apostol-core)
-set(MODULES_LIB_NAME apostol-modules)
+#set(MODULES_LIB_NAME apostol-modules)
 
 add_custom_target(
         auto_increment_version
@@ -37,8 +40,17 @@ add_custom_target(
         -P ${CMAKE_SOURCE_DIR}/AutoVersion.cmake
 )
 
+set(PROJECT_LIB_DIR "src/lib")
+
 # Delphi classes for C++
 # ----------------------------------------------------------------------------------------------------------------------
+set(DELPHI_LIB_NAME delphi)
+set(DELPHI_LIB_DIR "${PROJECT_LIB_DIR}/${DELPHI_LIB_NAME}")
+
+# -Iinclude
+include_directories(${DELPHI_LIB_DIR}/include)
+include_directories(${DELPHI_LIB_DIR}/src)
+
 add_compile_options("-DDELPHI_LIB_EXPORTS")
 add_compile_options(-DWWWServerName="${PROJECT_DESCRIPTION}")
 
@@ -52,28 +64,55 @@ if (WITH_SQLITE3)
     add_compile_options("-DWITH_SQLITE3")
 endif()
 
-set(DELPHI_LIB_DIR "src/lib/delphi")
+if (WITH_CURL)
+    set(CURL_LIB_NAME "curl")
+    add_compile_options("-DWITH_CURL")
+endif()
 
 add_subdirectory(${DELPHI_LIB_DIR})
 
-# -Iinclude
-include_directories(${DELPHI_LIB_DIR}/include)
-include_directories(${DELPHI_LIB_DIR}/src)
+# Find PkgConfig
+#------------------------------------------------------------------------------
+find_package( PkgConfig REQUIRED )
+
+set( prefix "${CMAKE_PREFIX_PATH}" )
+set( exec_prefix "\${prefix}" )
+set( libdir "\${exec_prefix}/lib" )
+set( includedir "\${exec_prefix}/include" )
+
+set( pkgconfigdir "${libdir}/pkgconfig" CACHE PATH "Path to pkgconfig directory." )
+
+# Find dl
+#------------------------------------------------------------------------------
+if ((${CMAKE_SYSTEM_NAME} MATCHES "Linux"))
+    find_package( Dl REQUIRED )
+
+    message(STATUS "Dl libs: ${dl_LIBS}")
+    message(STATUS "Dl libraries: ${dl_LIBRARIES}")
+endif()
+
+# rapidxml
+# ----------------------------------------------------------------------------------------------------------------------
+include_directories(${PROJECT_LIB_DIR}/rapidxml)
+file(GLOB lib_files ${lib_files} ${PROJECT_LIB_DIR}/rapidxml/*.hpp)
 
 # Apostol
 # ----------------------------------------------------------------------------------------------------------------------
-include_directories(src/app src/core src/modules src/lib/rapidxml)
+include_directories(src/app src/core src/modules src/modules/Workers src/modules/Helpers src/processes)
 
 file(GLOB app_files version.h src/app/*.hpp src/app/*.cpp)
 file(GLOB core_files src/core/*.hpp src/core/*.cpp)
-file(GLOB modules_files src/modules/Modules.hpp src/modules/*/*.hpp src/modules/*/*.cpp)
-file(GLOB lib_files src/lib/rapidxml/*.hpp)
+file(GLOB modules_files src/modules/Modules.hpp src/modules/*/*.hpp src/modules/*/*/*.hpp src/modules/*/*/*.cpp)
+file(GLOB processes_files src/processes/Processes.hpp src/processes/*/*.hpp src/processes/*/*.cpp)
 
 # Apostol Core
 # ----------------------------------------------------------------------------------------------------------------------
 add_library(${CORE_LIB_NAME} STATIC
         $<TARGET_OBJECTS:delphi>
+        ${lib_files}
         ${core_files}
+        ${modules_files}
+        ${processes_files}
         )
 
 target_compile_definitions(${CORE_LIB_NAME} PUBLIC
@@ -95,20 +134,20 @@ target_compile_definitions(${CORE_LIB_NAME} PUBLIC
         APP_ERROR_LOG_FILE="logs/error.log"
         APP_ACCESS_LOG_FILE="logs/access.log"
         APP_POSTGRES_LOG_FILE="logs/postgres.log"
-        APP_DOC_ROOT="www/"
+        APP_DOC_ROOT="www"
         )
 
-target_link_libraries(${CORE_LIB_NAME} dl pthread ${PQ_LIB_NAME} ${SQLITE3_LIB_NAME})
+target_link_libraries(${CORE_LIB_NAME} pthread ${PQ_LIB_NAME} ${SQLITE3_LIB_NAME} ${CURL_LIB_NAME} crypto)
 
 # Apostol modules
 # ----------------------------------------------------------------------------------------------------------------------
-add_library(${MODULES_LIB_NAME} STATIC ${modules_files})
-target_link_libraries(${MODULES_LIB_NAME} ${CORE_LIB_NAME} crypto)
+#add_library(${MODULES_LIB_NAME} STATIC ${modules_files})
+#target_link_libraries(${MODULES_LIB_NAME} ${CORE_LIB_NAME})
 
 # Apostol
 # ----------------------------------------------------------------------------------------------------------------------
-add_executable(${PROJECT_NAME} ${lib_files} ${app_files})
-target_link_libraries(${PROJECT_NAME} ${MODULES_LIB_NAME})
+add_executable(${PROJECT_NAME} ${app_files})
+target_link_libraries(${PROJECT_NAME} ${CORE_LIB_NAME})
 
 add_dependencies(${PROJECT_NAME} auto_increment_version)
 
@@ -119,10 +158,16 @@ set(INSTALL_PATH "${PROJECT_PREFIX}")
 install(TARGETS ${PROJECT_NAME} DESTINATION ${INSTALL_BIN_PATH})
 
 install(DIRECTORY DESTINATION ${INSTALL_PATH})
+install(DIRECTORY DESTINATION ${INSTALL_PATH}/auth)
 install(DIRECTORY DESTINATION ${INSTALL_PATH}/conf)
 install(DIRECTORY DESTINATION ${INSTALL_PATH}/logs)
+install(DIRECTORY DESTINATION ${INSTALL_PATH}/sites)
+install(DIRECTORY conf/auth/ DESTINATION ${INSTALL_PATH}/auth)
+install(DIRECTORY conf/sites/ DESTINATION ${INSTALL_PATH}/sites)
 install(DIRECTORY www/ DESTINATION ${INSTALL_PATH}/www)
 install(FILES conf/default.conf DESTINATION ${INSTALL_PATH}/conf)
+install(FILES conf/auth.conf DESTINATION ${INSTALL_PATH}/conf)
+install(FILES conf/sites.conf DESTINATION ${INSTALL_PATH}/conf)
 install(FILES conf/default.conf DESTINATION ${INSTALL_PATH} RENAME ${PROJECT_NAME}.conf)
 
 if (INSTALL_AS_ROOT)

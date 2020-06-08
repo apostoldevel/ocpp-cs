@@ -1,0 +1,4 @@
+{
+  "hosts": ["localhost:4977"],
+  "root": "/etc/bps/www"
+}

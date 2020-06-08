@@ -2,11 +2,11 @@
 
 Program name:
 
-  epc
+  ocpp
 
 Module Name:
 
-  Epc.hpp
+  ocpp.hpp
 
 Notices:
 
@@ -31,8 +31,7 @@ Author:
 #define APP_VER          APP_NAME "/" APP_VERSION
 //----------------------------------------------------------------------------------------------------------------------
 
-#include "Core.hpp"
-#include "Modules.hpp"
+#include "Header.hpp"
 //----------------------------------------------------------------------------------------------------------------------
 
 extern "C++" {
@@ -47,10 +46,12 @@ namespace Apostol {
             void ParseCmdLine() override;
             void ShowVersionInfo() override;
 
+            void StartProcess() override;
+
         public:
 
             COCPP(int argc, char *const *argv): CApplication(argc, argv) {
-                CreateModules(this);
+
             };
 
             ~COCPP() override = default;

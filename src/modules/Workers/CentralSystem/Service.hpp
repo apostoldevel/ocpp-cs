@@ -29,7 +29,7 @@ extern "C++" {
 
 namespace Apostol {
 
-    namespace CSService {
+    namespace Workers {
 
         //--------------------------------------------------------------------------------------------------------------
 
@@ -66,23 +66,24 @@ namespace Apostol {
 
         public:
 
-            explicit CCSService(CModuleManager *AManager);
+            explicit CCSService(CModuleProcess *AProcess);
 
             ~CCSService() override;
 
-            static class CCSService *CreateModule(CModuleManager *AManager) {
-                return new CCSService(AManager);
+            static class CCSService *CreateModule(CModuleProcess *AProcess) {
+                return new CCSService(AProcess);
             }
 
             void Heartbeat() override;
             void Execute(CHTTPServerConnection *AConnection) override;
 
+            bool IsEnabled() override;
             bool CheckUserAgent(const CString& Value) override;
 
         };
     }
 }
 
-using namespace Apostol::CSService;
+using namespace Apostol::Workers;
 }
 #endif //APOSTOL_WEBSERVICE_HPP
