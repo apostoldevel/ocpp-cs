@@ -80,11 +80,11 @@ namespace Apostol {
         }
         //--------------------------------------------------------------------------------------------------------------
 #endif
-        void CCertificateDownloader::FetchCerts(CAuthParam &Key) {
+        void CCertificateDownloader::FetchCerts(CProvider &Key) {
 
-            Key.Status = CAuthParam::ksError;
-#ifdef WITH_CURL
-            const auto& URI = Key.CertURI();
+            Key.Status = CProvider::ksError;
+
+            const auto& URI = Key.CertURI("web");
 
             if (URI.IsEmpty()) {
                 Log()->Error(APP_LOG_WARN, 0, _T("Certificate URI is empty."));
@@ -93,6 +93,7 @@ namespace Apostol {
 
             Log()->Debug(0, _T("Trying to fetch public keys from: %s"), URI.c_str());
 
+#ifdef WITH_CURL
             CString jsonString;
 
             try {
@@ -105,7 +106,7 @@ namespace Apostol {
                 if (m_Curl.Code() == CURLE_OK) {
                     if (!jsonString.IsEmpty()) {
                         Key.Keys << jsonString;
-                        Key.Status = CAuthParam::ksSuccess;
+                        Key.Status = CProvider::ksSuccess;
                     }
                 } else {
                     Log()->Error(APP_LOG_EMERG, 0, _T("[CURL] Failed: %s (%s)."), m_Curl.GetErrorMessage().c_str(), URI.c_str());
@@ -113,48 +114,95 @@ namespace Apostol {
             } catch (Delphi::Exception::Exception &e) {
                 Log()->Error(APP_LOG_EMERG, 0, _T("[CURL] Error: %s"), e.what());
             }
+#else
+            auto OnRequest = [this, &Key](CHTTPClient *Sender, CRequest *Request) {
+                Key.StatusTime = Now();
+                Key.Status = CProvider::ksFetching;
+                CLocation Location(Key.CertURI("web"));
+                CRequest::Prepare(Request, "GET", Location.pathname.c_str());
+            };
+
+            auto OnExecute = [this, &Key](CTCPConnection *AConnection) {
+                auto LConnection = dynamic_cast<CHTTPClientConnection *> (AConnection);
+                auto LReply = LConnection->Reply();
+
+                try {
+                    DebugRequest(LConnection->Request());
+                    DebugReply(LReply);
+
+                    Key.StatusTime = Now();
+                    Key.Status = CProvider::ksError;
+                    Key.Keys << LReply->Content;
+
+                    Key.Status = CProvider::ksSuccess;
+                } catch (Delphi::Exception::Exception &e) {
+                    Log()->Error(APP_LOG_INFO, 0, "[Certificate] Message: %s", e.what());
+                    Key.Status = CProvider::ksError;
+                }
+
+                LConnection->CloseConnection(true);
+                return true;
+            };
+
+            auto OnException = [this, &Key](CTCPConnection *AConnection, Delphi::Exception::Exception *AException) {
+                auto LConnection = dynamic_cast<CHTTPClientConnection *> (AConnection);
+                auto LClient = dynamic_cast<CHTTPClient *> (LConnection->Client());
+
+                Log()->Error(APP_LOG_EMERG, 0, "[%s:%d] %s", LClient->Host().c_str(), LClient->Port(), AException->what());
+
+                Key.Status = CProvider::ksError;
+            };
+
+            CLocation Location(URI);
+            auto LClient = GetClient(Location.hostname, Location.port);
+
+            LClient->OnRequest(OnRequest);
+            LClient->OnExecute(OnExecute);
+            LClient->OnException(OnException);
+
+            LClient->Active(true);
 #endif
         }
         //--------------------------------------------------------------------------------------------------------------
 
         void CCertificateDownloader::FetchProviders() {
-            auto& Params = Server().AuthParams();
-            for (int i = 0; i < Params.Count(); i++) {
-                auto& Key = Params[i].Value();
-                if (Key.Status == CAuthParam::ksUnknown) {
-                    Key.StatusTime = Now();
-                    Key.Status = CAuthParam::ksFetching;
-                    FetchCerts(Key);
+            auto& Providers = Server().Providers();
+            for (int i = 0; i < Providers.Count(); i++) {
+                auto& Provider = Providers[i].Value();
+                if (Provider.Status == CProvider::ksUnknown) {
+                    Provider.StatusTime = Now();
+                    Provider.Status = CProvider::ksFetching;
+                    FetchCerts(Provider);
                 }
             }
         }
         //--------------------------------------------------------------------------------------------------------------
 
         void CCertificateDownloader::CheckProviders() {
-            auto& Params = Server().AuthParams();
-            for (int i = 0; i < Params.Count(); i++) {
-                auto& Key = Params[i].Value();
-                if (Key.Status == CAuthParam::ksSuccess) {
-                    Key.StatusTime = Now();
-                    Key.Status = CAuthParam::ksSaved;
-                    SaveKeys(Key);
+            auto& Providers = Server().Providers();
+            for (int i = 0; i < Providers.Count(); i++) {
+                auto& Provider = Providers[i].Value();
+                if (Provider.Status == CProvider::ksSuccess) {
+                    Provider.StatusTime = Now();
+                    Provider.Status = CProvider::ksSaved;
+                    SaveKeys(Provider);
                 }
 
-                if (Key.Status != CAuthParam::ksUnknown && (Now() - Key.StatusTime >= (CDateTime) (m_SyncPeriod * 60 / 86400))) {
-                    Key.StatusTime = Now();
-                    Key.Status = CAuthParam::ksUnknown;
+                if (Provider.Status != CProvider::ksUnknown && (Now() - Provider.StatusTime >= (CDateTime) (m_SyncPeriod * 60 / 86400))) {
+                    Provider.StatusTime = Now();
+                    Provider.Status = CProvider::ksUnknown;
                 }
             }
         }
         //--------------------------------------------------------------------------------------------------------------
 
-        void CCertificateDownloader::SaveKeys(const CAuthParam &Key) {
+        void CCertificateDownloader::SaveKeys(const CProvider &Provider) {
             const CString pathCerts = Config()->Prefix() + _T("certs/");
             const CString lockFile = pathCerts + "lock";
             if (!FileExists(lockFile.c_str())) {
                 CFile Lock(lockFile.c_str(), FILE_CREATE_OR_OPEN);
                 Lock.Open();
-                Key.Keys.SaveToFile(CString(pathCerts + Key.Provider).c_str());
+                Provider.Keys.SaveToFile(CString(pathCerts + Provider.Name).c_str());
                 Lock.Close(true);
                 if (unlink(lockFile.c_str()) == FILE_ERROR) {
                     Log()->Error(APP_LOG_ALERT, errno, _T("Could not delete file: \"%s\" error: "), lockFile.c_str());
@@ -170,7 +218,9 @@ namespace Apostol {
         //--------------------------------------------------------------------------------------------------------------
 
         bool CCertificateDownloader::IsEnabled() {
-            return true;
+            if (m_ModuleStatus == msUnknown)
+                m_ModuleStatus = msEnabled;
+            return m_ModuleStatus == msEnabled;
         }
         //--------------------------------------------------------------------------------------------------------------
 
