@@ -86,6 +86,7 @@ namespace Apostol {
 
         class CJSONProtocol {
         public:
+            static void ExceptionToJson(int ErrorCode, const std::exception &e, CJSON& Json);
 
             static bool Request(const CString &String, CJSONMessage &Message);
             static void Response(const CJSONMessage &Message, CString &String);
@@ -468,7 +469,7 @@ namespace Apostol {
 
         public:
 
-            CMessageHandler(CMessageManager *AManager, COnMessageHandlerEvent && Handler);
+            CMessageHandler(OCPP::CMessageManager *AManager, COnMessageHandlerEvent && Handler);
 
             const CString &UniqueId() const { return m_UniqueId; }
 
@@ -500,6 +501,8 @@ namespace Apostol {
             explicit CMessageManager(CChargingPoint *APoint): CCollection(this), m_Point(APoint) {
 
             }
+
+            void SendAll(CHTTPServerConnection *AConnection);
 
             CMessageHandler *Add(COnMessageHandlerEvent &&Handler, const CString &Action, const CJSON &Payload);
 

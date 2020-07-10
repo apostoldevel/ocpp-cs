@@ -44,6 +44,8 @@ namespace Apostol {
 
             void InitMethods() override;
 
+            static void ReplyError(CHTTPServerConnection *AConnection, CReply::CStatusType ErrorCode, const CString &Message);
+
             static bool CheckAuthorization(CHTTPServerConnection *AConnection, CAuthorization &Authorization);
 
             bool QueryStart(CHTTPServerConnection *AConnection, const CStringList& SQL);

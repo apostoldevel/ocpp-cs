@@ -179,22 +179,29 @@ namespace Apostol {
 
         //--------------------------------------------------------------------------------------------------------------
 
+        void CJSONProtocol::ExceptionToJson(int ErrorCode, const std::exception &e, CJSON &Json) {
+            Json.Clear();
+            Json << CString().Format(R"({"error": {"code": %u, "message": "%s"}})", ErrorCode, Delphi::Json::EncodeJsonString(e.what()).c_str());
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
         bool CJSONProtocol::Request(const CString &String, CJSONMessage &Message) {
             bool Result = false;
 
             if (String.Size() > 0) {
 
                 CString Item;
-                size_t Pos = 0;
 
                 bool Quotes = false;
                 int Brackets = 0;
 
                 CJSONParserState State = psBegin;
 
-                TCHAR ch = String.at(Pos++);
+                TCHAR ch;
 
-                while (ch != 0) {
+                for (size_t i = 0; i < String.Size(); i++) {
+
+                    ch = String.at(i);
 
                     switch (State) {
                         case psBegin:
@@ -342,7 +349,11 @@ namespace Apostol {
                             Item.Append(ch);
 
                             if (Brackets == 0) {
-                                Message.Payload << Item;
+                                try {
+                                    Message.Payload << Item;
+                                } catch (std::exception &e) {
+                                    ExceptionToJson(500, e, Message.Payload);
+                                }
                                 State = psEnd;
                             }
 
@@ -359,7 +370,11 @@ namespace Apostol {
                             Item.Append(ch);
 
                             if (Brackets == 0) {
-                                Message.Payload << Item;
+                                try {
+                                    Message.Payload << Item;
+                                } catch (std::exception &e) {
+                                    ExceptionToJson(500, e, Message.Payload);
+                                }
                                 State = psEnd;
                             }
 
@@ -372,8 +387,6 @@ namespace Apostol {
 
                             break;
                     }
-
-                    ch = String.at(Pos++);
                 }
             }
 
@@ -630,7 +643,7 @@ namespace Apostol {
 
         //--------------------------------------------------------------------------------------------------------------
 
-        CMessageHandler::CMessageHandler(CMessageManager *AManager, COnMessageHandlerEvent &&Handler) :
+        CMessageHandler::CMessageHandler(OCPP::CMessageManager *AManager, COnMessageHandlerEvent &&Handler) :
                 CCollectionItem(AManager), m_Handler(Handler) {
             m_UniqueId = GetUID(APOSTOL_MODULE_UID_LENGTH);
         }
@@ -690,6 +703,15 @@ namespace Apostol {
             }
 
             return nullptr;
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
+        void CMessageManager::SendAll(CHTTPServerConnection *AConnection) {
+            CMessageHandler *Handler = nullptr;
+            for (int I = 0; I < Count(); ++I) {
+                Handler = Get(I);
+                Handler->Handler(AConnection);
+            }
         }
 
         //--------------------------------------------------------------------------------------------------------------

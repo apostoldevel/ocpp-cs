@@ -1,0 +1,102 @@
+@media (min-width: 1200px) {
+  .bs-docs-sidebar.affix-bottom, .bs-docs-sidebar.affix-top, .bs-docs-sidebar.affix {
+    width: auto;
+  }
+}
+
+@media (min-width: 768px) {
+  .bs-docs-sidebar {
+    padding-left: 0;
+    margin-left: -15px;
+  }
+}
+
+.img-docs { margin: 16px 0 16px 0 }
+
+.bs-docs-sidenav {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+.back-to-top:hover { color: #4D4D4D; text-decoration: none; }
+.back-to-top:focus { color: #999; text-decoration: none; }
+.back-to-top {
+  padding: 0 5px;
+  margin-top: 10px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #999;
+}
+
+/* All levels of nav */
+.bs-docs-sidebar .nav > li > a {
+  display: block;
+  font-size: 13px;
+  font-weight: normal;
+  color: #999;
+  padding: 0px 15px;
+  white-space: nowrap;
+}
+
+.bs-docs-sidebar .nav > li > a:hover,
+.bs-docs-sidebar .nav > li > a:focus {
+  padding-left: 14px;
+  color: #4D4D4D;
+  text-decoration: none;
+  background-color: transparent;
+  border-left: 1px solid #424242;
+}
+
+.bs-docs-sidebar .nav > .active > a,
+.bs-docs-sidebar .nav > .active:hover > a,
+.bs-docs-sidebar .nav > .active:focus > a {
+  padding-left: 13px;
+  font-weight: bold;
+  color: #4D4D4D;
+  background-color: transparent;
+  border-left: 2px solid #424242;
+}
+
+h1.title {
+  line-height: 24px;
+  font-size: 22px;
+  margin-bottom: 18px;
+  display: block;
+  padding-bottom: 2px;
+  border-bottom: 1px solid #ddd;
+}
+
+h1.title img { margin: -5px 5px 0 0 }
+
+.h4, .h5, .h6, h4, h5, h6 { margin-top: 8px; margin-bottom: 8px; }
+
+h1, h2, h3, h4, h6, .h1, .h2, .h3, .h4, .h6 {
+  font-family: OSRoboto, ALSStory, Arial, sans-serif !important;
+  font-weight: normal !important;
+}
+
+.toptable { border-collapse: collapse; border-spacing: 0; width: 100% }
+.thumbnail { padding: 5px }
+.thumbnail .caption { margin-top: 5px; border-top: 1px solid #eaeaea; padding: 15px 9px 7px 9px }
+.uley { padding-left: 19px }
+.nowrap { white-space: nowrap }
+.panel-heading .pull-right { font-size: 14px }
+.panel-title { font-size: 18px; font-weight: normal !important }
+
+.h1, .h2, .h3, h1, h2, h3 { margin-top: 10px; }
+.t6 { margin-top: 6px }
+.hidehead { white-space: nowrap; line-height: 18px; font-size: 13px }
+
+#head1 { display: inline-block; margin: 41px 0 0 4px }
+#alts { margin-bottom: -6px }
+
+.text-muted { color: #999999 }
+.text-number {
+  font-size: 75%;
+  color: #a94442;
+}
+
+h1[id] {
+  padding-top: 20px;
+  margin-top: 0;
+}

@@ -248,7 +248,7 @@
                                   <div class="form-row">
                                       <div class="form-group col-md-4">
                                           <label for="apiURL">API</label>
-                                          <input type="text" class="form-control" id="apiURL" aria-describedby="apiURLHelp" placeholder="Default: http://ocpp.epcelectro.ru/api/v1" value="http://ocpp.epcelectro.ru/api/v1" required>
+                                          <input type="text" class="form-control" id="apiURL" aria-describedby="apiURLHelp" placeholder="Default: /api/v1" value="/api/v1" required>
                                           <small id="serverHelp" class="form-text text-muted">API URL</small>
                                       </div>
                                       <div class="form-group col-md-4">
@@ -256,10 +256,14 @@
                                           <input type="text" class="form-control" id="APIPassphrase" value="">
                                           <small id="APIPassphraseHelp" class="form-text text-muted">API Passphrase for POST requests</small>
                                       </div>
+
                                       <div class="form-group col-md-4">
                                           <label for="ChargePoint">Identity</label>
-                                          <input type="text" class="form-control" id="ChargePoint" value="EVB-P18240308">
-                                          <small id="ChargePointHelp" class="form-text text-muted">Charge Point Identity</small>
+                                          <select id="ChargePoint" class="custom-select">
+                                              <option value="EVB-P1844374" selected>EVB-P1844374</option>
+                                              <option value="EVB-P18210114">EVB-P18210114</option>
+                                              <option value="EVB-P18240308">EVB-P18240308</option>
+                                          </select>
                                       </div>
                                   </div>
                               </form>
@@ -280,10 +284,31 @@
 
     <!-- Optional JavaScript -->
     <!-- jQuery first, then Popper.js, then Bootstrap JS -->
-    <script src="https://code.jquery.com/jquery-3.3.1.slim.min.js" integrity="sha384-q8i/X+965DzO0rT7abK41JStQIAqVgRVzpbzo5smXKp4YfRvH+8abtTE1Pi6jizo" crossorigin="anonymous"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.7/umd/popper.min.js" integrity="sha384-UO2eT0CpHqdSJQ6hJty5KVphtPhzWj9WO1clHTMGa3JDZwrnQq4sF86dIHNDz0W1" crossorigin="anonymous"></script>
-    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js" integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM" crossorigin="anonymous"></script>
+    <script src="https://code.jquery.com/jquery-3.4.1.slim.min.js" integrity="sha384-J6qa4849blE2+poT4WnyKhv5vZF5SrPo0iEjwBvKU7imGFAV0wwj1yYfoRSJoZ+n" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.0/dist/umd/popper.min.js" integrity="sha384-Q6E9RHvbIyZFJoft+2mJbHaEWldlvI9IOYy5n3zV9zzTtmI3UksdQRVvoxMfooAo" crossorigin="anonymous"></script>
+    <script src="/assets/vendor/bootstrap/4.4.1/js/bootstrap.min.js" integrity="sha384-wfSDF2E50Y2D1uUdj0O3uMBJnjuUD4Ih7YwaYd1iqfktj0Uod8GCExl3Og8ifwB6" crossorigin="anonymous"></script>
     <script>
+        async function CheckResponse(json, status) {
+            if (status === 400) {
+                if (json.hasOwnProperty('error')) {
+                    window.location.replace(`/error/400?error=invalid_request&error_description=${encodeURIComponent(json["error"]["message"])}`);
+                }
+            } else if (status === 404) {
+                if (json.hasOwnProperty('error')) {
+                    window.location.replace(window.location = `/error/404?error=not_found&error_description=${encodeURIComponent(json["error"]["message"])}`);
+                }
+            } else if (status === 500) {
+                if (json.hasOwnProperty('error')) {
+                    window.location.replace(window.location = `/error/500?error=server_exception&error_description=${encodeURIComponent(json["error"]["message"])}`);
+                }
+            } else {
+                if (json.hasOwnProperty('error')) {
+                    const ErrorCode = json["error"]["code"];
+                    window.location.replace(window.location = `/error/error?code=${ErrorCode}&error=invalid_request&error_description=${encodeURIComponent(json["error"]["message"])}`);
+                }
+            }
+        }
+
       /**
        * @return {string}
        */
@@ -297,9 +322,15 @@
               cache: "no-store"
           });
 
-          let data = await response.json();
-          const result = '<html lang="ru"><body><pre><code>' + JSON.stringify(data, undefined, 4) + '</code></pre></body></html>';
-          return result;
+          const json = await response.json();
+
+          if (response.ok) {
+              return '<pre><code>' + JSON.stringify(json, undefined, 4) + '</code></pre>';
+          }
+
+          await CheckResponse(json, response.status);
+
+          return undefined;
       }
 
       function empty(e) {
@@ -352,7 +383,7 @@
 
       function GetConfiguration() {
           const url = $("input[id='apiURL']").val();
-          const point = $("input[id='ChargePoint']").val();
+          const point = $("select[id='ChargePoint']").val();
           const key = $("input[id='GetConfigurationKey']").val();
           const Request = $("#GetConfigurationRequest");
 
@@ -378,7 +409,7 @@
       function ChangeConfiguration() {
           const url = $("input[id='apiURL']").val();
           const passphrase = $("input[id='APIPassphrase']").val();
-          const point = $("input[id='ChargePoint']").val();
+          const point = $("select[id='ChargePoint']").val();
           const key = $("input[id='ChangeConfigurationKey']").val();
           const value = $("input[id='ChangeConfigurationValue']").val();
           const Request = $("#ChangeConfigurationRequest");
@@ -409,7 +440,7 @@
       function RemoteStartTransaction() {
           const url = $("input[id='apiURL']").val();
           const passphrase = $("input[id='APIPassphrase']").val();
-          const point = $("input[id='ChargePoint']").val();
+          const point = $("select[id='ChargePoint']").val();
           const Request = $("#RemoteStartTransactionRequest");
 
           const connectorId = $("input[id='RemoteStartTransaction-connectorId']").val();
@@ -441,7 +472,7 @@
       function RemoteStopTransaction() {
           const url = $("input[id='apiURL']").val();
           const passphrase = $("input[id='APIPassphrase']").val();
-          const point = $("input[id='ChargePoint']").val();
+          const point = $("select[id='ChargePoint']").val();
           const Request = $("#RemoteStopTransactionRequest");
 
           const transactionId = $("input[id='RemoteStopTransaction-transactionId']").val();
@@ -471,7 +502,7 @@
       function ReserveNow() {
           const url = $("input[id='apiURL']").val();
           const passphrase = $("input[id='APIPassphrase']").val();
-          const point = $("input[id='ChargePoint']").val();
+          const point = $("select[id='ChargePoint']").val();
           const Request = $("#ReserveNowRequest");
 
           const connectorId = $("input[id='ReserveNow-connectorId']").val();
@@ -508,7 +539,7 @@
       function CancelReservation() {
           const url = $("input[id='apiURL']").val();
           const passphrase = $("input[id='APIPassphrase']").val();
-          const point = $("input[id='ChargePoint']").val();
+          const point = $("select[id='ChargePoint']").val();
           const Request = $("#CancelReservationRequest");
 
           const reservationId = $("input[id='CancelReservation-reservationId']").val();
@@ -536,7 +567,7 @@
       }
 
       function GetChargePoint() {
-          const url = 'http://api.epcelectro.ru/api/v1';
+          const url = 'https://api.plugme.ru/api/v1';
           const Session = $("input[id='Session']").val();
           const id = $("input[id='ChargePointId']").val();
           const Request = $("#GetChargePointRequest");
