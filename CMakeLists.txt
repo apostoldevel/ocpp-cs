@@ -96,6 +96,16 @@ endif()
 include_directories(${PROJECT_LIB_DIR}/rapidxml)
 file(GLOB lib_files ${lib_files} ${PROJECT_LIB_DIR}/rapidxml/*.hpp)
 
+# picojson
+# ----------------------------------------------------------------------------------------------------------------------
+include_directories(${PROJECT_LIB_DIR}/picojson)
+file(GLOB lib_files ${lib_files} ${PROJECT_LIB_DIR}/picojson/*.h)
+
+# jwt-cpp
+# ----------------------------------------------------------------------------------------------------------------------
+include_directories(${PROJECT_LIB_DIR}/jwt-cpp)
+file(GLOB lib_files ${lib_files} ${PROJECT_LIB_DIR}/jwt-cpp/*.h)
+
 # Apostol
 # ----------------------------------------------------------------------------------------------------------------------
 include_directories(src/app src/core src/modules src/modules/Workers src/modules/Helpers src/processes)
@@ -158,15 +168,15 @@ set(INSTALL_PATH "${PROJECT_PREFIX}")
 install(TARGETS ${PROJECT_NAME} DESTINATION ${INSTALL_BIN_PATH})
 
 install(DIRECTORY DESTINATION ${INSTALL_PATH})
-install(DIRECTORY DESTINATION ${INSTALL_PATH}/auth)
+install(DIRECTORY DESTINATION ${INSTALL_PATH}/oauth2)
 install(DIRECTORY DESTINATION ${INSTALL_PATH}/conf)
 install(DIRECTORY DESTINATION ${INSTALL_PATH}/logs)
 install(DIRECTORY DESTINATION ${INSTALL_PATH}/sites)
-install(DIRECTORY conf/auth/ DESTINATION ${INSTALL_PATH}/auth)
+install(DIRECTORY conf/oauth2/ DESTINATION ${INSTALL_PATH}/oauth2)
 install(DIRECTORY conf/sites/ DESTINATION ${INSTALL_PATH}/sites)
 install(DIRECTORY www/ DESTINATION ${INSTALL_PATH}/www)
 install(FILES conf/default.conf DESTINATION ${INSTALL_PATH}/conf)
-install(FILES conf/auth.conf DESTINATION ${INSTALL_PATH}/conf)
+install(FILES conf/oauth2.conf DESTINATION ${INSTALL_PATH}/conf)
 install(FILES conf/sites.conf DESTINATION ${INSTALL_PATH}/conf)
 install(FILES conf/default.conf DESTINATION ${INSTALL_PATH} RENAME ${PROJECT_NAME}.conf)
 

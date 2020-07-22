@@ -27,6 +27,9 @@ Author:
 #include "Service.hpp"
 //----------------------------------------------------------------------------------------------------------------------
 
+#include "jwt.h"
+//----------------------------------------------------------------------------------------------------------------------
+
 #include <openssl/sha.h>
 //----------------------------------------------------------------------------------------------------------------------
 
@@ -252,22 +255,173 @@ namespace Apostol {
         }
         //--------------------------------------------------------------------------------------------------------------
 
+        CString CCSService::VerifyToken(const CString &Token) {
+
+            const auto& GetSecret = [](const CProvider &Provider, const CString &Application) {
+                const auto &Secret = Provider.Secret(Application);
+                if (Secret.IsEmpty())
+                    throw ExceptionFrm("Not found Secret for \"%s:%s\"",
+                                       Provider.Name.c_str(),
+                                       Application.c_str()
+                    );
+                return Secret;
+            };
+
+            auto decoded = jwt::decode(Token);
+            const auto& aud = CString(decoded.get_audience());
+
+            CString Application;
+
+            const auto& Providers = Server().Providers();
+
+            const auto Index = OAuth2::Helper::ProviderByClientId(Providers, aud, Application);
+            if (Index == -1)
+                throw COAuth2Error(_T("Not found provider by Client ID."));
+
+            const auto& Provider = Providers[Index].Value();
+
+            const auto& iss = CString(decoded.get_issuer());
+            const CStringList& Issuers = Provider.GetIssuers(Application);
+            if (Issuers[iss].IsEmpty())
+                throw jwt::token_verification_exception("Token doesn't contain the required issuer.");
+
+            const auto& alg = decoded.get_algorithm();
+            const auto& ch = alg.substr(0, 2);
+
+            const auto& Secret = GetSecret(Provider, Application);
+
+            if (ch == "HS") {
+                if (alg == "HS256") {
+                    auto verifier = jwt::verify()
+                            .allow_algorithm(jwt::algorithm::hs256{Secret});
+                    verifier.verify(decoded);
+
+                    return Token; // if algorithm HS256
+                } else if (alg == "HS384") {
+                    auto verifier = jwt::verify()
+                            .allow_algorithm(jwt::algorithm::hs384{Secret});
+                    verifier.verify(decoded);
+                } else if (alg == "HS512") {
+                    auto verifier = jwt::verify()
+                            .allow_algorithm(jwt::algorithm::hs512{Secret});
+                    verifier.verify(decoded);
+                }
+            } else if (ch == "RS") {
+
+                const auto& kid = decoded.get_key_id();
+                const auto& key = OAuth2::Helper::GetPublicKey(Providers, kid);
+
+                if (alg == "RS256") {
+                    auto verifier = jwt::verify()
+                            .allow_algorithm(jwt::algorithm::rs256{key});
+                    verifier.verify(decoded);
+                } else if (alg == "RS384") {
+                    auto verifier = jwt::verify()
+                            .allow_algorithm(jwt::algorithm::rs384{key});
+                    verifier.verify(decoded);
+                } else if (alg == "RS512") {
+                    auto verifier = jwt::verify()
+                            .allow_algorithm(jwt::algorithm::rs512{key});
+                    verifier.verify(decoded);
+                }
+            } else if (ch == "ES") {
+
+                const auto& kid = decoded.get_key_id();
+                const auto& key = OAuth2::Helper::GetPublicKey(Providers, kid);
+
+                if (alg == "ES256") {
+                    auto verifier = jwt::verify()
+                            .allow_algorithm(jwt::algorithm::es256{key});
+                    verifier.verify(decoded);
+                } else if (alg == "ES384") {
+                    auto verifier = jwt::verify()
+                            .allow_algorithm(jwt::algorithm::es384{key});
+                    verifier.verify(decoded);
+                } else if (alg == "ES512") {
+                    auto verifier = jwt::verify()
+                            .allow_algorithm(jwt::algorithm::es512{key});
+                    verifier.verify(decoded);
+                }
+            } else if (ch == "PS") {
+
+                const auto& kid = decoded.get_key_id();
+                const auto& key = OAuth2::Helper::GetPublicKey(Providers, kid);
+
+                if (alg == "PS256") {
+                    auto verifier = jwt::verify()
+                            .allow_algorithm(jwt::algorithm::ps256{key});
+                    verifier.verify(decoded);
+                } else if (alg == "PS384") {
+                    auto verifier = jwt::verify()
+                            .allow_algorithm(jwt::algorithm::ps384{key});
+                    verifier.verify(decoded);
+                } else if (alg == "PS512") {
+                    auto verifier = jwt::verify()
+                            .allow_algorithm(jwt::algorithm::ps512{key});
+                    verifier.verify(decoded);
+                }
+            }
+
+            const auto& Result = CCleanToken(R"({"alg":"HS256","typ":"JWT"})", decoded.get_payload(), true);
+
+            return Result.Sign(jwt::algorithm::hs256{Secret});
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
+        bool CCSService::CheckAuthorizationData(CRequest *ARequest, CAuthorization &Authorization) {
+
+            const auto &LHeaders = ARequest->Headers;
+            const auto &LCookies = ARequest->Cookies;
+
+            const auto &LAuthorization = LHeaders.Values(_T("Authorization"));
+
+            if (LAuthorization.IsEmpty()) {
+
+                const auto &headerSession = LHeaders.Values(_T("Session"));
+                const auto &headerSecret = LHeaders.Values(_T("Secret"));
+
+                Authorization.Username = headerSession;
+                Authorization.Password = headerSecret;
+
+                if (Authorization.Username.IsEmpty() || Authorization.Password.IsEmpty())
+                    return false;
+
+                Authorization.Schema = CAuthorization::asBasic;
+                Authorization.Type = CAuthorization::atSession;
+
+            } else {
+                Authorization << LAuthorization;
+            }
+
+            return true;
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
         bool CCSService::CheckAuthorization(CHTTPServerConnection *AConnection, CAuthorization &Authorization) {
+
             auto LRequest = AConnection->Request();
             auto LReply = AConnection->Reply();
 
-            const auto& LAuthorization = LRequest->Headers.Values(_T("Authorization"));
-            if (LAuthorization.IsEmpty())
-                return false;
-
             try {
-                const auto& APIPassphrase = Config()->IniFile().ReadString("api", "passphrase", "ocpp");
-                Authorization << LAuthorization;
-                if (Authorization.Username == "ocpp" && Authorization.Password == APIPassphrase) {
-                    return true;
+                if (CheckAuthorizationData(LRequest, Authorization)) {
+                    if (Authorization.Schema == CAuthorization::asBearer) {
+                        Authorization.Token = VerifyToken(Authorization.Token);
+                        return true;
+                    }
                 }
+
+                if (Authorization.Schema == CAuthorization::asBasic)
+                    AConnection->Data().Values("Authorization", "Basic");
+
+                ReplyError(AConnection, CReply::unauthorized, "Unauthorized.");
+            } catch (jwt::token_expired_exception &e) {
+                ReplyError(AConnection, CReply::forbidden, e.what());
+            } catch (jwt::token_verification_exception &e) {
+                ReplyError(AConnection, CReply::bad_request, e.what());
+            } catch (CAuthorizationError &e) {
+                ReplyError(AConnection, CReply::bad_request, e.what());
             } catch (std::exception &e) {
-                Log()->Error(APP_LOG_EMERG, 0, e.what());
+                ReplyError(AConnection, CReply::bad_request, e.what());
             }
 
             return false;
@@ -395,6 +549,11 @@ namespace Apostol {
 
                     } else if (LCommand == "ChargePoint") {
 
+                        CAuthorization Authorization;
+                        if (!CheckAuthorization(AConnection, Authorization)) {
+                            return;
+                        }
+
                         if (LPath.Count() < 5) {
                             AConnection->SendStockReply(CReply::not_found);
                             return;
@@ -491,13 +650,13 @@ namespace Apostol {
         //--------------------------------------------------------------------------------------------------------------
 
         void CCSService::DoGet(CHTTPServerConnection *AConnection) {
+
             auto LRequest = AConnection->Request();
-            auto LReply = AConnection->Reply();
 
             CString LPath(LRequest->Location.pathname);
 
             // Request path must be absolute and not contain "..".
-            if (LPath.empty() || LPath.front() != '/' || LPath.find("..") != CString::npos) {
+            if (LPath.empty() || LPath.front() != '/' || LPath.find(_T("..")) != CString::npos) {
                 AConnection->SendStockReply(CReply::bad_request);
                 return;
             }
@@ -507,20 +666,27 @@ namespace Apostol {
                 return;
             }
 
-            CAuthorization Authorization;
-            if (!CheckAuthorization(AConnection, Authorization)) {
-                CReply::GetReply(LReply, CReply::unauthorized);
-                CReply::AddUnauthorized(LReply, false);
-                AConnection->SendReply();
-                return;
-            }
-
             if (LPath.SubString(0, 5) == "/api/") {
                 DoAPI(AConnection);
                 return;
             }
 
-            SendResource(AConnection, LPath);
+            CString LResource(LPath);
+
+            // If path ends in slash.
+            if (LResource.back() == '/') {
+                LResource += _T("index.html");
+            }
+
+            TCHAR szBuffer[PATH_MAX] = {0};
+            CString LFileExt = ExtractFileExt(szBuffer, LResource.c_str());
+
+            if (LFileExt == LResource) {
+                LFileExt = _T(".html");
+                LResource += LFileExt;
+            }
+
+            SendResource(AConnection, LResource, Mapping::ExtToType(LFileExt.c_str()));
         }
         //--------------------------------------------------------------------------------------------------------------
 
@@ -552,16 +718,9 @@ namespace Apostol {
 
                     LReply->ContentType = CReply::json;
 
-                    const CString &LContentType = LRequest->Headers.Values("content-type");
-                    if (!LContentType.IsEmpty() && LRequest->ContentLength == 0) {
-                        AConnection->SendStockReply(CReply::no_content);
-                        return;
-                    }
-
                     try {
                         CAuthorization Authorization;
                         if (!CheckAuthorization(AConnection, Authorization)) {
-                            AConnection->SendStockReply(CReply::unauthorized);
                             return;
                         }
 
@@ -633,30 +792,23 @@ namespace Apostol {
                                 AWSConnection->ConnectionStatus(csReplySent);
                             };
 
+                            CJSON LPayload;
+
+                            ContentToJson(LRequest, LPayload);
+
                             if (LAction == "ChangeConfiguration") {
 
-                                CJSON LPayload(jvtObject);
+                                const auto &key = LPayload["key"].AsString();
+                                const auto &value = LPayload["value"].AsString();
 
-                                if (LContentType == "application/json") {
+                                if (key.IsEmpty()) {
+                                    AConnection->SendStockReply(CReply::bad_request);
+                                    return;
+                                }
 
-                                    LPayload << LRequest->Content;
-
-                                } else {
-                                    const CString &key = LRequest->Params["key"];
-                                    const CString &value = LRequest->Params["value"];
-
-                                    if (key.IsEmpty()) {
-                                        AConnection->SendStockReply(CReply::bad_request);
-                                        return;
-                                    }
-
-                                    if (value.IsEmpty()) {
-                                        AConnection->SendStockReply(CReply::bad_request);
-                                        return;
-                                    }
-
-                                    LPayload.Object().AddPair("key", key);
-                                    LPayload.Object().AddPair("value", value);
+                                if (value.IsEmpty()) {
+                                    AConnection->SendStockReply(CReply::bad_request);
+                                    return;
                                 }
 
                                 lpPoint->Messages()->Add(OnRequest, LAction, LPayload);
@@ -665,28 +817,17 @@ namespace Apostol {
 
                             } else if (LAction == "RemoteStartTransaction") {
 
-                                CJSON LPayload(jvtObject);
+                                const auto &connectorId = LPayload["connectorId"].AsString();
+                                const auto &idTag = LPayload["idTag"].AsString();
 
-                                if (LContentType == "application/json") {
+                                if (connectorId.IsEmpty()) {
+                                    AConnection->SendStockReply(CReply::bad_request);
+                                    return;
+                                }
 
-                                    LPayload << LRequest->Content;
-
-                                } else {
-                                    const CString &connectorId = LRequest->Params["connectorId"];
-                                    const CString &idTag = LRequest->Params["idTag"];
-
-                                    if (connectorId.IsEmpty()) {
-                                        AConnection->SendStockReply(CReply::bad_request);
-                                        return;
-                                    }
-
-                                    if (idTag.IsEmpty()) {
-                                        AConnection->SendStockReply(CReply::bad_request);
-                                        return;
-                                    }
-
-                                    LPayload.Object().AddPair("connectorId", connectorId);
-                                    LPayload.Object().AddPair("idTag", idTag);
+                                if (idTag.IsEmpty()) {
+                                    AConnection->SendStockReply(CReply::bad_request);
+                                    return;
                                 }
 
                                 lpPoint->Messages()->Add(OnRequest, LAction, LPayload);
@@ -695,21 +836,11 @@ namespace Apostol {
 
                             } else if (LAction == "RemoteStopTransaction") {
 
-                                CJSON LPayload(jvtObject);
+                                const auto &transactionId = LPayload["transactionId"].AsString();
 
-                                if (LContentType == "application/json") {
-
-                                    LPayload << LRequest->Content;
-
-                                } else {
-                                    const CString &transactionId = LRequest->Params["transactionId"];
-
-                                    if (transactionId.IsEmpty()) {
-                                        AConnection->SendStockReply(CReply::bad_request);
-                                        return;
-                                    }
-
-                                    LPayload.Object().AddPair("transactionId", transactionId);
+                                if (transactionId.IsEmpty()) {
+                                    AConnection->SendStockReply(CReply::bad_request);
+                                    return;
                                 }
 
                                 lpPoint->Messages()->Add(OnRequest, LAction, LPayload);
@@ -718,47 +849,30 @@ namespace Apostol {
 
                             } else if (LAction == "ReserveNow") {
 
-                                CJSON LPayload(jvtObject);
+                                const auto &connectorId = LPayload["connectorId"].AsString();
+                                const auto &expiryDate = LPayload["expiryDate"].AsString();
+                                const auto &idTag = LPayload["idTag"].AsString();
+                                const auto &parentIdTag = LPayload["parentIdTag"].AsString();
+                                const auto &reservationId = LPayload["reservationId"].AsString();
 
-                                if (LContentType == "application/json") {
+                                if (connectorId.IsEmpty()) {
+                                    AConnection->SendStockReply(CReply::bad_request);
+                                    return;
+                                }
 
-                                    LPayload << LRequest->Content;
+                                if (expiryDate.IsEmpty()) {
+                                    AConnection->SendStockReply(CReply::bad_request);
+                                    return;
+                                }
 
-                                } else {
-                                    const CString &connectorId = LRequest->Params["connectorId"];
-                                    const CString &expiryDate = LRequest->Params["expiryDate"];
-                                    const CString &idTag = LRequest->Params["idTag"];
-                                    const CString &parentIdTag = LRequest->Params["parentIdTag"];
-                                    const CString &reservationId = LRequest->Params["reservationId"];
+                                if (idTag.IsEmpty()) {
+                                    AConnection->SendStockReply(CReply::bad_request);
+                                    return;
+                                }
 
-                                    if (connectorId.IsEmpty()) {
-                                        AConnection->SendStockReply(CReply::bad_request);
-                                        return;
-                                    }
-
-                                    if (expiryDate.IsEmpty()) {
-                                        AConnection->SendStockReply(CReply::bad_request);
-                                        return;
-                                    }
-
-                                    if (idTag.IsEmpty()) {
-                                        AConnection->SendStockReply(CReply::bad_request);
-                                        return;
-                                    }
-
-                                    if (reservationId.IsEmpty()) {
-                                        AConnection->SendStockReply(CReply::bad_request);
-                                        return;
-                                    }
-
-                                    LPayload.Object().AddPair("connectorId", connectorId);
-                                    LPayload.Object().AddPair("expiryDate", expiryDate);
-                                    LPayload.Object().AddPair("idTag", idTag);
-
-                                    if (!parentIdTag.IsEmpty())
-                                        LPayload.Object().AddPair("parentIdTag", parentIdTag);
-
-                                    LPayload.Object().AddPair("reservationId", reservationId);
+                                if (reservationId.IsEmpty()) {
+                                    AConnection->SendStockReply(CReply::bad_request);
+                                    return;
                                 }
 
                                 lpPoint->Messages()->Add(OnRequest, LAction, LPayload);
@@ -767,21 +881,23 @@ namespace Apostol {
 
                             } else if (LAction == "CancelReservation") {
 
-                                CJSON LPayload(jvtObject);
+                                const auto &reservationId = LPayload["reservationId"].AsString();
 
-                                if (LContentType == "application/json") {
+                                if (reservationId.IsEmpty()) {
+                                    AConnection->SendStockReply(CReply::bad_request);
+                                    return;
+                                }
 
-                                    LPayload << LRequest->Content;
+                                lpPoint->Messages()->Add(OnRequest, LAction, LPayload);
 
-                                } else {
-                                    const CString &reservationId = LRequest->Params["reservationId"];
+                                return;
+                            } else if (LAction == "Reset") {
 
-                                    if (reservationId.IsEmpty()) {
-                                        AConnection->SendStockReply(CReply::bad_request);
-                                        return;
-                                    }
+                                const auto &type = LPayload["type"].AsString();
 
-                                    LPayload.Object().AddPair("reservationId", reservationId);
+                                if (type.IsEmpty()) {
+                                    AConnection->SendStockReply(CReply::bad_request);
+                                    return;
                                 }
 
                                 lpPoint->Messages()->Add(OnRequest, LAction, LPayload);

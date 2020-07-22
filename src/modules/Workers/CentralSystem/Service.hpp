@@ -46,10 +46,11 @@ namespace Apostol {
 
             static void ReplyError(CHTTPServerConnection *AConnection, CReply::CStatusType ErrorCode, const CString &Message);
 
-            static bool CheckAuthorization(CHTTPServerConnection *AConnection, CAuthorization &Authorization);
-
             bool QueryStart(CHTTPServerConnection *AConnection, const CStringList& SQL);
             bool DBParse(CHTTPServerConnection *AConnection, const CString &Identity, const CString &Action, const CJSON &Payload);
+
+            static bool CheckAuthorizationData(CRequest *ARequest, CAuthorization &Authorization);
+            CString VerifyToken(const CString &Token);
 
         protected:
 
@@ -81,6 +82,8 @@ namespace Apostol {
 
             bool IsEnabled() override;
             bool CheckUserAgent(const CString& Value) override;
+
+            bool CheckAuthorization(CHTTPServerConnection *AConnection, CAuthorization &Authorization);
 
         };
     }

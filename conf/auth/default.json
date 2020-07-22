@@ -1,9 +1,0 @@
-{
-  "issuers": ["localhost:4977"],
-  "audience": "default",
-  "algorithm": "HS256",
-  "secret": "secret",
-  "auth_uri": "/oauth2/auth",
-  "token_uri": "/oauth2/token",
-  "redirect_uri": "/oauth2/callback"
-}

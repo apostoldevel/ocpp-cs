@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <!-- Required meta tags -->
+    <meta charset="utf-8">
+    <meta name="description" content="Plugme: Авторизация">
+
+    <!-- Required meta tags -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+
+    <title>Авторизация | Plugme</title>
+
+    <!-- Bootstrap CSS -->
+    <link rel="stylesheet" href="/assets/vendor/bootstrap/4.5.0/css/bootstrap.min.css" integrity="sha384-9aIt2nRpC12Uk9gS9baDl411NQApFmC26EwAOH8WgZl5MYYxFfc+NcPb1dKGj7Sk" crossorigin="anonymous">
+
+    <!-- Favicons -->
+    <link href="/assets/img/favicon.png" rel="icon">
+    <link href="/assets/img/apple-touch-icon.png" rel="apple-touch-icon">
+
+    <!-- Custom styles for this template -->
+    <link href="/assets/css/fonts.css" rel="stylesheet" type="text/css">
+    <link href="/assets/css/main.css" rel="stylesheet" type="text/css">
+    <link href="/assets/css/floating-labels.css" rel="stylesheet" type="text/css">
+</head>
+
+<body>
+<div class="form-signin">
+    <form id="formSignIn" class="needs-validation" novalidate>
+        <div class="text-center mb-4">
+            <h1 class="h3 mb-3 font-weight-normal">Вход в Plugme</h1>
+        </div>
+
+        <div class="form-label-group">
+            <input id="username" class="form-control" placeholder="Логин или адрес электронной почты" required autofocus>
+            <label for="username">Логин или адрес электронной почты</label>
+            <div id="usernameMessage" class="invalid-feedback">
+                Введите логин или адрес электронной почты
+            </div>
+            <div class="mt-1 text-muted font-weight-bold">
+                <a href="#" style="color: rgb(51, 51, 51); font-size: 14px;">Забыли логин?</a>
+            </div>
+        </div>
+
+        <button id="btnSignInNext" class="btn btn-lg btn-primary btn-block" type="button" onclick="SignInNext()">Далее</button>
+        <div id="alertMessage" class="text-center invalid-feedback"></div>
+
+        <div class="mt-1 text-muted font-weight-bold text-center">
+            <a href="#" style="color: rgb(51, 51, 51); font-size: 14px;" onclick="SignUp()">Еще не зарегистрировались? Регистрация.</a>
+        </div>
+
+        <div class="mt-3">
+            <hr class="my-1">
+            <p class="mt-3 text-muted text-center">© Plugme 2020</p>
+        </div>
+    </form>
+</div>
+<!-- Optional JavaScript -->
+<!-- jQuery first, then Popper.js, then Bootstrap JS -->
+<script src="https://code.jquery.com/jquery-3.5.1.slim.min.js" integrity="sha384-DfXdz2htPH0lsSSs5nCTpuj/zy4C+OGpamoFVy38MVBnE+IbbVYUew+OrCXaRkfj" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.0/dist/umd/popper.min.js" integrity="sha384-Q6E9RHvbIyZFJoft+2mJbHaEWldlvI9IOYy5n3zV9zzTtmI3UksdQRVvoxMfooAo" crossorigin="anonymous"></script>
+<script src="/assets/vendor/bootstrap/4.5.0/js/bootstrap.min.js" integrity="sha384-OgVRvuATP1z7JjHLkuOU7Xw704+h835Lr+6QL9UvYjZE3Ipu6Tp75j7Bh/kR0JKI" crossorigin="anonymous"></script>
+<script>
+    function empty(e) {
+        switch (e) {
+            case "":
+            case 0:
+            case false:
+            case null:
+            case undefined:
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    async function AsyncFetch (path, method = "GET", body = null, headers = {}) {
+
+        const apiPath = `/api/v1${path}`;
+
+        // await response of fetch call
+        let response = await fetch(apiPath, {
+            method: method,
+            headers: headers,
+            body: body,
+            mode: "cors",
+            cache: "no-store"
+        });
+
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+            throw new TypeError("Content type not JSON!");
+        }
+
+        return await response.json();
+    }
+
+    function Identifier() {
+
+        let username = $("input[id='username']");
+        let message = $("div[id='usernameMessage']");
+
+        AsyncFetch(`/identifier?value=${username.val()}`)
+        .then((json) => {
+            if (json.hasOwnProperty('error')) {
+                message.html(json['error']['message']);
+            } else {
+                if (empty(json['id'])) {
+                    message.html('Пользователь не зарегистрирован');
+                    username.addClass('is-invalid');
+                } else {
+                    message.html('Введите логин или адрес электронной почты');
+                    username.removeClass('is-invalid');
+                    const identifier = encodeURI(json[json['identifiers'][0]]);
+                    localStorage.setItem('identifier', identifier);
+                    document.location.replace(`/oauth/pwd${document.location.search}&identifier=${identifier}`);
+                }
+            }
+        }).catch((e) => {
+            console.log(e.message);
+        });
+    }
+
+    function SignUp() {
+        document.location.replace(`/oauth/signup${document.location.search}`);
+    }
+
+    function SignInNext() {
+        let form = document.getElementById('formSignIn');
+
+        if (form.checkValidity() === false) {
+            form.classList.add('was-validated');
+            return;
+        }
+
+        Identifier();
+    }
+
+    function isKeyPressed(event, expectedKey, expectedCode) {
+        const code = event.which || event.keyCode;
+        return expectedKey === event.key || code === expectedCode;
+    }
+
+    (function() {
+        'use strict';
+        $("input[id='username']").on('keydown', function (event) {
+            if (isKeyPressed(event, 'Enter', 13)) {
+                let form = document.getElementById('formSignIn');
+
+                event.preventDefault();
+                event.stopPropagation();
+
+                if (form.checkValidity() === false) {
+                    form.classList.add('was-validated');
+                } else {
+                    SignInNext();
+                }
+            }
+        });
+    })();
+
+    $(document).ready(function() {
+        $("input[id='username']").val(localStorage.getItem('identifier'));
+    });
+</script>
+</body>
+</html>

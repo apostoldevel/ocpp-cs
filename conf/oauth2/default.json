@@ -1,0 +1,17 @@
+{
+  "service": {
+    "issuers": ["accounts.plugme.ru"],
+    "scopes": ["api","openid","profile","email"],
+    "client_id": "ocpp-plugme.ru",
+    "client_secret": "",
+    "algorithm": "HS256",
+    "auth_uri": "/oauth2/authorize",
+    "token_uri": "/oauth2/token",
+    "redirect_uris": [
+      "http://localhost:9220/dashboard/",
+      "https://ocpp.plugme.ru/dashboard/",
+      "https://oauthdebugger.com/debug",
+      "https://auth.advancedrestclient.com/oauth-popup.html"
+    ]
+  }
+}
