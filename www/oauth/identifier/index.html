@@ -111,8 +111,8 @@
                     message.html('Введите логин или адрес электронной почты');
                     username.removeClass('is-invalid');
                     const identifier = encodeURI(json[json['identifiers'][0]]);
-                    localStorage.setItem('identifier', identifier);
-                    document.location.replace(`/oauth/pwd${document.location.search}&identifier=${identifier}`);
+                    localStorage.setItem('identifier', index);
+                    document.location.replace(`/oauth/pwd${document.location.search}&identifier=${index}`);
                 }
             }
         }).catch((e) => {

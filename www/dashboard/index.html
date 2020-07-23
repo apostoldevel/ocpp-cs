@@ -477,11 +477,11 @@
                 location = '/welcome/';
             }
         } else if (status === 404) {
-            location = `/error/404?error=not_found&error_description=${encodeURIComponent(message)}`;
+            location = `/error/404/?error=not_found&error_description=${encodeURIComponent(message)}`;
         } else if (status === 500) {
-            location = `/error/500?error=server_error&error_description=${encodeURIComponent(message)}`;
+            location = `/error/500/?error=server_error&error_description=${encodeURIComponent(message)}`;
         } else {
-            location = `/error/error?code=${status}&error=invalid_request&error_description=${encodeURIComponent(message)}`;
+            location = `/error/?code=${status}&error=invalid_request&error_description=${encodeURIComponent(message)}`;
         }
 
         return location;

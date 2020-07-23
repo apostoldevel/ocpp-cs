@@ -37,7 +37,7 @@
 <div class="form-signin">
     <form id="formSignUp" class="needs-validation" novalidate>
         <div class="text-center mb-4">
-            <h1 class="h3 mb-3 font-weight-normal">Регистрация в<br>Plugme</h1>
+            <h1 class="h3 mb-3 font-weight-normal">Регистрация в Plugme</h1>
             <p class="text-center">Для доступа к услугам необходимо зарегистрироваться.</p>
         </div>
 
@@ -191,7 +191,7 @@
             }
         } else {
             if (json.hasOwnProperty('error')) {
-                window.location.replace(window.location = `/oauth/error?code=${status}&error=invalid_request&error_description=${encodeURIComponent(json["error"]["message"])}`);
+                window.location.replace(window.location = `../error`);
             }
         }
     }
