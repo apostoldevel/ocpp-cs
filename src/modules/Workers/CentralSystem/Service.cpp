@@ -671,22 +671,7 @@ namespace Apostol {
                 return;
             }
 
-            CString LResource(LPath);
-
-            // If path ends in slash.
-            if (LResource.back() == '/') {
-                LResource += _T("index.html");
-            }
-
-            TCHAR szBuffer[PATH_MAX] = {0};
-            CString LFileExt = ExtractFileExt(szBuffer, LResource.c_str());
-
-            if (LFileExt == LResource) {
-                LFileExt = _T(".html");
-                LResource += LFileExt;
-            }
-
-            SendResource(AConnection, LResource, Mapping::ExtToType(LFileExt.c_str()));
+            SendResource(AConnection, LPath);
         }
         //--------------------------------------------------------------------------------------------------------------
 
