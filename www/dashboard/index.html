@@ -513,8 +513,6 @@
 
         const location = await CheckResponse(json, response.status);
 
-        AlertOn = true;
-
         if (empty(location))
             return json;
 
@@ -601,7 +599,7 @@
         const key = $("input[id='GetConfigurationKey']").val();
         const Request = $("#GetConfigurationRequest");
 
-        let route = '/ChargePoint/' + point + '/GetConfiguration';
+        let route = `/ChargePoint/${point}/GetConfiguration`;
 
         if (!empty(key))
             route = route + '?key=' + key;
@@ -626,7 +624,7 @@
         const value = $("input[id='ChangeConfigurationValue']").val();
         const Request = $("#ChangeConfigurationRequest");
 
-        let route = '/ChargePoint/' + point + '/ChangeConfiguration';
+        let route = `/ChargePoint/${point}/ChangeConfiguration`;
 
         let body = {
             key: key,
@@ -636,7 +634,7 @@
         let execute = $("button[id='btnChangeConfiguration']");
         execute.prop('disabled', true);
 
-        TokenFetch(route, 'POST', JSON.stringify(body))
+        TokenFetch(route, 'POST', JSON.stringify(body), {'Content-Type': 'application/json'})
             .then((json) => {
                 Request.html(JsonToHTML(json));
                 execute.prop('disabled', false);
@@ -654,7 +652,7 @@
         const connectorId = $("input[id='RemoteStartTransaction-connectorId']").val();
         const idTag = $("input[id='RemoteStartTransaction-idTag']").val();
 
-        let route = '/ChargePoint/' + point + '/RemoteStartTransaction';
+        let route = `/ChargePoint/${point}/RemoteStartTransaction`;
 
         let body = {
             connectorId: connectorId,
@@ -664,7 +662,7 @@
         let execute = $("button[id='btnRemoteStartTransaction']");
         execute.prop('disabled', true);
 
-        TokenFetch(route, 'POST', JSON.stringify(body))
+        TokenFetch(route, 'POST', JSON.stringify(body), {'Content-Type': 'application/json'})
             .then((json) => {
                 Request.html(JsonToHTML(json));
                 execute.prop('disabled', false);
@@ -681,7 +679,7 @@
 
         const transactionId = $("input[id='RemoteStopTransaction-transactionId']").val();
 
-        let route = '/ChargePoint/' + point + '/RemoteStopTransaction';
+        let route = `/ChargePoint/${point}/RemoteStopTransaction`;
 
         let body = {
             transactionId: transactionId
@@ -690,7 +688,7 @@
         let execute = $("button[id='btnRemoteStopTransaction']");
         execute.prop('disabled', true);
 
-        TokenFetch(route, 'POST', JSON.stringify(body))
+        TokenFetch(route, 'POST', JSON.stringify(body), {'Content-Type': 'application/json'})
             .then((json) => {
                 Request.html(JsonToHTML(json));
                 execute.prop('disabled', false);
@@ -711,7 +709,7 @@
         const parentIdTag = $("input[id='ReserveNow-parentIdTag']").val();
         const reservationId = $("input[id='ReserveNow-reservationId']").val();
 
-        let route = '/ChargePoint/' + point + '/ReserveNow';
+        let route = `/ChargePoint/${point}/ReserveNow`;
 
         let body = {
             connectorId: connectorId,
@@ -724,7 +722,7 @@
         let execute = $("button[id='btnReserveNow']");
         execute.prop('disabled', true);
 
-        TokenFetch(route, 'POST', JSON.stringify(body))
+        TokenFetch(route, 'POST', JSON.stringify(body), {'Content-Type': 'application/json'})
             .then((json) => {
                 Request.html(JsonToHTML(json));
                 execute.prop('disabled', false);
@@ -741,7 +739,7 @@
 
         const reservationId = $("input[id='CancelReservation-reservationId']").val();
 
-        let route = '/ChargePoint/' + point + '/CancelReservation';
+        let route = `/ChargePoint/${point}/CancelReservation`;
 
         let body = {
             reservationId: reservationId
@@ -750,7 +748,7 @@
         let execute = $("button[id='btnCancelReservation']");
         execute.prop('disabled', true);
 
-        TokenFetch(route, 'POST', JSON.stringify(body))
+        TokenFetch(route, 'POST', JSON.stringify(body), {'Content-Type': 'application/json'})
             .then((json) => {
                 Request.html(JsonToHTML(json));
                 execute.prop('disabled', false);
@@ -767,7 +765,7 @@
 
         const type = $("select[id='Reset-type']").val();
 
-        let route = '/ChargePoint/' + point + '/Reset';
+        let route = `/ChargePoint/${point}/Reset`;
 
         let body = {
             type: type
@@ -776,7 +774,7 @@
         let execute = $("button[id='btnReset']");
         execute.prop('disabled', true);
 
-        TokenFetch(route, 'POST', JSON.stringify(body))
+        TokenFetch(route, 'POST', JSON.stringify(body), {'Content-Type': 'application/json'})
             .then((json) => {
                 Request.html(JsonToHTML(json));
                 execute.prop('disabled', false);
