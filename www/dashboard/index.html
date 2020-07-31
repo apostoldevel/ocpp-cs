@@ -100,6 +100,12 @@
                                 <li class="nav-item">
                                     <a class="nav-link" data-toggle="tab" href="#tab-reset">Reset</a>
                                 </li>
+                                <li class="nav-item">
+                                    <a class="nav-link" data-toggle="tab" href="#tab-trigger-message">Message Trigger</a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link" data-toggle="tab" href="#tab-unlock-connector">Unlock Connector</a>
+                                </li>
                             </ul>
                             <span class="navbar-text">
                                 <div class="input-group">
@@ -287,6 +293,53 @@
                                 </form>
                                 <hr>
                                 <div id="ResetRequest">
+                                    <small class="form-text text-muted">Press "Execute" button...</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="tab-trigger-message" class="container tab-pane fade">
+                            <div class="mt-3">
+                                <small class="form-text text-muted">Trigger message:</small>
+                                <hr>
+                                <form onsubmit="TriggerMessage()">
+                                    <div class="form-group row">
+                                        <label for="TriggerMessage-requestedMessage" class="col-sm-2 col-form-label">Message</label>
+                                        <div class="col-sm-10">
+                                            <select id="TriggerMessage-requestedMessage" class="custom-select">
+                                                <option value="BootNotification">BootNotification</option>
+                                                <option value="DiagnosticsStatusNotification">DiagnosticsStatusNotification</option>
+                                                <option value="FirmwareStatusNotification">FirmwareStatusNotification</option>
+                                                <option value="Heartbeat">Heartbeat</option>
+                                                <option value="MeterValues">MeterValues</option>
+                                                <option value="StatusNotification" selected>StatusNotification</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <button id="btnTriggerMessage" type="submit" class="btn btn-primary">Execute</button>
+                                </form>
+                                <hr>
+                                <div id="TriggerMessageRequest">
+                                    <small class="form-text text-muted">Press "Execute" button...</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div id="tab-unlock-connector" class="container tab-pane fade">
+                            <div class="mt-3">
+                                <small class="form-text text-muted">Reset:</small>
+                                <hr>
+                                <form onsubmit="UnlockConnector()">
+                                    <div class="form-group row">
+                                        <div class="form-group row">
+                                            <label for="UnlockConnector-connectorId" class="col-sm-2 col-form-label">connectorId</label>
+                                            <div class="col-sm-10">
+                                                <input type="text" class="form-control" id="UnlockConnector-connectorId" placeholder="Integer" required>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <button id="btnUnlockConnector" type="submit" class="btn btn-primary">Execute</button>
+                                </form>
+                                <hr>
+                                <div id="UnlockConnectorRequest">
                                     <small class="form-text text-muted">Press "Execute" button...</small>
                                 </div>
                             </div>
@@ -772,6 +825,58 @@
         };
 
         let execute = $("button[id='btnReset']");
+        execute.prop('disabled', true);
+
+        TokenFetch(route, 'POST', JSON.stringify(body), {'Content-Type': 'application/json'})
+            .then((json) => {
+                Request.html(JsonToHTML(json));
+                execute.prop('disabled', false);
+            })
+            .catch((e) => {
+                Request.html(e.message);
+                execute.prop('disabled', false);
+            });
+    }
+
+    function TriggerMessage() {
+        const point = $("select[id='ChargePoints']").val();
+        const Request = $("#TriggerMessageRequest");
+
+        const requestedMessage = $("select[id='TriggerMessage-requestedMessage']").val();
+
+        let route = `/ChargePoint/${point}/TriggerMessage`;
+
+        let body = {
+            requestedMessage: requestedMessage
+        };
+
+        let execute = $("button[id='btnTriggerMessage']");
+        execute.prop('disabled', true);
+
+        TokenFetch(route, 'POST', JSON.stringify(body), {'Content-Type': 'application/json'})
+            .then((json) => {
+                Request.html(JsonToHTML(json));
+                execute.prop('disabled', false);
+            })
+            .catch((e) => {
+                Request.html(e.message);
+                execute.prop('disabled', false);
+            });
+    }
+
+    function UnlockConnector() {
+        const point = $("select[id='ChargePoints']").val();
+        const Request = $("#UnlockConnectorRequest");
+
+        const connectorId = $("select[id='UnlockConnector-connectorId']").val();
+
+        let route = `/ChargePoint/${point}/UnlockConnector`;
+
+        let body = {
+            connectorId: connectorId
+        };
+
+        let execute = $("button[id='btnUnlockConnector']");
         execute.prop('disabled', true);
 
         TokenFetch(route, 'POST', JSON.stringify(body), {'Content-Type': 'application/json'})

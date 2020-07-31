@@ -888,6 +888,30 @@ namespace Apostol {
                                 lpPoint->Messages()->Add(OnRequest, LAction, LPayload);
 
                                 return;
+                            } else if (LAction == "TriggerMessage") {
+
+                                const auto &requestedMessage = LPayload["requestedMessage"].AsString();
+
+                                if (requestedMessage.IsEmpty()) {
+                                    AConnection->SendStockReply(CReply::bad_request);
+                                    return;
+                                }
+
+                                lpPoint->Messages()->Add(OnRequest, LAction, LPayload);
+
+                                return;
+                            } else if (LAction == "UnlockConnector") {
+
+                                const auto &connectorId = LPayload["connectorId"].AsString();
+
+                                if (connectorId.IsEmpty()) {
+                                    AConnection->SendStockReply(CReply::bad_request);
+                                    return;
+                                }
+
+                                lpPoint->Messages()->Add(OnRequest, LAction, LPayload);
+
+                                return;
                             }
                         }
                     } catch (Delphi::Exception::Exception &E) {
