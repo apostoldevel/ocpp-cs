@@ -228,7 +228,6 @@ namespace Apostol {
 
         bool CCSService::DBParse(CHTTPServerConnection *AConnection, const CString &Identity, const CString &Action,
                                  const CJSON &Payload) {
-
             CStringList SQL;
 
             SQL.Add(CString());
@@ -241,16 +240,19 @@ namespace Apostol {
 
         void CCSService::DoPointDisconnected(CObject *Sender) {
             auto LConnection = dynamic_cast<CHTTPServerConnection *>(Sender);
-            try {
-                auto lpPoint = CChargingPoint::FindOfConnection(LConnection);
-                Log()->Message(_T("[%s:%d] Point %s closed connection."),
-                        LConnection->Socket()->Binding()->PeerIP(), LConnection->Socket()->Binding()->PeerPort(),
-                        lpPoint->Identity().IsEmpty() ? "(empty)" : lpPoint->Identity().c_str());
-                delete lpPoint;
-            } catch (Delphi::Exception::Exception &E) {
-                Log()->Message(_T("[%s:%d] Point closed connection (%s)."),
-                        LConnection->Socket()->Binding()->PeerIP(),
-                        LConnection->Socket()->Binding()->PeerPort(), E.what());
+            if (LConnection != nullptr && LConnection->Connected()) {
+                try {
+                    auto lpPoint = CChargingPoint::FindOfConnection(LConnection);
+                    Log()->Message(_T("[%s:%d] Point %s closed connection."),
+                                   LConnection->Socket()->Binding()->PeerIP(),
+                                   LConnection->Socket()->Binding()->PeerPort(),
+                                   lpPoint->Identity().IsEmpty() ? "(empty)" : lpPoint->Identity().c_str());
+                    delete lpPoint;
+                } catch (Delphi::Exception::Exception &E) {
+                    Log()->Message(_T("[%s:%d] Point closed connection (%s)."),
+                                   LConnection->Socket()->Binding()->PeerIP(),
+                                   LConnection->Socket()->Binding()->PeerPort(), E.what());
+                }
             }
         }
         //--------------------------------------------------------------------------------------------------------------
