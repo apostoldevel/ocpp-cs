@@ -44,13 +44,11 @@ namespace Apostol {
 
             void InitMethods() override;
 
-            static void ReplyError(CHTTPServerConnection *AConnection, CReply::CStatusType ErrorCode, const CString &Message);
-
             bool QueryStart(CHTTPServerConnection *AConnection, const CStringList& SQL);
             bool DBParse(CHTTPServerConnection *AConnection, const CString &Identity, const CString &Action, const CJSON &Payload);
 
             static bool CheckAuthorizationData(CRequest *ARequest, CAuthorization &Authorization);
-            CString VerifyToken(const CString &Token);
+            void VerifyToken(const CString &Token);
 
         protected:
 
@@ -77,13 +75,12 @@ namespace Apostol {
                 return new CCSService(AProcess);
             }
 
+            bool CheckAuthorization(CHTTPServerConnection *AConnection, CAuthorization &Authorization);
+
             void Heartbeat() override;
             void Execute(CHTTPServerConnection *AConnection) override;
 
-            bool IsEnabled() override;
-            bool CheckUserAgent(const CString& Value) override;
-
-            bool CheckAuthorization(CHTTPServerConnection *AConnection, CAuthorization &Authorization);
+            bool Enabled() override;
 
         };
     }

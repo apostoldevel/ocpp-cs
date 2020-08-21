@@ -539,6 +539,8 @@ namespace Apostol {
 
             int m_TransactionId;
 
+            int m_UpdateCount;
+
             CAuthorizeRequest m_AuthorizeRequest;
             CStartTransactionRequest m_StartTransactionRequest;
             CStopTransactionRequest m_StopTransactionRequest;
@@ -559,6 +561,11 @@ namespace Apostol {
             ~CChargingPoint() override;
 
             void SwitchConnection(CHTTPServerConnection *Value);
+
+            void BeginUpdate() { m_UpdateCount++; }
+            void EndUpdate() { m_UpdateCount--; }
+
+            int UpdateCount() const { return m_UpdateCount; }
 
             CHTTPServerConnection *Connection() { return m_pConnection; };
 

@@ -671,8 +671,8 @@ namespace Apostol {
         }
         //--------------------------------------------------------------------------------------------------------------
 
-        CMessageHandler *CMessageManager::Add(COnMessageHandlerEvent &&Handler, const CString &Action,
-                const CJSON &Payload) {
+        CMessageHandler *CMessageManager::Add(COnMessageHandlerEvent &&Handler, const CString &Action, const CJSON &Payload) {
+
             auto LHandler = new CMessageHandler(this, static_cast<COnMessageHandlerEvent &&>(Handler));
             auto LConnection = m_Point->Connection();
 
@@ -723,6 +723,7 @@ namespace Apostol {
         CChargingPoint::CChargingPoint(CHTTPServerConnection *AConnection, CChargingPointManager *AManager) : CCollectionItem(AManager) {
             m_pConnection = AConnection;
             m_TransactionId = 0;
+            m_UpdateCount = 0;
             m_Messages = new CMessageManager(this);
             AddToConnection(AConnection);
         }
@@ -759,10 +760,12 @@ namespace Apostol {
 
         void CChargingPoint::SwitchConnection(CHTTPServerConnection *AConnection) {
             if (m_pConnection != AConnection) {
-                DeleteFromConnection(m_pConnection);
+                BeginUpdate();
                 m_pConnection->Disconnect();
+                DeleteFromConnection(m_pConnection);
                 m_pConnection = AConnection;
                 AddToConnection(m_pConnection);
+                EndUpdate();
             }
         }
         //--------------------------------------------------------------------------------------------------------------

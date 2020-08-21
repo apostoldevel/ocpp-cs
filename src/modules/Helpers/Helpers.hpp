@@ -25,11 +25,8 @@ Author:
 #define APOSTOL_HELPERS_HPP
 //----------------------------------------------------------------------------------------------------------------------
 
-#include "CertificateDownloader/CertificateDownloader.hpp"
-//----------------------------------------------------------------------------------------------------------------------
-
 static inline void CreateHelpers(CModuleProcess *AProcess) {
-    CCertificateDownloader::CreateModule(AProcess);
+
 }
 
 #endif //APOSTOL_HELPERS_HPP

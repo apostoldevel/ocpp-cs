@@ -30,28 +30,11 @@ Author:
 #include "jwt.h"
 //----------------------------------------------------------------------------------------------------------------------
 
-#include <openssl/sha.h>
-//----------------------------------------------------------------------------------------------------------------------
-
 extern "C++" {
 
 namespace Apostol {
 
     namespace Workers {
-
-        CString to_string(unsigned long Value) {
-            TCHAR szString[_INT_T_LEN + 1] = {0};
-            sprintf(szString, "%lu", Value);
-            return CString(szString);
-        }
-        //--------------------------------------------------------------------------------------------------------------
-
-        CString SHA1(const CString &data) {
-            CString digest;
-            digest.SetLength(SHA_DIGEST_LENGTH);
-            ::SHA1((unsigned char *) data.data(), data.length(), (unsigned char *) digest.Data());
-            return digest;
-        }
 
         //--------------------------------------------------------------------------------------------------------------
 
@@ -94,20 +77,6 @@ namespace Apostol {
             m_pMethods->AddObject(_T("PATCH"), (CObject *) new CMethodHandler(false, std::bind(&CCSService::MethodNotAllowed, this, _1)));
             m_pMethods->AddObject(_T("CONNECT"), (CObject *) new CMethodHandler(false, std::bind(&CCSService::MethodNotAllowed, this, _1)));
 #endif
-        }
-        //--------------------------------------------------------------------------------------------------------------
-
-        void CCSService::ReplyError(CHTTPServerConnection *AConnection, CReply::CStatusType ErrorCode, const CString &Message) {
-            auto LReply = AConnection->Reply();
-
-            if (ErrorCode == CReply::unauthorized) {
-                CReply::AddUnauthorized(LReply, AConnection->Data()["Authorization"] != "Basic", "invalid_client", Message.c_str());
-            }
-
-            LReply->Content.Clear();
-            LReply->Content.Format(R"({"error": {"code": %u, "message": "%s"}})", ErrorCode, Delphi::Json::EncodeJsonString(Message).c_str());
-
-            AConnection->SendReply(ErrorCode, nullptr, true);
         }
         //--------------------------------------------------------------------------------------------------------------
 
@@ -240,24 +209,32 @@ namespace Apostol {
 
         void CCSService::DoPointDisconnected(CObject *Sender) {
             auto LConnection = dynamic_cast<CHTTPServerConnection *>(Sender);
-            if (LConnection != nullptr && !LConnection->ClosedGracefully()) {
-                try {
-                    auto LPoint = CChargingPoint::FindOfConnection(LConnection);
-                    Log()->Message(_T("[%s:%d] Point %s closed connection."),
-                                   LConnection->Socket()->Binding()->PeerIP(),
-                                   LConnection->Socket()->Binding()->PeerPort(),
-                                   LPoint->Identity().IsEmpty() ? "(empty)" : LPoint->Identity().c_str());
-                    delete LPoint;
-                } catch (Delphi::Exception::Exception &E) {
-                    Log()->Message(_T("[%s:%d] Point closed connection (%s)."),
-                                   LConnection->Socket()->Binding()->PeerIP(),
-                                   LConnection->Socket()->Binding()->PeerPort(), E.what());
+            if (LConnection != nullptr) {
+                auto LPoint = CChargingPoint::FindOfConnection(LConnection);
+                if (LPoint != nullptr) {
+                    if (!LConnection->ClosedGracefully()) {
+                        Log()->Message(_T("[%s:%d] Point \"%s\" closed connection."),
+                                       LConnection->Socket()->Binding()->PeerIP(),
+                                       LConnection->Socket()->Binding()->PeerPort(),
+                                       LPoint->Identity().IsEmpty() ? "(empty)" : LPoint->Identity().c_str()
+                        );
+                    }
+                    if (LPoint->UpdateCount() == 0) {
+                        delete LPoint;
+                    }
+                } else {
+                    if (!LConnection->ClosedGracefully()) {
+                        Log()->Message(_T("[%s:%d] Unknown point closed connection."),
+                                       LConnection->Socket()->Binding()->PeerIP(),
+                                       LConnection->Socket()->Binding()->PeerPort()
+                        );
+                    }
                 }
             }
         }
         //--------------------------------------------------------------------------------------------------------------
 
-        CString CCSService::VerifyToken(const CString &Token) {
+        void CCSService::VerifyToken(const CString &Token) {
 
             const auto& GetSecret = [](const CProvider &Provider, const CString &Application) {
                 const auto &Secret = Provider.Secret(Application);
@@ -288,85 +265,22 @@ namespace Apostol {
                 throw jwt::token_verification_exception("Token doesn't contain the required issuer.");
 
             const auto& alg = decoded.get_algorithm();
-            const auto& ch = alg.substr(0, 2);
 
             const auto& Secret = GetSecret(Provider, Application);
 
-            if (ch == "HS") {
-                if (alg == "HS256") {
-                    auto verifier = jwt::verify()
-                            .allow_algorithm(jwt::algorithm::hs256{Secret});
-                    verifier.verify(decoded);
-
-                    return Token; // if algorithm HS256
-                } else if (alg == "HS384") {
-                    auto verifier = jwt::verify()
-                            .allow_algorithm(jwt::algorithm::hs384{Secret});
-                    verifier.verify(decoded);
-                } else if (alg == "HS512") {
-                    auto verifier = jwt::verify()
-                            .allow_algorithm(jwt::algorithm::hs512{Secret});
-                    verifier.verify(decoded);
-                }
-            } else if (ch == "RS") {
-
-                const auto& kid = decoded.get_key_id();
-                const auto& key = OAuth2::Helper::GetPublicKey(Providers, kid);
-
-                if (alg == "RS256") {
-                    auto verifier = jwt::verify()
-                            .allow_algorithm(jwt::algorithm::rs256{key});
-                    verifier.verify(decoded);
-                } else if (alg == "RS384") {
-                    auto verifier = jwt::verify()
-                            .allow_algorithm(jwt::algorithm::rs384{key});
-                    verifier.verify(decoded);
-                } else if (alg == "RS512") {
-                    auto verifier = jwt::verify()
-                            .allow_algorithm(jwt::algorithm::rs512{key});
-                    verifier.verify(decoded);
-                }
-            } else if (ch == "ES") {
-
-                const auto& kid = decoded.get_key_id();
-                const auto& key = OAuth2::Helper::GetPublicKey(Providers, kid);
-
-                if (alg == "ES256") {
-                    auto verifier = jwt::verify()
-                            .allow_algorithm(jwt::algorithm::es256{key});
-                    verifier.verify(decoded);
-                } else if (alg == "ES384") {
-                    auto verifier = jwt::verify()
-                            .allow_algorithm(jwt::algorithm::es384{key});
-                    verifier.verify(decoded);
-                } else if (alg == "ES512") {
-                    auto verifier = jwt::verify()
-                            .allow_algorithm(jwt::algorithm::es512{key});
-                    verifier.verify(decoded);
-                }
-            } else if (ch == "PS") {
-
-                const auto& kid = decoded.get_key_id();
-                const auto& key = OAuth2::Helper::GetPublicKey(Providers, kid);
-
-                if (alg == "PS256") {
-                    auto verifier = jwt::verify()
-                            .allow_algorithm(jwt::algorithm::ps256{key});
-                    verifier.verify(decoded);
-                } else if (alg == "PS384") {
-                    auto verifier = jwt::verify()
-                            .allow_algorithm(jwt::algorithm::ps384{key});
-                    verifier.verify(decoded);
-                } else if (alg == "PS512") {
-                    auto verifier = jwt::verify()
-                            .allow_algorithm(jwt::algorithm::ps512{key});
-                    verifier.verify(decoded);
-                }
+            if (alg == "HS256") {
+                auto verifier = jwt::verify()
+                        .allow_algorithm(jwt::algorithm::hs256{Secret});
+                verifier.verify(decoded);
+            } else if (alg == "HS384") {
+                auto verifier = jwt::verify()
+                        .allow_algorithm(jwt::algorithm::hs384{Secret});
+                verifier.verify(decoded);
+            } else if (alg == "HS512") {
+                auto verifier = jwt::verify()
+                        .allow_algorithm(jwt::algorithm::hs512{Secret});
+                verifier.verify(decoded);
             }
-
-            const auto& Result = CCleanToken(R"({"alg":"HS256","typ":"JWT"})", decoded.get_payload(), true);
-
-            return Result.Sign(jwt::algorithm::hs256{Secret});
         }
         //--------------------------------------------------------------------------------------------------------------
 
@@ -402,12 +316,11 @@ namespace Apostol {
         bool CCSService::CheckAuthorization(CHTTPServerConnection *AConnection, CAuthorization &Authorization) {
 
             auto LRequest = AConnection->Request();
-            auto LReply = AConnection->Reply();
 
             try {
                 if (CheckAuthorizationData(LRequest, Authorization)) {
                     if (Authorization.Schema == CAuthorization::asBearer) {
-                        Authorization.Token = VerifyToken(Authorization.Token);
+                        VerifyToken(Authorization.Token);
                         return true;
                     }
                 }
@@ -458,14 +371,16 @@ namespace Apostol {
             AConnection->SwitchingProtocols(LAccept, LProtocol);
 
             auto LPoint = m_CPManager->FindPointByIdentity(LIdentity);
+
             if (LPoint == nullptr) {
                 LPoint = m_CPManager->Add(AConnection);
                 LPoint->Identity() = LIdentity;
-                LPoint->Address() = GetHost(AConnection);
             } else {
                 LPoint->SwitchConnection(AConnection);
-                LPoint->Address() = GetHost(AConnection);
             }
+
+            LPoint->Address() = GetHost(AConnection);
+
 #if defined(_GLIBCXX_RELEASE) && (_GLIBCXX_RELEASE >= 9)
             AConnection->OnDisconnected([this](auto && Sender) { DoPointDisconnected(Sender); });
 #else
@@ -510,7 +425,7 @@ namespace Apostol {
 
                     } else if (LCommand == "time") {
 
-                        LReply->Content << "{\"serverTime\": " << to_string(MsEpoch()) << "}";
+                        LReply->Content << "{\"serverTime\": " << LongToString(MsEpoch()) << "}";
                         AConnection->SendReply(CReply::ok);
                         return;
 
@@ -595,31 +510,33 @@ namespace Apostol {
                             return;
                         }
 
-                        auto OnRequest = [AConnection](OCPP::CMessageHandler *AHandler,
-                                CHTTPServerConnection *AWSConnection) {
-
-                            auto LReply = AConnection->Reply();
+                        auto OnRequest = [AConnection](OCPP::CMessageHandler *AHandler, CHTTPServerConnection *AWSConnection) {
 
                             auto LWSRequest = AWSConnection->WSRequest();
-                            const CString LRequest(LWSRequest->Payload());
 
-                            CReply::CStatusType Status = CReply::ok;
+                            if (!AConnection->ClosedGracefully()) {
 
-                            try {
-                                CJSONMessage LMessage;
+                                auto LReply = AConnection->Reply();
+                                const CString LRequest(LWSRequest->Payload());
 
-                                if (!CJSONProtocol::Request(LRequest, LMessage)) {
-                                    Status = CReply::bad_request;
+                                CReply::CStatusType Status = CReply::ok;
+
+                                try {
+                                    CJSONMessage LMessage;
+
+                                    if (!CJSONProtocol::Request(LRequest, LMessage)) {
+                                        Status = CReply::bad_request;
+                                    }
+
+                                    LReply->Content = LMessage.Payload.ToString();
+                                    AConnection->SendReply(Status, nullptr, true);
+                                } catch (std::exception &e) {
+                                    ReplyError(AConnection, CReply::internal_server_error, e.what());
+                                    Log()->Error(APP_LOG_EMERG, 0, e.what());
                                 }
 
-                                LReply->Content = LMessage.Payload.ToString();
-                                AConnection->SendReply(Status, nullptr, true);
-                            } catch (std::exception &e) {
-                                ReplyError(AConnection, CReply::internal_server_error, e.what());
-                                Log()->Error(APP_LOG_EMERG, 0, e.what());
+                                AConnection->CloseConnection(true);
                             }
-
-                            AConnection->CloseConnection(true);
 
                             AWSConnection->ConnectionStatus(csReplySent);
                             LWSRequest->Clear();
@@ -752,31 +669,34 @@ namespace Apostol {
                                 return;
                             }
 
-                            auto OnRequest = [AConnection](OCPP::CMessageHandler *AHandler,
-                                                           CHTTPServerConnection *AWSConnection) {
-
-                                auto LReply = AConnection->Reply();
+                            auto OnRequest = [AConnection](OCPP::CMessageHandler *AHandler, CHTTPServerConnection *AWSConnection) {
 
                                 auto LWSRequest = AWSConnection->WSRequest();
-                                const CString LRequest(LWSRequest->Payload());
 
-                                CReply::CStatusType Status = CReply::ok;
+                                if (!AConnection->ClosedGracefully()) {
 
-                                try {
-                                    CJSONMessage LMessage;
+                                    auto LReply = AConnection->Reply();
+                                    const CString LRequest(LWSRequest->Payload());
 
-                                    if (!CJSONProtocol::Request(LRequest, LMessage)) {
-                                        Status = CReply::bad_request;
+                                    CReply::CStatusType Status = CReply::ok;
+
+                                    try {
+                                        CJSONMessage LMessage;
+
+                                        if (!CJSONProtocol::Request(LRequest, LMessage)) {
+                                            Status = CReply::bad_request;
+                                        }
+
+                                        LReply->Content = LMessage.Payload.ToString();
+                                        AConnection->SendReply(Status, nullptr, true);
+                                    } catch (std::exception &e) {
+                                        ReplyError(AConnection, CReply::internal_server_error, e.what());
+                                        Log()->Error(APP_LOG_EMERG, 0, e.what());
                                     }
-
-                                    LReply->Content = LMessage.Payload.ToString();
-                                    AConnection->SendReply(Status, nullptr, true);
-                                } catch (std::exception &e) {
-                                    ReplyError(AConnection, CReply::internal_server_error, e.what());
-                                    Log()->Error(APP_LOG_EMERG, 0, e.what());
                                 }
 
                                 AWSConnection->ConnectionStatus(csReplySent);
+                                LWSRequest->Clear();
                             };
 
                             CJSON LPayload;
@@ -982,12 +902,14 @@ namespace Apostol {
                         auto LHandler = LPoint->Messages()->FindMessageById(jmRequest.UniqueId);
                         if (Assigned(LHandler)) {
                             LHandler->Handler(AConnection);
+                            delete LHandler;
                         }
+                        LWSRequest->Clear();
                     }
                 }
             } catch (std::exception &e) {
                 //AConnection->SendWebSocketClose();
-                //AConnection->CloseConnection(true);
+                AConnection->Clear();
                 Log()->Error(APP_LOG_EMERG, 0, e.what());
             }
         }
@@ -1013,16 +935,12 @@ namespace Apostol {
         }
         //--------------------------------------------------------------------------------------------------------------
 
-        bool CCSService::IsEnabled() {
+        bool CCSService::Enabled() {
             if (m_ModuleStatus == msUnknown)
                 m_ModuleStatus = msEnabled;
             return m_ModuleStatus == msEnabled;
         }
         //--------------------------------------------------------------------------------------------------------------
-
-        bool CCSService::CheckUserAgent(const CString &Value) {
-            return IsEnabled();
-        }
 
     }
 }
