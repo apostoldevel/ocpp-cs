@@ -661,7 +661,7 @@ namespace Apostol {
 
         //--------------------------------------------------------------------------------------------------------------
 
-        CMessageHandler *CMessageManager::Get(int Index) {
+        CMessageHandler *CMessageManager::Get(int Index) const {
             return dynamic_cast<CMessageHandler *> (inherited::GetItem(Index));
         }
         //--------------------------------------------------------------------------------------------------------------
@@ -1060,7 +1060,7 @@ namespace Apostol {
 
         //--------------------------------------------------------------------------------------------------------------
 
-        CChargingPoint *CChargingPointManager::Get(int Index) {
+        CChargingPoint *CChargingPointManager::Get(int Index) const {
             return dynamic_cast<CChargingPoint *> (inherited::GetItem(Index));
         }
         //--------------------------------------------------------------------------------------------------------------

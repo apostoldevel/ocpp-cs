@@ -493,7 +493,7 @@ namespace Apostol {
 
             CChargingPoint *m_Point;
 
-            CMessageHandler *Get(int Index);
+            CMessageHandler *Get(int Index) const;
             void Set(int Index, CMessageHandler *Value);
 
         public:
@@ -511,10 +511,10 @@ namespace Apostol {
 
             CMessageHandler *FindMessageById(const CString &Value);
 
-            CMessageHandler *Handlers(int Index) { return Get(Index); }
+            CMessageHandler *Handlers(int Index) const { return Get(Index); }
             void Handlers(int Index, CMessageHandler *Value) { Set(Index, Value); }
 
-            CMessageHandler *operator[] (int Index) override { return Handlers(Index); };
+            CMessageHandler *operator[] (int Index) const override { return Handlers(Index); };
 
         };
 
@@ -624,7 +624,7 @@ namespace Apostol {
 
         private:
 
-            CChargingPoint *Get(int Index);
+            CChargingPoint *Get(int Index) const;
             void Set(int Index, CChargingPoint *Value);
 
         public:
@@ -641,10 +641,10 @@ namespace Apostol {
             CChargingPoint *FindPointByIdentity(const CString &Value);
             CChargingPoint *FindPointByConnection(CHTTPServerConnection *Value);
 
-            CChargingPoint *Points(int Index) { return Get(Index); }
+            CChargingPoint *Points(int Index) const { return Get(Index); }
             void Points(int Index, CChargingPoint *Value) { Set(Index, Value); }
 
-            CChargingPoint *operator[] (int Index) override { return Points(Index); };
+            CChargingPoint *operator[] (int Index) const override { return Points(Index); };
 
         };
 

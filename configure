@@ -1,0 +1,179 @@
+#!/bin/bash
+
+# Script to configure OCPP.
+#
+# Script options:
+# --help                   Display usage, overriding script execution.
+#
+
+# Initialize the build environment.
+#==============================================================================
+# Exit this script on the first build error.
+#------------------------------------------------------------------------------
+set -e
+
+PROJECT_NAME=ocpp
+BUILD_TYPE=Release
+
+pop_directory()
+{
+    popd >/dev/null
+}
+
+push_directory()
+{
+    local DIRECTORY="$1"
+
+    pushd "$DIRECTORY" >/dev/null
+}
+
+create_directory()
+{
+    local DIRECTORY="$1"
+
+    rm -rf "$DIRECTORY"
+    mkdir "$DIRECTORY"
+}
+
+display_heading_message()
+{
+    echo
+    echo "********************** $@ **********************"
+    echo
+}
+
+display_message()
+{
+    echo "$@"
+}
+
+display_error()
+{
+    >&2 echo "$@"
+}
+
+display_help()
+{
+    display_message "Usage: ./configure [OPTION]..."
+    display_message "Manage the configure."
+    display_message "Script options:"
+    display_message "  --build-dir=<path>       Location of build files (default: $BUILD_DIR)."
+    display_message "  --release                Release build (default)."
+    display_message "  --debug                  Debug build."
+    display_message "  --update                 Update build."
+    display_message "  --help                   Display usage, overriding script execution."
+    display_message ""
+}
+
+display_configuration()
+{
+    display_message "Configuration."
+    display_message "--------------------------------------------------------------------"
+    display_message "PROJECT_NAME         : $PROJECT_NAME"
+    display_message "BUILD_TYPE           : $BUILD_TYPE"
+    display_message "BUILD_DIR            : $BUILD_DIR"
+    display_message "--------------------------------------------------------------------"
+}
+
+# Download from github.
+download_from_github()
+{
+    local DIRECTORY=$1
+    local ACCOUNT=$2
+    local REPO=$3
+    local BRANCH=$4
+    local DIR=$5
+    shift 5
+
+    push_directory "$DIRECTORY"
+
+    FORK="$ACCOUNT/$REPO"
+
+    if ! [ -d $DIR ]; then
+      # Clone the repository locally.
+      display_heading_message "Download: $FORK/$BRANCH"
+      git clone --depth 1 --branch $BRANCH --single-branch "https://github.com/$FORK" $DIR
+    else
+      push_directory "$DIR"
+      display_heading_message "Updating: $FORK/$BRANCH"
+      git pull
+      pop_directory
+    fi
+
+    pop_directory
+}
+
+github()
+{
+    display_heading_message "Updating the current project"
+    git pull
+
+    download_from_github src/lib ufocomp libdelphi master delphi
+    download_from_github src ufocomp apostol-core master core
+}
+
+Success()
+{
+    display_message ""
+    echo -e "********************** \e[32;1mSUCCESS\e[0m **********************"
+    echo -e "\e[32m-- To build the $PROJECT_NAME run:\e[0m"
+    display_message "--------------------------------------------------------------------"
+    echo -e "\e[1m$ cd $BUILD_DIR \e[0m"
+    echo -e "\e[1m$ make \e[0m"
+    display_message "--------------------------------------------------------------------"
+    echo -e "\e[32m-- To install the $PROJECT_NAME run:\e[0m"
+    display_message "--------------------------------------------------------------------"
+    echo -e "\e[1m$ sudo make install\e[0m"
+    display_message "--------------------------------------------------------------------"
+}
+
+make_configuration()
+{
+    if ! [[ $BUILD_UPDATE ]]; then
+        create_directory $BUILD_DIR
+    fi
+
+    echo '#define AUTO_VERSION _T("1.0.e00000-b0")' > version.h
+
+    github
+
+    display_heading_message "Make: $PROJECT_NAME"
+
+    cmake -DCMAKE_BUILD_TYPE=$BUILD_TYPE . -B $BUILD_DIR
+
+    Success
+}
+
+# Parse command line options that are handled by this script.
+#------------------------------------------------------------------------------
+for OPTION in "$@"; do
+    case $OPTION in
+        # Standard script options.
+        (--help)                DISPLAY_HELP="yes";;
+
+        (--release)             BUILD_TYPE="Release";;
+        (--debug)               BUILD_TYPE="Debug";;
+
+        (--update)              BUILD_UPDATE="yes";;
+
+        # Unique script options.
+        (--build-dir=*)         BUILD_DIR="${OPTION#*=}";;
+    esac
+done
+
+if ! [[ $BUILD_DIR ]]; then
+  if [[ $BUILD_TYPE == Debug ]]; then
+    BUILD_DIR=cmake-build-debug
+  else
+    BUILD_DIR=cmake-build-release
+  fi
+fi
+
+# Configure.
+#==============================================================================
+if [[ $DISPLAY_HELP ]]; then
+    display_help
+else
+    display_configuration
+    make_configuration
+fi
