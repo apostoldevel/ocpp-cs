@@ -47,7 +47,7 @@ namespace Apostol {
             bool QueryStart(CHTTPServerConnection *AConnection, const CStringList& SQL);
             bool DBParse(CHTTPServerConnection *AConnection, const CString &Identity, const CString &Action, const CJSON &Payload);
 
-            static bool CheckAuthorizationData(CRequest *ARequest, CAuthorization &Authorization);
+            static bool CheckAuthorizationData(CHTTPRequest *ARequest, CAuthorization &Authorization);
             void VerifyToken(const CString &Token);
 
         protected:
@@ -63,7 +63,7 @@ namespace Apostol {
             void DoPointDisconnected(CObject *Sender);
 
             void DoPostgresQueryExecuted(CPQPollQuery *APollQuery) override;
-            void DoPostgresQueryException(CPQPollQuery *APollQuery, Delphi::Exception::Exception *AException) override;
+            void DoPostgresQueryException(CPQPollQuery *APollQuery, const Delphi::Exception::Exception &E) override;
 
         public:
 
@@ -78,7 +78,7 @@ namespace Apostol {
             bool CheckAuthorization(CHTTPServerConnection *AConnection, CAuthorization &Authorization);
 
             void Heartbeat() override;
-            void Execute(CHTTPServerConnection *AConnection) override;
+            bool Execute(CHTTPServerConnection *AConnection) override;
 
             bool Enabled() override;
 
