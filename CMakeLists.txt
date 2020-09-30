@@ -163,6 +163,8 @@ add_dependencies(${PROJECT_NAME} auto_increment_version)
 
 # Install
 # ----------------------------------------------------------------------------------------------------------------------
+file(GLOB conf_files conf/*.conf)
+
 set(INSTALL_PATH "${PROJECT_PREFIX}")
 
 install(TARGETS ${PROJECT_NAME} DESTINATION ${INSTALL_BIN_PATH})
@@ -175,9 +177,7 @@ install(DIRECTORY DESTINATION ${INSTALL_PATH}/sites)
 install(DIRECTORY conf/oauth2/ DESTINATION ${INSTALL_PATH}/oauth2)
 install(DIRECTORY conf/sites/ DESTINATION ${INSTALL_PATH}/sites)
 install(DIRECTORY www/ DESTINATION ${INSTALL_PATH}/www)
-install(FILES conf/default.conf DESTINATION ${INSTALL_PATH}/conf)
-install(FILES conf/oauth2.conf DESTINATION ${INSTALL_PATH}/conf)
-install(FILES conf/sites.conf DESTINATION ${INSTALL_PATH}/conf)
+install(FILES ${conf_files} DESTINATION ${INSTALL_PATH}/conf)
 install(FILES conf/default.conf DESTINATION ${INSTALL_PATH} RENAME ${PROJECT_NAME}.conf)
 
 if (INSTALL_AS_ROOT)
