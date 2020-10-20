@@ -31,6 +31,8 @@ namespace Apostol {
 
     namespace Workers {
 
+        typedef TPairs<CStringList> COperations;
+
         //--------------------------------------------------------------------------------------------------------------
 
         //-- CCSService ------------------------------------------------------------------------------------------------
@@ -40,25 +42,32 @@ namespace Apostol {
         class CCSService: public CApostolModule {
         private:
 
+            COperations m_Operations;
+
             CChargingPointManager *m_CPManager;
+
+            bool m_ParseInDataBase;
 
             void InitMethods() override;
 
-            bool QueryStart(CHTTPServerConnection *AConnection, const CStringList& SQL);
-            bool DBParse(CHTTPServerConnection *AConnection, const CString &Identity, const CString &Action, const CJSON &Payload);
+            void InitOperations();
+
+            void ParseJSON(CHTTPServerConnection *AConnection, const CString &Identity, const CString &Action, const CJSON &Payload);
 
             static bool CheckAuthorizationData(CHTTPRequest *ARequest, CAuthorization &Authorization);
             void VerifyToken(const CString &Token);
 
+            static void DoWebSocketError(CHTTPServerConnection *AConnection, const Delphi::Exception::Exception &E);
+
         protected:
 
-            void DoOCPP(CHTTPServerConnection *AConnection);
+            void DoWebSocket(CHTTPServerConnection *AConnection);
             void DoAPI(CHTTPServerConnection *AConnection);
 
             void DoGet(CHTTPServerConnection *AConnection) override;
             void DoPost(CHTTPServerConnection *AConnection);
 
-            void DoWebSocket(CHTTPServerConnection *AConnection);
+            void DoOCPP(CHTTPServerConnection *AConnection);
 
             void DoPointDisconnected(CObject *Sender);
 
@@ -76,6 +85,8 @@ namespace Apostol {
             }
 
             bool CheckAuthorization(CHTTPServerConnection *AConnection, CAuthorization &Authorization);
+
+            void Initialization(CModuleProcess *AProcess) override;
 
             void Heartbeat() override;
             bool Execute(CHTTPServerConnection *AConnection) override;

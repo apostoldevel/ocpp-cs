@@ -46,7 +46,10 @@ namespace Apostol {
             m_CPManager = new CChargingPointManager();
             m_Headers.Add("Authorization");
 
+            m_ParseInDataBase = false;
+
             CCSService::InitMethods();
+            InitOperations();
         }
         //--------------------------------------------------------------------------------------------------------------
 
@@ -80,52 +83,185 @@ namespace Apostol {
         }
         //--------------------------------------------------------------------------------------------------------------
 
-        void CCSService::DoPostgresQueryException(CPQPollQuery *APollQuery, const Delphi::Exception::Exception &E) {
-            auto LConnection = dynamic_cast<CHTTPServerConnection *> (APollQuery->PollConnection());
+        void CCSService::InitOperations() {
+            
+            m_Operations.AddPair("CancelReservation", CStringList());
+            m_Operations.Last().Value().Add("reservationId=true");
 
-            if (LConnection != nullptr) {
-                auto LWSRequest = LConnection->WSRequest();
-                auto LWSReply = LConnection->WSReply();
+            m_Operations.AddPair("ChangeAvailability", CStringList());
+            m_Operations.Last().Value().Add("connectorId=true");
+            m_Operations.Last().Value().Add("type=true");
 
-                const CString LRequest(LWSRequest->Payload());
+            m_Operations.AddPair("ChangeConfiguration", CStringList());
+            m_Operations.Last().Value().Add("key=true");
+            m_Operations.Last().Value().Add("value=true");
 
-                CJSONMessage jmRequest;
-                CJSONProtocol::Request(LRequest, jmRequest);
+            m_Operations.AddPair("ClearCache", CStringList());
 
-                CJSONMessage jmResponse;
-                CString LResponse;
+            m_Operations.AddPair("ClearChargingProfile", CStringList());
+            m_Operations.Last().Value().Add("id=false");
+            m_Operations.Last().Value().Add("connectorId=false");
+            m_Operations.Last().Value().Add("chargingProfilePurpose=false");
+            m_Operations.Last().Value().Add("stackLevel=false");
 
-                CJSON LResult;
+            m_Operations.AddPair("DataTransfer", CStringList());
+            m_Operations.Last().Value().Add("vendorId=true");
+            m_Operations.Last().Value().Add("messageId=false");
+            m_Operations.Last().Value().Add("data=false");
 
-                CJSONProtocol::PrepareResponse(jmRequest, jmResponse);
+            m_Operations.AddPair("GetCompositeSchedule", CStringList());
+            m_Operations.Last().Value().Add("connectorId=true");
+            m_Operations.Last().Value().Add("duration=true");
+            m_Operations.Last().Value().Add("chargingRateUnit=false");
 
-                jmResponse.MessageTypeId = OCPP::mtCallError;
-                jmResponse.ErrorCode = "InternalError";
-                jmResponse.ErrorDescription = E.what();
+            m_Operations.AddPair("GetConfiguration", CStringList());
+            m_Operations.Last().Value().Add("key=false");
 
-                CJSONProtocol::Response(jmResponse, LResponse);
-#ifdef _DEBUG
-                DebugMessage("\n[%p] [%s:%d] [%d] [WebSocket] Response:\n%s\n", LConnection, LConnection->Socket()->Binding()->PeerIP(),
-                             LConnection->Socket()->Binding()->PeerPort(), LConnection->Socket()->Binding()->Handle(), LResponse.c_str());
-#endif
-                LWSReply->SetPayload(LResponse);
-                LConnection->SendWebSocket(true);
-            }
+            m_Operations.AddPair("GetDiagnostics", CStringList());
+            m_Operations.Last().Value().Add("location=true");
+            m_Operations.Last().Value().Add("retries=false");
+            m_Operations.Last().Value().Add("retryInterval=false");
+            m_Operations.Last().Value().Add("startTime=false");
+            m_Operations.Last().Value().Add("stopTime=false");
 
-            Log()->Error(APP_LOG_EMERG, 0, E.what());
+            m_Operations.AddPair("GetLocalListVersion", CStringList());
+
+            m_Operations.AddPair("RemoteStartTransaction", CStringList());
+            m_Operations.Last().Value().Add("connectorId=false");
+            m_Operations.Last().Value().Add("idTag=true");
+            m_Operations.Last().Value().Add("chargingProfile=false");
+
+            m_Operations.AddPair("RemoteStopTransaction", CStringList());
+            m_Operations.Last().Value().Add("transactionId=true");
+
+            m_Operations.AddPair("ReserveNow", CStringList());
+            m_Operations.Last().Value().Add("connectorId=true");
+            m_Operations.Last().Value().Add("expiryDate=true");
+            m_Operations.Last().Value().Add("idTag=true");
+            m_Operations.Last().Value().Add("parentIdTag=false");
+            m_Operations.Last().Value().Add("reservationId=true");
+
+            m_Operations.AddPair("Reset", CStringList());
+            m_Operations.Last().Value().Add("type=true");
+
+            m_Operations.AddPair("SendLocalList", CStringList());
+            m_Operations.Last().Value().Add("listVersion=true");
+            m_Operations.Last().Value().Add("localAuthorizationList=false");
+            m_Operations.Last().Value().Add("updateType=true");
+
+            m_Operations.AddPair("SetChargingProfile", CStringList());
+            m_Operations.Last().Value().Add("connectorId=true");
+            m_Operations.Last().Value().Add("csChargingProfiles=true");
+
+            m_Operations.AddPair("TriggerMessage", CStringList());
+            m_Operations.Last().Value().Add("requestedMessage=true");
+            m_Operations.Last().Value().Add("connectorId=false");
+
+            m_Operations.AddPair("UnlockConnector", CStringList());
+            m_Operations.Last().Value().Add("connectorId=true");
+
+            m_Operations.AddPair("UpdateFirmware", CStringList());
+            m_Operations.Last().Value().Add("location=true");
+            m_Operations.Last().Value().Add("retries=false");
+            m_Operations.Last().Value().Add("retrieveDate=true");
+            m_Operations.Last().Value().Add("retryInterval=false");
         }
         //--------------------------------------------------------------------------------------------------------------
 
         void CCSService::DoPostgresQueryExecuted(CPQPollQuery *APollQuery) {
-            clock_t start = clock();
 
-            auto LConnection = dynamic_cast<CHTTPServerConnection *> (APollQuery->PollConnection());
+            CPQResult *Result;
 
+            try {
+                for (int I = 0; I < APollQuery->Count(); I++) {
+                    Result = APollQuery->Results(I);
+
+                    if (Result->ExecStatus() != PGRES_TUPLES_OK)
+                        throw Delphi::Exception::EDBError(Result->GetErrorMessage());
+                }
+            } catch (std::exception &e) {
+                Log()->Error(APP_LOG_EMERG, 0, e.what());
+            }
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
+        void CCSService::DoPostgresQueryException(CPQPollQuery *APollQuery, const Delphi::Exception::Exception &E) {
+            Log()->Error(APP_LOG_EMERG, 0, E.what());
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
+        void CCSService::DoPointDisconnected(CObject *Sender) {
+            auto LConnection = dynamic_cast<CHTTPServerConnection *>(Sender);
             if (LConnection != nullptr) {
+                auto LPoint = CChargingPoint::FindOfConnection(LConnection);
+                if (LPoint != nullptr) {
+                    if (!LConnection->ClosedGracefully()) {
+                        Log()->Message(_T("[%s:%d] Point \"%s\" closed connection."),
+                                       LConnection->Socket()->Binding()->PeerIP(),
+                                       LConnection->Socket()->Binding()->PeerPort(),
+                                       LPoint->Identity().IsEmpty() ? "(empty)" : LPoint->Identity().c_str()
+                        );
+                    }
+                    if (LPoint->UpdateCount() == 0) {
+                        delete LPoint;
+                    }
+                } else {
+                    if (!LConnection->ClosedGracefully()) {
+                        Log()->Message(_T("[%s:%d] Unknown point closed connection."),
+                                       LConnection->Socket()->Binding()->PeerIP(),
+                                       LConnection->Socket()->Binding()->PeerPort()
+                        );
+                    }
+                }
+            }
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
+        void CCSService::DoWebSocketError(CHTTPServerConnection *AConnection, const Delphi::Exception::Exception &E) {
+
+            Log()->Error(APP_LOG_EMERG, 0, E.what());
+
+            if (AConnection->ClosedGracefully())
+                return;
+
+            auto LWSRequest = AConnection->WSRequest();
+            auto LWSReply = AConnection->WSReply();
+
+            const CString LRequest(LWSRequest->Payload());
+
+            CJSONMessage jmRequest;
+            CJSONProtocol::Request(LRequest, jmRequest);
+
+            CJSONMessage jmResponse;
+            CString LResponse;
+
+            CJSON LResult;
+
+            CJSONProtocol::PrepareResponse(jmRequest, jmResponse);
+
+            jmResponse.MessageTypeId = OCPP::mtCallError;
+            jmResponse.ErrorCode = "InternalError";
+            jmResponse.ErrorDescription = E.what();
+
+            CJSONProtocol::Response(jmResponse, LResponse);
+
+            LWSReply->SetPayload(LResponse);
+            AConnection->SendWebSocket(true);
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
+        void CCSService::ParseJSON(CHTTPServerConnection *AConnection, const CString &Identity, const CString &Action,
+                const CJSON &Payload) {
+
+            auto OnExecuted = [AConnection](CPQPollQuery *APollQuery) {
+
+                if (AConnection->ClosedGracefully())
+                    return;
+
                 CPQResult *Result;
 
-                auto LWSRequest = LConnection->WSRequest();
-                auto LWSReply = LConnection->WSReply();
+                auto LWSRequest = AConnection->WSRequest();
+                auto LWSReply = AConnection->WSReply();
 
                 const CString LRequest(LWSRequest->Payload());
 
@@ -164,72 +300,24 @@ namespace Apostol {
                 }
 
                 CJSONProtocol::Response(jmResponse, LResponse);
-#ifdef _DEBUG
-                DebugMessage("\n[%p] [%s:%d] [%d] [WebSocket] Response:\n%s\n", LConnection, LConnection->Socket()->Binding()->PeerIP(),
-                             LConnection->Socket()->Binding()->PeerPort(), LConnection->Socket()->Binding()->Handle(), LResponse.c_str());
-#endif
+
                 LWSReply->SetPayload(LResponse);
-                LConnection->SendWebSocket(true);
-            }
+                AConnection->SendWebSocket(true);
+            };
 
-            log_debug1(APP_LOG_DEBUG_CORE, Log(), 0, _T("Query executed runtime: %.2f ms."), (double) ((clock() - start) / (double) CLOCKS_PER_SEC * 1000));
-        }
-        //--------------------------------------------------------------------------------------------------------------
+            auto OnException = [AConnection](CPQPollQuery *APollQuery, const Delphi::Exception::Exception &E) {
+                DoWebSocketError(AConnection, E);
+            };
 
-        bool CCSService::QueryStart(CHTTPServerConnection *AConnection, const CStringList& SQL) {
-            auto LQuery = GetQuery(AConnection);
-
-            if (LQuery == nullptr)
-                throw Delphi::Exception::Exception("QueryStart: GetQuery() failed!");
-
-            LQuery->SQL() = SQL;
-
-            if (LQuery->Start() != POLL_QUERY_START_ERROR) {
-                AConnection->CloseConnection(false);
-                return true;
-            } else {
-                delete LQuery;
-            }
-
-            return false;
-        }
-        //--------------------------------------------------------------------------------------------------------------
-
-        bool CCSService::DBParse(CHTTPServerConnection *AConnection, const CString &Identity, const CString &Action,
-                                 const CJSON &Payload) {
             CStringList SQL;
 
             SQL.Add(CString());
-            SQL.Last().Format("SELECT * FROM ocpp.Parse('%s', '%s', '%s'::jsonb);",
-                              Identity.c_str(), Action.c_str(), Payload.ToString().c_str());
+            SQL.Last().Format("SELECT * FROM ocpp.Parse('%s', '%s', '%s'::jsonb);", Identity.c_str(), Action.c_str(), Payload.ToString().c_str());
 
-            return QueryStart(AConnection, SQL);
-        }
-        //--------------------------------------------------------------------------------------------------------------
-
-        void CCSService::DoPointDisconnected(CObject *Sender) {
-            auto LConnection = dynamic_cast<CHTTPServerConnection *>(Sender);
-            if (LConnection != nullptr) {
-                auto LPoint = CChargingPoint::FindOfConnection(LConnection);
-                if (LPoint != nullptr) {
-                    if (!LConnection->ClosedGracefully()) {
-                        Log()->Message(_T("[%s:%d] Point \"%s\" closed connection."),
-                                       LConnection->Socket()->Binding()->PeerIP(),
-                                       LConnection->Socket()->Binding()->PeerPort(),
-                                       LPoint->Identity().IsEmpty() ? "(empty)" : LPoint->Identity().c_str()
-                        );
-                    }
-                    if (LPoint->UpdateCount() == 0) {
-                        delete LPoint;
-                    }
-                } else {
-                    if (!LConnection->ClosedGracefully()) {
-                        Log()->Message(_T("[%s:%d] Unknown point closed connection."),
-                                       LConnection->Socket()->Binding()->PeerIP(),
-                                       LConnection->Socket()->Binding()->PeerPort()
-                        );
-                    }
-                }
+            try {
+                ExecSQL(SQL, nullptr, OnExecuted, OnException);
+            } catch (Delphi::Exception::Exception &E) {
+                DoWebSocketError(AConnection, E);
             }
         }
         //--------------------------------------------------------------------------------------------------------------
@@ -344,6 +432,7 @@ namespace Apostol {
         //--------------------------------------------------------------------------------------------------------------
 
         void CCSService::DoOCPP(CHTTPServerConnection *AConnection) {
+
             auto LRequest = AConnection->Request();
             auto LReply = AConnection->Reply();
 
@@ -444,12 +533,10 @@ namespace Apostol {
                             jsonPoint.Object().AddPair("Address", LPoint->Address());
 
                             if (LPoint->Connection()->Connected()) {
-                                jsonConnection.Object().AddPair("Socket",
-                                                                LPoint->Connection()->Socket()->Binding()->Handle());
-                                jsonConnection.Object().AddPair("IP",
-                                                                LPoint->Connection()->Socket()->Binding()->PeerIP());
-                                jsonConnection.Object().AddPair("Port",
-                                                                LPoint->Connection()->Socket()->Binding()->PeerPort());
+                                jsonConnection.Object().AddPair("Socket", LPoint->Connection()->Socket()->Binding()->Handle());
+                                jsonConnection.Object().AddPair("IP", LPoint->Connection()->Socket()->Binding()->PeerIP());
+                                jsonConnection.Object().AddPair("Port", LPoint->Connection()->Socket()->Binding()->PeerPort());
+
                                 jsonPoint.Object().AddPair("Connection", jsonConnection);
                             }
 
@@ -477,36 +564,57 @@ namespace Apostol {
                         }
 
                         const auto &LIdentity = LPath[3];
-                        const auto &LAction = LPath[4];
+                        const auto &LOperation = LPath[4];
+
+                        const auto Index = m_Operations.IndexOfName(LOperation);
+                        if (Index == -1) {
+                            ReplyError(AConnection, CHTTPReply::bad_request, CString().Format("Invalid operation: %s", LOperation.c_str()));
+                            return;
+                        }
+
+                        CJSON Json;
+                        ContentToJson(LRequest, Json);
+
+                        const auto &Fields = m_Operations[Index].Value();
+                        const auto &Object = Json.Object();
+
+                        for (int i = 0; i < Object.Count(); i++) {
+                            const auto& Key = Object.Members(i).String();
+                            if (Fields.IndexOfName(Key) == -1) {
+                                ReplyError(AConnection, CHTTPReply::bad_request, CString().Format("Invalid key: %s", Key.c_str()));
+                                return;
+                            }
+                        }
+
+                        for (int i = 0; i < Fields.Count(); i++) {
+                            const auto& Key = Fields.Names(i);
+                            const auto Required = Fields.ValueFromIndex(i) == "true";
+                            if (Required && Json[Key].IsNull()) {
+                                ReplyError(AConnection, CHTTPReply::bad_request, CString().Format("Not found required key: %s", Key.c_str()));
+                                return;
+                            }
+                        }
 
                         auto LPoint = m_CPManager->FindPointByIdentity(LIdentity);
 
                         if (LPoint == nullptr) {
-                            LReply->Content.Format(R"({"error": {"code": %u, "message": "%s"}})", 300,
-                                                   "Charge point not found.");
-                            AConnection->SendReply(CHTTPReply::ok);
+                            ReplyError(AConnection, CHTTPReply::bad_request, CString().Format("Not found Charge Point by Identity: %s", LIdentity.c_str()));
                             return;
                         }
 
                         auto LConnection = LPoint->Connection();
                         if (LConnection == nullptr) {
-                            LReply->Content.Format(R"({"error": {"code": %u, "message": "%s"}})", 301,
-                                                   "Charge point offline.");
-                            AConnection->SendReply(CHTTPReply::ok);
+                            ReplyError(AConnection, CHTTPReply::bad_request, "Charge Point offline.");
                             return;
                         }
 
                         if (!LConnection->Connected()) {
-                            LReply->Content.Format(R"({"error": {"code": %u, "message": "%s"}})", 302,
-                                                   "Charge point not connected.");
-                            AConnection->SendReply(CHTTPReply::ok);
+                            ReplyError(AConnection, CHTTPReply::bad_request, "Charge Point not connected.");
                             return;
                         }
 
                         if (LConnection->Protocol() != pWebSocket) {
-                            LReply->Content.Format(R"({"error": {"code": %u, "message": "%s"}})", 303,
-                                                   "Incorrect charge point protocol version.");
-                            AConnection->SendReply(CHTTPReply::ok);
+                            ReplyError(AConnection, CHTTPReply::bad_request, "Incorrect Charge Point protocol version.");
                             return;
                         }
 
@@ -532,38 +640,22 @@ namespace Apostol {
                                     AConnection->SendReply(Status, nullptr, true);
                                 } catch (std::exception &e) {
                                     ReplyError(AConnection, CHTTPReply::internal_server_error, e.what());
-                                    Log()->Error(APP_LOG_EMERG, 0, e.what());
                                 }
-
-                                AConnection->CloseConnection(true);
                             }
 
                             AWSConnection->ConnectionStatus(csReplySent);
                             LWSRequest->Clear();
                         };
 
-                        if (LAction == "GetConfiguration") {
+                        LPoint->Messages()->Add(OnRequest, LOperation, Json);
 
-                            CJSON LPayload;
-                            CJSONArray LArray;
-
-                            const auto &LKey = LRequest->Params["key"];
-                            if (!LKey.IsEmpty()) {
-                                LArray.Add(LKey);
-                                LPayload.Object().AddPair("key", LArray);
-                            }
-
-                            LPoint->Messages()->Add(OnRequest, LAction, LPayload);
-
-                            return;
-                        }
+                        return;
                     }
                 }
 
                 AConnection->SendStockReply(CHTTPReply::not_found);
             } catch (std::exception &e) {
                 ReplyError(AConnection, CHTTPReply::internal_server_error, e.what());
-                Log()->Error(APP_LOG_EMERG, 0, e.what());
             }
         }
         //--------------------------------------------------------------------------------------------------------------
@@ -595,6 +687,7 @@ namespace Apostol {
         //--------------------------------------------------------------------------------------------------------------
 
         void CCSService::DoPost(CHTTPServerConnection *AConnection) {
+
             auto LRequest = AConnection->Request();
             auto LReply = AConnection->Reply();
 
@@ -610,238 +703,8 @@ namespace Apostol {
 
             if (LService == "api") {
 
-                if (LPath.Count() < 3) {
-                    AConnection->SendStockReply(CHTTPReply::not_found);
-                    return;
-                }
-
-                const auto& LVersion = LPath[1];
-                const auto& LCommand = LPath[2];
-
-                if (LVersion == "v1") {
-
-                    LReply->ContentType = CHTTPReply::json;
-
-                    try {
-                        CAuthorization Authorization;
-                        if (!CheckAuthorization(AConnection, Authorization)) {
-                            return;
-                        }
-
-                        if (LCommand == "ChargePoint") {
-
-                            if (LPath.Count() < 5) {
-                                AConnection->SendStockReply(CHTTPReply::not_found);
-                                return;
-                            }
-
-                            const auto &LIdentity = LPath[3];
-                            const auto &LAction = LPath[4];
-
-                            auto LPoint = m_CPManager->FindPointByIdentity(LIdentity);
-
-                            if (LPoint == nullptr) {
-                                LReply->Content.Format(R"({"error": {"code": %u, "message": "%s"}})", 300,
-                                                       "Charge point not found.");
-                                AConnection->SendReply(CHTTPReply::ok);
-                                return;
-                            }
-
-                            auto LConnection = LPoint->Connection();
-                            if (LConnection == nullptr) {
-                                LReply->Content.Format(R"({"error": {"code": %u, "message": "%s"}})", 301,
-                                                       "Charge point offline.");
-                                AConnection->SendReply(CHTTPReply::ok);
-                                return;
-                            }
-
-                            if (!LConnection->Connected()) {
-                                LReply->Content.Format(R"({"error": {"code": %u, "message": "%s"}})", 302,
-                                                       "Charge point not connected.");
-                                AConnection->SendReply(CHTTPReply::ok);
-                                return;
-                            }
-
-                            if (LConnection->Protocol() != pWebSocket) {
-                                LReply->Content.Format(R"({"error": {"code": %u, "message": "%s"}})", 303,
-                                                       "Incorrect charge point protocol version.");
-                                AConnection->SendReply(CHTTPReply::ok);
-                                return;
-                            }
-
-                            auto OnRequest = [AConnection](OCPP::CMessageHandler *AHandler, CHTTPServerConnection *AWSConnection) {
-
-                                auto LWSRequest = AWSConnection->WSRequest();
-
-                                if (!AConnection->ClosedGracefully()) {
-
-                                    auto LReply = AConnection->Reply();
-                                    const CString LRequest(LWSRequest->Payload());
-
-                                    CHTTPReply::CStatusType Status = CHTTPReply::ok;
-
-                                    try {
-                                        CJSONMessage LMessage;
-
-                                        if (!CJSONProtocol::Request(LRequest, LMessage)) {
-                                            Status = CHTTPReply::bad_request;
-                                        }
-
-                                        LReply->Content = LMessage.Payload.ToString();
-                                        AConnection->SendReply(Status, nullptr, true);
-                                    } catch (std::exception &e) {
-                                        ReplyError(AConnection, CHTTPReply::internal_server_error, e.what());
-                                        Log()->Error(APP_LOG_EMERG, 0, e.what());
-                                    }
-                                }
-
-                                AWSConnection->ConnectionStatus(csReplySent);
-                                LWSRequest->Clear();
-                            };
-
-                            CJSON LPayload;
-
-                            ContentToJson(LRequest, LPayload);
-
-                            if (LAction == "ChangeConfiguration") {
-
-                                const auto &key = LPayload["key"].AsString();
-                                const auto &value = LPayload["value"].AsString();
-
-                                if (key.IsEmpty()) {
-                                    AConnection->SendStockReply(CHTTPReply::bad_request);
-                                    return;
-                                }
-
-                                if (value.IsEmpty()) {
-                                    AConnection->SendStockReply(CHTTPReply::bad_request);
-                                    return;
-                                }
-
-                                LPoint->Messages()->Add(OnRequest, LAction, LPayload);
-
-                                return;
-
-                            } else if (LAction == "RemoteStartTransaction") {
-
-                                const auto &connectorId = LPayload["connectorId"].AsString();
-                                const auto &idTag = LPayload["idTag"].AsString();
-
-                                if (connectorId.IsEmpty()) {
-                                    AConnection->SendStockReply(CHTTPReply::bad_request);
-                                    return;
-                                }
-
-                                if (idTag.IsEmpty()) {
-                                    AConnection->SendStockReply(CHTTPReply::bad_request);
-                                    return;
-                                }
-
-                                LPoint->Messages()->Add(OnRequest, LAction, LPayload);
-
-                                return;
-
-                            } else if (LAction == "RemoteStopTransaction") {
-
-                                const auto &transactionId = LPayload["transactionId"].AsString();
-
-                                if (transactionId.IsEmpty()) {
-                                    AConnection->SendStockReply(CHTTPReply::bad_request);
-                                    return;
-                                }
-
-                                LPoint->Messages()->Add(OnRequest, LAction, LPayload);
-
-                                return;
-
-                            } else if (LAction == "ReserveNow") {
-
-                                const auto &connectorId = LPayload["connectorId"].AsString();
-                                const auto &expiryDate = LPayload["expiryDate"].AsString();
-                                const auto &idTag = LPayload["idTag"].AsString();
-                                const auto &parentIdTag = LPayload["parentIdTag"].AsString();
-                                const auto &reservationId = LPayload["reservationId"].AsString();
-
-                                if (connectorId.IsEmpty()) {
-                                    AConnection->SendStockReply(CHTTPReply::bad_request);
-                                    return;
-                                }
-
-                                if (expiryDate.IsEmpty()) {
-                                    AConnection->SendStockReply(CHTTPReply::bad_request);
-                                    return;
-                                }
-
-                                if (idTag.IsEmpty()) {
-                                    AConnection->SendStockReply(CHTTPReply::bad_request);
-                                    return;
-                                }
-
-                                if (reservationId.IsEmpty()) {
-                                    AConnection->SendStockReply(CHTTPReply::bad_request);
-                                    return;
-                                }
-
-                                LPoint->Messages()->Add(OnRequest, LAction, LPayload);
-
-                                return;
-
-                            } else if (LAction == "CancelReservation") {
-
-                                const auto &reservationId = LPayload["reservationId"].AsString();
-
-                                if (reservationId.IsEmpty()) {
-                                    AConnection->SendStockReply(CHTTPReply::bad_request);
-                                    return;
-                                }
-
-                                LPoint->Messages()->Add(OnRequest, LAction, LPayload);
-
-                                return;
-                            } else if (LAction == "Reset") {
-
-                                const auto &type = LPayload["type"].AsString();
-
-                                if (type.IsEmpty()) {
-                                    AConnection->SendStockReply(CHTTPReply::bad_request);
-                                    return;
-                                }
-
-                                LPoint->Messages()->Add(OnRequest, LAction, LPayload);
-
-                                return;
-                            } else if (LAction == "TriggerMessage") {
-
-                                const auto &requestedMessage = LPayload["requestedMessage"].AsString();
-
-                                if (requestedMessage.IsEmpty()) {
-                                    AConnection->SendStockReply(CHTTPReply::bad_request);
-                                    return;
-                                }
-
-                                LPoint->Messages()->Add(OnRequest, LAction, LPayload);
-
-                                return;
-                            } else if (LAction == "UnlockConnector") {
-
-                                const auto &connectorId = LPayload["connectorId"].AsString();
-
-                                if (connectorId.IsEmpty()) {
-                                    AConnection->SendStockReply(CHTTPReply::bad_request);
-                                    return;
-                                }
-
-                                LPoint->Messages()->Add(OnRequest, LAction, LPayload);
-
-                                return;
-                            }
-                        }
-                    } catch (Delphi::Exception::Exception &E) {
-                        ExceptionToJson(CHTTPReply::internal_server_error, E, LReply->Content);
-                        AConnection->SendReply(CHTTPReply::internal_server_error);
-                        Log()->Error(APP_LOG_EMERG, 0, E.what());
-                    }
-                }
+                DoAPI(AConnection);
+                return;
 
             } else if (LService == "Ocpp") {
 
@@ -876,7 +739,25 @@ namespace Apostol {
             try {
                 auto LPoint = CChargingPoint::FindOfConnection(AConnection);
 
-                if (!Config()->PostgresConnect()) {
+                if (m_ParseInDataBase) {
+
+                    CJSONMessage jmRequest;
+                    CJSONProtocol::Request(LRequest, jmRequest);
+
+                    if (jmRequest.MessageTypeId == OCPP::mtCall) {
+                        // Обработаем запрос в СУБД
+                        ParseJSON(AConnection, LPoint->Identity(), jmRequest.Action, jmRequest.Payload);
+                    } else {
+                        // Ответ от зарядной станции отправим в обработчик
+                        auto LHandler = LPoint->Messages()->FindMessageById(jmRequest.UniqueId);
+                        if (Assigned(LHandler)) {
+                            LHandler->Handler(AConnection);
+                            delete LHandler;
+                        }
+                        LWSRequest->Clear();
+                    }
+
+                } else {
 
                     CString LResponse;
 
@@ -888,30 +769,18 @@ namespace Apostol {
                     } else {
                         Log()->Error(APP_LOG_EMERG, 0, "Unknown WebSocket request: %s", LRequest.c_str());
                     }
-
-                } else {
-
-                    CJSONMessage jmRequest;
-                    CJSONProtocol::Request(LRequest, jmRequest);
-
-                    if (jmRequest.MessageTypeId == OCPP::mtCall) {
-                        // Обработаем запрос в СУБД
-                        DBParse(AConnection, LPoint->Identity(), jmRequest.Action, jmRequest.Payload);
-                    } else {
-                        // Ответ от зарядной станции отправим в обработчик
-                        auto LHandler = LPoint->Messages()->FindMessageById(jmRequest.UniqueId);
-                        if (Assigned(LHandler)) {
-                            LHandler->Handler(AConnection);
-                            delete LHandler;
-                        }
-                        LWSRequest->Clear();
-                    }
                 }
             } catch (std::exception &e) {
                 //AConnection->SendWebSocketClose();
                 AConnection->Clear();
                 Log()->Error(APP_LOG_EMERG, 0, e.what());
             }
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
+        void CCSService::Initialization(CModuleProcess *AProcess) {
+            CApostolModule::Initialization(AProcess);
+            m_ParseInDataBase = Config()->PostgresConnect();
         }
         //--------------------------------------------------------------------------------------------------------------
 
