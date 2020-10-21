@@ -805,7 +805,6 @@
     });
 
     $('.nav-tabs a[href="#tab-get-diagnostics"]').click(function() {
-        $("input[id='GetDiagnostics-location']").val('ftp://ftpuser:t2SvpWl7ARdf6@plugme.ru/ocpp');
         $(this).tab('show');
     });
 
@@ -868,14 +867,16 @@
     function empty(e) {
         switch (e) {
             case "":
-            case 0:
-            case false:
             case null:
             case undefined:
                 return true;
             default:
                 return false;
         }
+    }
+
+    function NullIfEmpty(value) {
+        return empty(value) ? null : value;
     }
 
     function parseJWT(token) {
@@ -1157,7 +1158,12 @@
             obj = json[x];
 
             for (i in obj) {
-                txt += `<td scope="row">${obj[i]}</td>`;
+                const value = obj[i];
+                if (typeof value === 'object') {
+                    txt += `<td scope="row">${JSON.stringify(value, undefined, 2)}</td>`;
+                } else {
+                    txt += `<td scope="row">${value}</td>`;
+                }
             }
 
             txt += '</tr>';
@@ -1214,7 +1220,7 @@
         let route = `/ChargePoint/${point}/CancelReservation`;
 
         let body = {
-            reservationId: reservationId
+            reservationId: NullIfEmpty(reservationId)
         };
 
         let execute = $("button[id='CancelReservation-execute']");
@@ -1241,8 +1247,8 @@
         let route = `/ChargePoint/${point}/ChangeAvailability`;
 
         let body = {
-            connectorId: connectorId,
-            type: type
+            connectorId: NullIfEmpty(connectorId),
+            type: NullIfEmpty(type)
         };
 
         let execute = $("button[id='ChangeAvailability-execute']");
@@ -1269,8 +1275,8 @@
         let route = `/ChargePoint/${point}/ChangeConfiguration`;
 
         let body = {
-            key: key,
-            value: value
+            key: NullIfEmpty(key),
+            value: NullIfEmpty(value)
         };
 
         let execute = $("button[id='ChangeConfiguration-execute']");
@@ -1319,10 +1325,10 @@
         let route = `/ChargePoint/${point}/ClearChargingProfile`;
 
         let body = {
-            id: id,
-            connectorId: connectorId,
-            chargingProfilePurpose: JSON.parse(empty(chargingProfilePurpose) ? '{}' : chargingProfilePurpose),
-            stackLevel: stackLevel
+            id: NullIfEmpty(id),
+            connectorId: NullIfEmpty(connectorId),
+            chargingProfilePurpose: JSON.parse(empty(chargingProfilePurpose) ? null : chargingProfilePurpose),
+            stackLevel: NullIfEmpty(stackLevel)
         };
 
         let execute = $("button[id='ClearChargingProfile-execute']");
@@ -1350,9 +1356,9 @@
         let route = `/ChargePoint/${point}/DataTransfer`;
 
         let body = {
-            vendorId: vendorId,
-            messageId: messageId,
-            data: data
+            vendorId: NullIfEmpty(vendorId),
+            messageId: NullIfEmpty(messageId),
+            data: NullIfEmpty(data)
         };
 
         let execute = $("button[id='DataTransfer-execute']");
@@ -1380,9 +1386,9 @@
         let route = `/ChargePoint/${point}/GetCompositeSchedule`;
 
         let body = {
-            connectorId: connectorId,
-            duration: duration,
-            chargingRateUnit: chargingRateUnit
+            connectorId: NullIfEmpty(connectorId),
+            duration: NullIfEmpty(duration),
+            chargingRateUnit: NullIfEmpty(chargingRateUnit)
         };
 
         let execute = $("button[id='GetCompositeSchedule-execute']");
@@ -1408,10 +1414,10 @@
         let route = `/ChargePoint/${point}/GetConfiguration`;
 
         let body = {
-            key: key
+            key: NullIfEmpty(key)
         };
 
-        let execute = $("button[id='GetConfiguration-execite']");
+        let execute = $("button[id='GetConfiguration-execute']");
         execute.prop('disabled', true);
 
         TokenFetch(route, 'POST', JSON.stringify(body), {'Content-Type': 'application/json'})
@@ -1438,14 +1444,14 @@
         let route = `/ChargePoint/${point}/GetDiagnostics`;
 
         let body = {
-            location: location,
-            retries: retries,
-            retryInterval: retryInterval,
-            startTime: startTime,
-            stopTime: stopTime
+            location: NullIfEmpty(location),
+            retries: NullIfEmpty(retries),
+            retryInterval: NullIfEmpty(retryInterval),
+            startTime: NullIfEmpty(startTime),
+            stopTime: NullIfEmpty(stopTime)
         };
 
-        let execute = $("button[id='GetDiagnostics-execite']");
+        let execute = $("button[id='GetDiagnostics-execute']");
         execute.prop('disabled', true);
 
         TokenFetch(route, 'POST', JSON.stringify(body), {'Content-Type': 'application/json'})
@@ -1489,8 +1495,8 @@
         let route = `/ChargePoint/${point}/RemoteStartTransaction`;
 
         let body = {
-            connectorId: connectorId,
-            idTag: idTag
+            connectorId: NullIfEmpty(connectorId),
+            idTag: NullIfEmpty(idTag)
         };
 
         let execute = $("button[id='RemoteStartTransaction-execute']");
@@ -1516,7 +1522,7 @@
         let route = `/ChargePoint/${point}/RemoteStopTransaction`;
 
         let body = {
-            transactionId: transactionId
+            transactionId: NullIfEmpty(transactionId)
         };
 
         let execute = $("button[id='RemoteStopTransaction-execute']");
@@ -1546,11 +1552,11 @@
         let route = `/ChargePoint/${point}/ReserveNow`;
 
         let body = {
-            connectorId: connectorId,
-            expiryDate: expiryDate,
-            idTag: idTag,
-            parentIdTag: parentIdTag,
-            reservationId: reservationId
+            connectorId: NullIfEmpty(connectorId),
+            expiryDate: NullIfEmpty(expiryDate),
+            idTag: NullIfEmpty(idTag),
+            parentIdTag: NullIfEmpty(parentIdTag),
+            reservationId: NullIfEmpty(reservationId)
         };
 
         let execute = $("button[id='ReserveNow-execute']");
@@ -1576,7 +1582,7 @@
         let route = `/ChargePoint/${point}/Reset`;
 
         let body = {
-            type: type
+            type: NullIfEmpty(type)
         };
 
         let execute = $("button[id='Reset-execute']");
@@ -1604,9 +1610,9 @@
         let route = `/ChargePoint/${point}/SendLocalList`;
 
         let body = {
-            listVersion: listVersion,
-            localAuthorizationList: JSON.parse(empty(localAuthorizationList) ? '{}' : localAuthorizationList),
-            updateType: updateType
+            listVersion: NullIfEmpty(listVersion),
+            localAuthorizationList: JSON.parse(empty(localAuthorizationList) ? null : localAuthorizationList),
+            updateType: NullIfEmpty(updateType)
         };
 
         let execute = $("button[id='SendLocalList-execute']");
@@ -1633,8 +1639,8 @@
         let route = `/ChargePoint/${point}/SetChargingProfile`;
 
         let body = {
-            connectorId: connectorId,
-            csChargingProfiles: JSON.parse(empty(csChargingProfiles) ? '{}' : csChargingProfiles)
+            connectorId: NullIfEmpty(connectorId),
+            csChargingProfiles: JSON.parse(empty(csChargingProfiles) ? null : csChargingProfiles)
         };
 
         let execute = $("button[id='SetChargingProfile-execute']");
@@ -1661,8 +1667,8 @@
         let route = `/ChargePoint/${point}/TriggerMessage`;
 
         let body = {
-            requestedMessage: requestedMessage,
-            connectorId: connectorId
+            requestedMessage: NullIfEmpty(requestedMessage),
+            connectorId: NullIfEmpty(connectorId)
         };
 
         let execute = $("button[id='TriggerMessage-execute']");
@@ -1688,7 +1694,7 @@
         let route = `/ChargePoint/${point}/UnlockConnector`;
 
         let body = {
-            connectorId: connectorId
+            connectorId: NullIfEmpty(connectorId)
         };
 
         let execute = $("button[id='UnlockConnector-execute']");
@@ -1717,13 +1723,13 @@
         let route = `/ChargePoint/${point}/UpdateFirmware`;
 
         let body = {
-            location: location,
-            retries: retries,
-            retrieveDate: retrieveDate,
-            retryInterval: retryInterval
+            location: NullIfEmpty(location),
+            retries: NullIfEmpty(retries),
+            retrieveDate: NullIfEmpty(retrieveDate),
+            retryInterval: NullIfEmpty(retryInterval)
         };
 
-        let execute = $("button[id='UpdateFirmware-execite']");
+        let execute = $("button[id='UpdateFirmware-execute']");
         execute.prop('disabled', true);
 
         TokenFetch(route, 'POST', JSON.stringify(body), {'Content-Type': 'application/json'})

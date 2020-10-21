@@ -636,8 +636,16 @@ namespace Apostol {
                                         Status = CHTTPReply::bad_request;
                                     }
 
-                                    LReply->Content = LMessage.Payload.ToString();
-                                    AConnection->SendReply(Status, nullptr, true);
+                                    if (LMessage.MessageTypeId == OCPP::mtCallError) {
+                                        ReplyError(AConnection, CHTTPReply::bad_request,
+                                                   CString().Format("%s: %s",
+                                                                    LMessage.ErrorCode.c_str(),
+                                                                    LMessage.ErrorDescription.c_str()
+                                        ));
+                                    } else {
+                                        LReply->Content = LMessage.Payload.ToString();
+                                        AConnection->SendReply(Status, nullptr, true);
+                                    }
                                 } catch (std::exception &e) {
                                     ReplyError(AConnection, CHTTPReply::internal_server_error, e.what());
                                 }
