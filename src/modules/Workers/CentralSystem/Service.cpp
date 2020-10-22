@@ -576,13 +576,21 @@ namespace Apostol {
                         ContentToJson(LRequest, Json);
 
                         const auto &Fields = m_Operations[Index].Value();
-                        const auto &Object = Json.Object();
+                        auto &Object = Json.Object();
 
                         for (int i = 0; i < Object.Count(); i++) {
-                            const auto& Key = Object.Members(i).String();
+
+                            const auto& Member = Object.Members(i);
+                            const auto& Key = Member.String();
+
                             if (Fields.IndexOfName(Key) == -1) {
                                 ReplyError(AConnection, CHTTPReply::bad_request, CString().Format("Invalid key: %s", Key.c_str()));
                                 return;
+                            }
+
+                            const auto& Value = Member.Value();
+                            if (Value.IsNull() || Value.IsEmpty()) {
+                                Object.Delete(i);
                             }
                         }
 
