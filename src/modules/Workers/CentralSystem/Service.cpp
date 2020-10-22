@@ -286,8 +286,10 @@ namespace Apostol {
 
                         const auto& Response = LResult["response"];
 
-                        if (!LResult["result"].AsBoolean())
-                            throw Delphi::Exception::EDBError(Response["error"].AsString().c_str());
+                        if (!LResult["result"].AsBoolean()) {
+                            jmResponse.Payload << Response["error"].ToString();
+                            throw Delphi::Exception::EDBError("Database query execution error.");
+                        }
 
                         jmResponse.Payload << Response.ToString();
                     }
@@ -327,10 +329,7 @@ namespace Apostol {
             const auto& GetSecret = [](const CProvider &Provider, const CString &Application) {
                 const auto &Secret = Provider.Secret(Application);
                 if (Secret.IsEmpty())
-                    throw ExceptionFrm("Not found Secret for \"%s:%s\"",
-                                       Provider.Name.c_str(),
-                                       Application.c_str()
-                    );
+                    throw ExceptionFrm("Not found Secret for \"%s:%s\"", Provider.Name.c_str(), Application.c_str());
                 return Secret;
             };
 
