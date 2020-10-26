@@ -347,7 +347,9 @@ namespace Apostol {
             const auto& Provider = Providers[Index].Value();
 
             const auto& iss = CString(decoded.get_issuer());
-            const CStringList& Issuers = Provider.GetIssuers(Application);
+
+            CStringList Issuers;
+            Provider.GetIssuers(Application, Issuers);
             if (Issuers[iss].IsEmpty())
                 throw jwt::token_verification_exception("Token doesn't contain the required issuer.");
 

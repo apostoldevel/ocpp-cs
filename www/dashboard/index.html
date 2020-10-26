@@ -1003,18 +1003,24 @@
     }
 
     async function CheckResponse(json, status) {
+        let error;
         let message;
         let location;
 
         if (json.hasOwnProperty('error')) {
-            if (json['error'].hasOwnProperty('message')) {
-                message = json["error"]["message"];
+            error = json['error'];
+            if (typeof error === 'object') {
+                message = error["message"];
             } else {
                 message = json["error_description"];
             }
         }
 
         if (status === 400) {
+            if (typeof error === 'string') {
+                token.clear();
+            }
+            window.alert(message);
             return undefined;
         } else if (status === 401) {
             location = '/welcome/';
