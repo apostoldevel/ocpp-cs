@@ -1253,7 +1253,7 @@
         let route = `/ChargePoint/${point}/ChangeAvailability`;
 
         let body = {
-            connectorId: NullIfEmpty(connectorId),
+            connectorId: NullIfEmpty(parseInt(connectorId)),
             type: NullIfEmpty(type)
         };
 
@@ -1331,10 +1331,10 @@
         let route = `/ChargePoint/${point}/ClearChargingProfile`;
 
         let body = {
-            id: NullIfEmpty(id),
-            connectorId: NullIfEmpty(connectorId),
+            id: NullIfEmpty(parseInt(id)),
+            connectorId: NullIfEmpty(parseInt(connectorId)),
             chargingProfilePurpose: JSON.parse(empty(chargingProfilePurpose) ? null : chargingProfilePurpose),
-            stackLevel: NullIfEmpty(stackLevel)
+            stackLevel: NullIfEmpty(parseInt(stackLevel))
         };
 
         let execute = $("button[id='ClearChargingProfile-execute']");
@@ -1392,7 +1392,7 @@
         let route = `/ChargePoint/${point}/GetCompositeSchedule`;
 
         let body = {
-            connectorId: NullIfEmpty(connectorId),
+            connectorId: NullIfEmpty(parseInt(connectorId)),
             duration: NullIfEmpty(duration),
             chargingRateUnit: NullIfEmpty(chargingRateUnit)
         };
@@ -1501,7 +1501,7 @@
         let route = `/ChargePoint/${point}/RemoteStartTransaction`;
 
         let body = {
-            connectorId: NullIfEmpty(connectorId),
+            connectorId: NullIfEmpty(parseInt(connectorId)),
             idTag: NullIfEmpty(idTag)
         };
 
@@ -1528,7 +1528,7 @@
         let route = `/ChargePoint/${point}/RemoteStopTransaction`;
 
         let body = {
-            transactionId: NullIfEmpty(transactionId)
+            transactionId: NullIfEmpty(parseInt(transactionId))
         };
 
         let execute = $("button[id='RemoteStopTransaction-execute']");
@@ -1558,7 +1558,7 @@
         let route = `/ChargePoint/${point}/ReserveNow`;
 
         let body = {
-            connectorId: NullIfEmpty(connectorId),
+            connectorId: NullIfEmpty(parseInt(connectorId)),
             expiryDate: NullIfEmpty(expiryDate),
             idTag: NullIfEmpty(idTag),
             parentIdTag: NullIfEmpty(parentIdTag),
@@ -1645,7 +1645,7 @@
         let route = `/ChargePoint/${point}/SetChargingProfile`;
 
         let body = {
-            connectorId: NullIfEmpty(connectorId),
+            connectorId: NullIfEmpty(parseInt(connectorId)),
             csChargingProfiles: JSON.parse(empty(csChargingProfiles) ? null : csChargingProfiles)
         };
 
@@ -1674,7 +1674,7 @@
 
         let body = {
             requestedMessage: NullIfEmpty(requestedMessage),
-            connectorId: NullIfEmpty(connectorId)
+            connectorId: NullIfEmpty(parseInt(connectorId))
         };
 
         let execute = $("button[id='TriggerMessage-execute']");
@@ -1700,7 +1700,7 @@
         let route = `/ChargePoint/${point}/UnlockConnector`;
 
         let body = {
-            connectorId: NullIfEmpty(connectorId)
+            connectorId: NullIfEmpty(parseInt(connectorId))
         };
 
         let execute = $("button[id='UnlockConnector-execute']");
