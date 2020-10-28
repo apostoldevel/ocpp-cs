@@ -89,6 +89,9 @@ namespace Apostol {
 
             xml_node<> *root = xmlDocument.first_node("s:Envelope");
 
+            if (root == nullptr)
+                throw Delphi::Exception::ExceptionFrm("Invalid SOAP Header.");
+
             xml_node<> *headers = root->first_node("s:Header");
             for (xml_node<> *header = headers->first_node(); header; header = header->next_sibling()) {
                 xml_node<> *address = header->first_node("a:Address");
