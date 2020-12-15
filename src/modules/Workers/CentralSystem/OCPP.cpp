@@ -676,23 +676,23 @@ namespace Apostol {
 
         CMessageHandler *CMessageManager::Add(COnMessageHandlerEvent &&Handler, const CString &Action, const CJSON &Payload) {
 
-            auto LHandler = new CMessageHandler(this, static_cast<COnMessageHandlerEvent &&>(Handler));
-            auto LConnection = m_Point->Connection();
+            auto pHandler = new CMessageHandler(this, static_cast<COnMessageHandlerEvent &&>(Handler));
+            auto pConnection = m_Point->Connection();
 
-            LHandler->Action() = Action;
+            pHandler->Action() = Action;
 
-            CString LResult;
+            CString sResult;
 
-            CJSONProtocol::Call(LHandler->UniqueId(), Action, Payload, LResult);
+            CJSONProtocol::Call(pHandler->UniqueId(), Action, Payload, sResult);
 
-            auto LWSReply = LConnection->WSReply();
+            auto pWSReply = pConnection->WSReply();
 
-            LWSReply->Clear();
-            LWSReply->SetPayload(LResult);
+            pWSReply->Clear();
+            pWSReply->SetPayload(sResult);
 
-            LConnection->SendWebSocket(true);
+            pConnection->SendWebSocket(true);
 
-            return LHandler;
+            return pHandler;
         }
         //--------------------------------------------------------------------------------------------------------------
 
@@ -1036,9 +1036,9 @@ namespace Apostol {
                     return true;
                 }
             } else {
-                auto LHandler = m_Messages->FindMessageById(LRequest.UniqueId);
-                if (Assigned(LHandler)) {
-                    LHandler->Handler(m_pConnection);
+                auto pHandler = m_Messages->FindMessageById(LRequest.UniqueId);
+                if (Assigned(pHandler)) {
+                    pHandler->Handler(m_pConnection);
                     return true;
                 }
             }

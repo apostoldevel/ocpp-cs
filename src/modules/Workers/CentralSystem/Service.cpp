@@ -193,17 +193,17 @@ namespace Apostol {
         void CCSService::DoPointDisconnected(CObject *Sender) {
             auto LConnection = dynamic_cast<CHTTPServerConnection *>(Sender);
             if (LConnection != nullptr) {
-                auto LPoint = CChargingPoint::FindOfConnection(LConnection);
-                if (LPoint != nullptr) {
+                auto pPoint = CChargingPoint::FindOfConnection(LConnection);
+                if (pPoint != nullptr) {
                     if (!LConnection->ClosedGracefully()) {
                         Log()->Message(_T("[%s:%d] Point \"%s\" closed connection."),
                                        LConnection->Socket()->Binding()->PeerIP(),
                                        LConnection->Socket()->Binding()->PeerPort(),
-                                       LPoint->Identity().IsEmpty() ? "(empty)" : LPoint->Identity().c_str()
+                                       pPoint->Identity().IsEmpty() ? "(empty)" : pPoint->Identity().c_str()
                         );
                     }
-                    if (LPoint->UpdateCount() == 0) {
-                        delete LPoint;
+                    if (pPoint->UpdateCount() == 0) {
+                        delete pPoint;
                     }
                 } else {
                     if (!LConnection->ClosedGracefully()) {
@@ -224,16 +224,16 @@ namespace Apostol {
             if (AConnection->ClosedGracefully())
                 return;
 
-            auto LWSRequest = AConnection->WSRequest();
-            auto LWSReply = AConnection->WSReply();
+            auto pWSRequest = AConnection->WSRequest();
+            auto pWSReply = AConnection->WSReply();
 
-            const CString LRequest(LWSRequest->Payload());
+            const CString pRequest(pWSRequest->Payload());
 
             CJSONMessage jmRequest;
-            CJSONProtocol::Request(LRequest, jmRequest);
+            CJSONProtocol::Request(pRequest, jmRequest);
 
             CJSONMessage jmResponse;
-            CString LResponse;
+            CString sResponse;
 
             CJSON LResult;
 
@@ -243,9 +243,9 @@ namespace Apostol {
             jmResponse.ErrorCode = "InternalError";
             jmResponse.ErrorDescription = E.what();
 
-            CJSONProtocol::Response(jmResponse, LResponse);
+            CJSONProtocol::Response(jmResponse, sResponse);
 
-            LWSReply->SetPayload(LResponse);
+            pWSReply->SetPayload(sResponse);
             AConnection->SendWebSocket(true);
         }
         //--------------------------------------------------------------------------------------------------------------
@@ -260,16 +260,16 @@ namespace Apostol {
 
                 CPQResult *Result;
 
-                auto LWSRequest = AConnection->WSRequest();
-                auto LWSReply = AConnection->WSReply();
+                auto pWSRequest = AConnection->WSRequest();
+                auto pWSReply = AConnection->WSReply();
 
-                const CString LRequest(LWSRequest->Payload());
+                const CString pRequest(pWSRequest->Payload());
 
                 CJSONMessage jmRequest;
-                CJSONProtocol::Request(LRequest, jmRequest);
+                CJSONProtocol::Request(pRequest, jmRequest);
 
                 CJSONMessage jmResponse;
-                CString LResponse;
+                CString sResponse;
 
                 CJSON LResult;
 
@@ -301,9 +301,9 @@ namespace Apostol {
                     Log()->Error(APP_LOG_EMERG, 0, E.what());
                 }
 
-                CJSONProtocol::Response(jmResponse, LResponse);
+                CJSONProtocol::Response(jmResponse, sResponse);
 
-                LWSReply->SetPayload(LResponse);
+                pWSReply->SetPayload(sResponse);
                 AConnection->SendWebSocket(true);
             };
 
@@ -404,10 +404,10 @@ namespace Apostol {
 
         bool CCSService::CheckAuthorization(CHTTPServerConnection *AConnection, CAuthorization &Authorization) {
 
-            auto LRequest = AConnection->Request();
+            auto pRequest = AConnection->Request();
 
             try {
-                if (CheckAuthorizationData(LRequest, Authorization)) {
+                if (CheckAuthorizationData(pRequest, Authorization)) {
                     if (Authorization.Schema == CAuthorization::asBearer) {
                         VerifyToken(Authorization.Token);
                         return true;
@@ -434,42 +434,42 @@ namespace Apostol {
 
         void CCSService::DoOCPP(CHTTPServerConnection *AConnection) {
 
-            auto LRequest = AConnection->Request();
-            auto LReply = AConnection->Reply();
+            auto pRequest = AConnection->Request();
+            auto pReply = AConnection->Reply();
 
-            LReply->ContentType = CHTTPReply::html;
+            pReply->ContentType = CHTTPReply::html;
 
-            CStringList LPath;
-            SplitColumns(LRequest->Location.pathname, LPath, '/');
+            CStringList slPath;
+            SplitColumns(pRequest->Location.pathname, slPath, '/');
 
-            if (LPath.Count() < 2) {
+            if (slPath.Count() < 2) {
                 AConnection->SendStockReply(CHTTPReply::not_found);
                 return;
             }
 
-            const CString& LSecWebSocketKey = LRequest->Headers.Values("sec-websocket-key");
-            if (LSecWebSocketKey.IsEmpty()) {
+            const auto& caSecWebSocketKey = pRequest->Headers.Values("sec-websocket-key");
+            if (caSecWebSocketKey.IsEmpty()) {
                 AConnection->SendStockReply(CHTTPReply::bad_request);
                 return;
             }
 
-            const auto& LIdentity = LPath[1];
-            const CString LAccept(SHA1(LSecWebSocketKey + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"));
-            const auto& LSecWebSocketProtocol = LRequest->Headers.Values("sec-websocket-protocol");
-            const CString LProtocol(LSecWebSocketProtocol.IsEmpty() ? "" : LSecWebSocketProtocol.SubString(0, LSecWebSocketProtocol.Find(',')));
+            const auto& caIdentity = slPath[1];
+            const CString csAccept(SHA1(caSecWebSocketKey + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"));
+            const auto& caSecWebSocketProtocol = pRequest->Headers.Values("sec-websocket-protocol");
+            const CString csProtocol(caSecWebSocketProtocol.IsEmpty() ? "" : caSecWebSocketProtocol.SubString(0, caSecWebSocketProtocol.Find(',')));
 
-            AConnection->SwitchingProtocols(LAccept, LProtocol);
+            AConnection->SwitchingProtocols(csAccept, csProtocol);
 
-            auto LPoint = m_CPManager->FindPointByIdentity(LIdentity);
+            auto pPoint = m_CPManager->FindPointByIdentity(caIdentity);
 
-            if (LPoint == nullptr) {
-                LPoint = m_CPManager->Add(AConnection);
-                LPoint->Identity() = LIdentity;
+            if (pPoint == nullptr) {
+                pPoint = m_CPManager->Add(AConnection);
+                pPoint->Identity() = caIdentity;
             } else {
-                LPoint->SwitchConnection(AConnection);
+                pPoint->SwitchConnection(AConnection);
             }
 
-            LPoint->Address() = GetHost(AConnection);
+            pPoint->Address() = GetHost(AConnection);
 
 #if defined(_GLIBCXX_RELEASE) && (_GLIBCXX_RELEASE >= 9)
             AConnection->OnDisconnected([this](auto && Sender) { DoPointDisconnected(Sender); });
@@ -481,45 +481,45 @@ namespace Apostol {
 
         void CCSService::DoAPI(CHTTPServerConnection *AConnection) {
 
-            auto LRequest = AConnection->Request();
-            auto LReply = AConnection->Reply();
+            auto pRequest = AConnection->Request();
+            auto pReply = AConnection->Reply();
 
-            CStringList LPath;
-            SplitColumns(LRequest->Location.pathname, LPath, '/');
+            CStringList slPath;
+            SplitColumns(pRequest->Location.pathname, slPath, '/');
 
-            if (LPath.Count() == 0) {
+            if (slPath.Count() == 0) {
                 AConnection->SendStockReply(CHTTPReply::not_found);
                 return;
             }
 
-            const auto &LService = LPath[0];
+            const auto &caService = slPath[0];
 
-            if (LPath.Count() < 3) {
+            if (slPath.Count() < 3) {
                 AConnection->SendStockReply(CHTTPReply::not_found);
                 return;
             }
 
-            const auto &LVersion = LPath[1];
-            const auto &LCommand = LPath[2];
+            const auto &caVersion = slPath[1];
+            const auto &caCommand = slPath[2];
 
             try {
 
-                if (LVersion == "v1") {
+                if (caVersion == "v1") {
 
-                    LReply->ContentType = CHTTPReply::json;
+                    pReply->ContentType = CHTTPReply::json;
 
-                    if (LCommand == "ping") {
+                    if (caCommand == "ping") {
 
                         AConnection->SendStockReply(CHTTPReply::ok);
                         return;
 
-                    } else if (LCommand == "time") {
+                    } else if (caCommand == "time") {
 
-                        LReply->Content << "{\"serverTime\": " << LongToString(MsEpoch()) << "}";
+                        pReply->Content << "{\"serverTime\": " << LongToString(MsEpoch()) << "}";
                         AConnection->SendReply(CHTTPReply::ok);
                         return;
 
-                    } else if (LCommand == "ChargePointList") {
+                    } else if (caCommand == "ChargePointList") {
 
                         CJSONObject jsonObject;
                         CJSONValue jsonArray(jvtArray);
@@ -528,15 +528,15 @@ namespace Apostol {
                             CJSONValue jsonPoint(jvtObject);
                             CJSONValue jsonConnection(jvtObject);
 
-                            auto LPoint = m_CPManager->Points(i);
+                            auto pPoint = m_CPManager->Points(i);
 
-                            jsonPoint.Object().AddPair("Identity", LPoint->Identity());
-                            jsonPoint.Object().AddPair("Address", LPoint->Address());
+                            jsonPoint.Object().AddPair("Identity", pPoint->Identity());
+                            jsonPoint.Object().AddPair("Address", pPoint->Address());
 
-                            if (LPoint->Connection()->Connected()) {
-                                jsonConnection.Object().AddPair("Socket", LPoint->Connection()->Socket()->Binding()->Handle());
-                                jsonConnection.Object().AddPair("IP", LPoint->Connection()->Socket()->Binding()->PeerIP());
-                                jsonConnection.Object().AddPair("Port", LPoint->Connection()->Socket()->Binding()->PeerPort());
+                            if (pPoint->Connection()->Connected()) {
+                                jsonConnection.Object().AddPair("Socket", pPoint->Connection()->Socket()->Binding()->Handle());
+                                jsonConnection.Object().AddPair("IP", pPoint->Connection()->Socket()->Binding()->PeerIP());
+                                jsonConnection.Object().AddPair("Port", pPoint->Connection()->Socket()->Binding()->PeerPort());
 
                                 jsonPoint.Object().AddPair("Connection", jsonConnection);
                             }
@@ -546,35 +546,35 @@ namespace Apostol {
 
                         jsonObject.AddPair("ChargePointList", jsonArray);
 
-                        LReply->Content = jsonObject.ToString();
+                        pReply->Content = jsonObject.ToString();
 
                         AConnection->SendReply(CHTTPReply::ok);
 
                         return;
 
-                    } else if (LCommand == "ChargePoint") {
+                    } else if (caCommand == "ChargePoint") {
 
                         CAuthorization Authorization;
                         if (!CheckAuthorization(AConnection, Authorization)) {
                             return;
                         }
 
-                        if (LPath.Count() < 5) {
+                        if (slPath.Count() < 5) {
                             AConnection->SendStockReply(CHTTPReply::not_found);
                             return;
                         }
 
-                        const auto &LIdentity = LPath[3];
-                        const auto &LOperation = LPath[4];
+                        const auto &caIdentity = slPath[3];
+                        const auto &caOperation = slPath[4];
 
-                        const auto Index = m_Operations.IndexOfName(LOperation);
+                        const auto Index = m_Operations.IndexOfName(caOperation);
                         if (Index == -1) {
-                            ReplyError(AConnection, CHTTPReply::bad_request, CString().Format("Invalid operation: %s", LOperation.c_str()));
+                            ReplyError(AConnection, CHTTPReply::bad_request, CString().Format("Invalid operation: %s", caOperation.c_str()));
                             return;
                         }
 
                         CJSON Json;
-                        ContentToJson(LRequest, Json);
+                        ContentToJson(pRequest, Json);
 
                         const auto &Fields = m_Operations[Index].Value();
                         auto &Object = Json.Object();
@@ -604,14 +604,14 @@ namespace Apostol {
                             }
                         }
 
-                        auto LPoint = m_CPManager->FindPointByIdentity(LIdentity);
+                        auto pPoint = m_CPManager->FindPointByIdentity(caIdentity);
 
-                        if (LPoint == nullptr) {
-                            ReplyError(AConnection, CHTTPReply::bad_request, CString().Format("Not found Charge Point by Identity: %s", LIdentity.c_str()));
+                        if (pPoint == nullptr) {
+                            ReplyError(AConnection, CHTTPReply::bad_request, CString().Format("Not found Charge Point by Identity: %s", caIdentity.c_str()));
                             return;
                         }
 
-                        auto LConnection = LPoint->Connection();
+                        auto LConnection = pPoint->Connection();
                         if (LConnection == nullptr) {
                             ReplyError(AConnection, CHTTPReply::bad_request, "Charge Point offline.");
                             return;
@@ -629,30 +629,30 @@ namespace Apostol {
 
                         auto OnRequest = [AConnection](OCPP::CMessageHandler *AHandler, CHTTPServerConnection *AWSConnection) {
 
-                            auto LWSRequest = AWSConnection->WSRequest();
+                            auto pWSRequest = AWSConnection->WSRequest();
 
                             if (!AConnection->ClosedGracefully()) {
 
-                                auto LReply = AConnection->Reply();
-                                const CString LRequest(LWSRequest->Payload());
+                                auto pReply = AConnection->Reply();
+                                const CString pRequest(pWSRequest->Payload());
 
                                 CHTTPReply::CStatusType Status = CHTTPReply::ok;
 
                                 try {
-                                    CJSONMessage LMessage;
+                                    CJSONMessage jsonMessage;
 
-                                    if (!CJSONProtocol::Request(LRequest, LMessage)) {
+                                    if (!CJSONProtocol::Request(pRequest, jsonMessage)) {
                                         Status = CHTTPReply::bad_request;
                                     }
 
-                                    if (LMessage.MessageTypeId == OCPP::mtCallError) {
+                                    if (jsonMessage.MessageTypeId == OCPP::mtCallError) {
                                         ReplyError(AConnection, CHTTPReply::bad_request,
                                                    CString().Format("%s: %s",
-                                                                    LMessage.ErrorCode.c_str(),
-                                                                    LMessage.ErrorDescription.c_str()
+                                                                    jsonMessage.ErrorCode.c_str(),
+                                                                    jsonMessage.ErrorDescription.c_str()
                                         ));
                                     } else {
-                                        LReply->Content = LMessage.Payload.ToString();
+                                        pReply->Content = jsonMessage.Payload.ToString();
                                         AConnection->SendReply(Status, nullptr, true);
                                     }
                                 } catch (std::exception &e) {
@@ -661,10 +661,10 @@ namespace Apostol {
                             }
 
                             AWSConnection->ConnectionStatus(csReplySent);
-                            LWSRequest->Clear();
+                            pWSRequest->Clear();
                         };
 
-                        LPoint->Messages()->Add(OnRequest, LOperation, Json);
+                        pPoint->Messages()->Add(OnRequest, caOperation, Json);
 
                         return;
                     }
@@ -679,55 +679,55 @@ namespace Apostol {
 
         void CCSService::DoGet(CHTTPServerConnection *AConnection) {
 
-            auto LRequest = AConnection->Request();
+            auto pRequest = AConnection->Request();
 
-            CString LPath(LRequest->Location.pathname);
+            CString sPath(pRequest->Location.pathname);
 
             // Request path must be absolute and not contain "..".
-            if (LPath.empty() || LPath.front() != '/' || LPath.find(_T("..")) != CString::npos) {
+            if (sPath.empty() || sPath.front() != '/' || sPath.find(_T("..")) != CString::npos) {
                 AConnection->SendStockReply(CHTTPReply::bad_request);
                 return;
             }
 
-            if (LPath.SubString(0, 6) == "/ocpp/") {
+            if (sPath.SubString(0, 6) == "/ocpp/") {
                 DoOCPP(AConnection);
                 return;
             }
 
-            if (LPath.SubString(0, 5) == "/api/") {
+            if (sPath.SubString(0, 5) == "/api/") {
                 DoAPI(AConnection);
                 return;
             }
 
-            SendResource(AConnection, LPath);
+            SendResource(AConnection, sPath);
         }
         //--------------------------------------------------------------------------------------------------------------
 
         void CCSService::DoPost(CHTTPServerConnection *AConnection) {
 
-            auto LRequest = AConnection->Request();
-            auto LReply = AConnection->Reply();
+            auto pRequest = AConnection->Request();
+            auto pReply = AConnection->Reply();
 
-            CStringList LPath;
-            SplitColumns(LRequest->Location.pathname, LPath, '/');
+            CStringList slPath;
+            SplitColumns(pRequest->Location.pathname, slPath, '/');
 
-            if (LPath.Count() < 2) {
+            if (slPath.Count() < 2) {
                 AConnection->SendStockReply(CHTTPReply::not_found);
                 return;
             }
 
-            const auto& LService = LPath[0];
+            const auto& caService = slPath[0];
 
-            if (LService == "api") {
+            if (caService == "api") {
 
                 DoAPI(AConnection);
                 return;
 
-            } else if (LService == "Ocpp") {
+            } else if (caService == "Ocpp") {
 
-                auto LPoint = m_CPManager->FindPointByConnection(AConnection);
-                if (LPoint == nullptr) {
-                    LPoint = m_CPManager->Add(AConnection);
+                auto pPoint = m_CPManager->FindPointByConnection(AConnection);
+                if (pPoint == nullptr) {
+                    pPoint = m_CPManager->Add(AConnection);
 #if defined(_GLIBCXX_RELEASE) && (_GLIBCXX_RELEASE >= 9)
                     AConnection->OnDisconnected([this](auto && Sender) { DoPointDisconnected(Sender); });
 #else
@@ -735,7 +735,7 @@ namespace Apostol {
 #endif
                 }
 
-                LPoint->Parse(ptSOAP, LRequest->Content, LReply->Content);
+                pPoint->Parse(ptSOAP, pRequest->Content, pReply->Content);
 
                 AConnection->SendReply(CHTTPReply::ok, "application/soap+xml");
 
@@ -748,43 +748,43 @@ namespace Apostol {
 
         void CCSService::DoWebSocket(CHTTPServerConnection *AConnection) {
 
-            auto LWSRequest = AConnection->WSRequest();
-            auto LWSReply = AConnection->WSReply();
+            auto pWSRequest = AConnection->WSRequest();
+            auto pWSReply = AConnection->WSReply();
 
-            const CString LRequest(LWSRequest->Payload());
+            const CString csRequest(pWSRequest->Payload());
 
             try {
-                auto LPoint = CChargingPoint::FindOfConnection(AConnection);
+                auto pPoint = CChargingPoint::FindOfConnection(AConnection);
 
                 if (m_ParseInDataBase) {
 
                     CJSONMessage jmRequest;
-                    CJSONProtocol::Request(LRequest, jmRequest);
+                    CJSONProtocol::Request(csRequest, jmRequest);
 
                     if (jmRequest.MessageTypeId == OCPP::mtCall) {
                         // Обработаем запрос в СУБД
-                        ParseJSON(AConnection, LPoint->Identity(), jmRequest.Action, jmRequest.Payload);
+                        ParseJSON(AConnection, pPoint->Identity(), jmRequest.Action, jmRequest.Payload);
                     } else {
                         // Ответ от зарядной станции отправим в обработчик
-                        auto LHandler = LPoint->Messages()->FindMessageById(jmRequest.UniqueId);
-                        if (Assigned(LHandler)) {
-                            LHandler->Handler(AConnection);
-                            delete LHandler;
+                        auto pHandler = pPoint->Messages()->FindMessageById(jmRequest.UniqueId);
+                        if (Assigned(pHandler)) {
+                            pHandler->Handler(AConnection);
+                            delete pHandler;
                         }
-                        LWSRequest->Clear();
+                        pWSRequest->Clear();
                     }
 
                 } else {
 
-                    CString LResponse;
+                    CString sResponse;
 
-                    if (LPoint->Parse(ptJSON, LRequest, LResponse)) {
-                        if (!LResponse.IsEmpty()) {
-                            LWSReply->SetPayload(LResponse);
+                    if (pPoint->Parse(ptJSON, csRequest, sResponse)) {
+                        if (!sResponse.IsEmpty()) {
+                            pWSReply->SetPayload(sResponse);
                             AConnection->SendWebSocket();
                         }
                     } else {
-                        Log()->Error(APP_LOG_EMERG, 0, "Unknown WebSocket request: %s", LRequest.c_str());
+                        Log()->Error(APP_LOG_EMERG, 0, "Unknown WebSocket request: %s", csRequest.c_str());
                     }
                 }
             } catch (std::exception &e) {
