@@ -180,36 +180,83 @@ namespace Apostol {
                         throw Delphi::Exception::EDBError(Result->GetErrorMessage());
                 }
             } catch (std::exception &e) {
-                Log()->Error(APP_LOG_EMERG, 0, e.what());
+                Log()->Error(APP_LOG_ERR, 0, e.what());
             }
         }
         //--------------------------------------------------------------------------------------------------------------
 
         void CCSService::DoPostgresQueryException(CPQPollQuery *APollQuery, const Delphi::Exception::Exception &E) {
-            Log()->Error(APP_LOG_EMERG, 0, E.what());
+            Log()->Error(APP_LOG_ERR, 0, E.what());
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
+        void CCSService::SetPointConnected(CChargingPoint *APoint, bool Value) {
+
+            auto OnExecuted = [](CPQPollQuery *APollQuery) {
+
+                CPQResult *Result;
+
+                try {
+                    for (int I = 0; I < APollQuery->Count(); I++) {
+                        Result = APollQuery->Results(I);
+
+                        if (Result->ExecStatus() != PGRES_TUPLES_OK)
+                            throw Delphi::Exception::EDBError(Result->GetErrorMessage());
+
+                    }
+                } catch (Delphi::Exception::Exception &E) {
+                    Log()->Error(APP_LOG_ERR, 0, E.what());
+                }
+            };
+
+            auto OnException = [](CPQPollQuery *APollQuery, const Delphi::Exception::Exception &E) {
+                Log()->Error(APP_LOG_ERR, 0, E.what());
+            };
+
+            CStringList SQL;
+
+            SQL.Add(CString());
+            SQL.Last().Format("SELECT * FROM ocpp.SetChargePointConnected('%s', %s);", APoint->Identity().c_str(), Value ? "true" : "false");
+
+            try {
+                ExecSQL(SQL, nullptr, OnExecuted, OnException);
+            } catch (Delphi::Exception::Exception &E) {
+                Log()->Error(APP_LOG_ERR, 0, E.what());
+            }
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
+        void CCSService::DoPointConnected(CChargingPoint *APoint) {
+            if (m_ParseInDataBase)
+                SetPointConnected(APoint, true);
         }
         //--------------------------------------------------------------------------------------------------------------
 
         void CCSService::DoPointDisconnected(CObject *Sender) {
-            auto LConnection = dynamic_cast<CHTTPServerConnection *>(Sender);
-            if (LConnection != nullptr) {
-                auto pPoint = CChargingPoint::FindOfConnection(LConnection);
+            auto pConnection = dynamic_cast<CHTTPServerConnection *>(Sender);
+            if (pConnection != nullptr) {
+                auto pPoint = CChargingPoint::FindOfConnection(pConnection);
                 if (pPoint != nullptr) {
-                    if (!LConnection->ClosedGracefully()) {
+                    if (m_ParseInDataBase) {
+                        SetPointConnected(pPoint, false);
+                    }
+
+                    if (!pConnection->ClosedGracefully()) {
                         Log()->Message(_T("[%s:%d] Point \"%s\" closed connection."),
-                                       LConnection->Socket()->Binding()->PeerIP(),
-                                       LConnection->Socket()->Binding()->PeerPort(),
+                                       pConnection->Socket()->Binding()->PeerIP(),
+                                       pConnection->Socket()->Binding()->PeerPort(),
                                        pPoint->Identity().IsEmpty() ? "(empty)" : pPoint->Identity().c_str()
                         );
                     }
+
                     if (pPoint->UpdateCount() == 0) {
                         delete pPoint;
                     }
                 } else {
-                    if (!LConnection->ClosedGracefully()) {
+                    if (!pConnection->ClosedGracefully()) {
                         Log()->Message(_T("[%s:%d] Unknown point closed connection."),
-                                       LConnection->Socket()->Binding()->PeerIP(),
-                                       LConnection->Socket()->Binding()->PeerPort()
+                                       pConnection->Socket()->Binding()->PeerIP(),
+                                       pConnection->Socket()->Binding()->PeerPort()
                         );
                     }
                 }
@@ -219,7 +266,7 @@ namespace Apostol {
 
         void CCSService::DoWebSocketError(CHTTPServerConnection *AConnection, const Delphi::Exception::Exception &E) {
 
-            Log()->Error(APP_LOG_EMERG, 0, E.what());
+            Log()->Error(APP_LOG_ERR, 0, E.what());
 
             if (AConnection->ClosedGracefully())
                 return;
@@ -298,7 +345,7 @@ namespace Apostol {
                     jmResponse.ErrorCode = "InternalError";
                     jmResponse.ErrorDescription = E.what();
 
-                    Log()->Error(APP_LOG_EMERG, 0, E.what());
+                    Log()->Error(APP_LOG_ERR, 0, E.what());
                 }
 
                 CJSONProtocol::Response(jmResponse, sResponse);
@@ -471,6 +518,8 @@ namespace Apostol {
 
             pPoint->Address() = GetHost(AConnection);
 
+            DoPointConnected(pPoint);
+
 #if defined(_GLIBCXX_RELEASE) && (_GLIBCXX_RELEASE >= 9)
             AConnection->OnDisconnected([this](auto && Sender) { DoPointDisconnected(Sender); });
 #else
@@ -611,18 +660,18 @@ namespace Apostol {
                             return;
                         }
 
-                        auto LConnection = pPoint->Connection();
-                        if (LConnection == nullptr) {
+                        auto pConnection = pPoint->Connection();
+                        if (pConnection == nullptr) {
                             ReplyError(AConnection, CHTTPReply::bad_request, "Charge Point offline.");
                             return;
                         }
 
-                        if (!LConnection->Connected()) {
+                        if (!pConnection->Connected()) {
                             ReplyError(AConnection, CHTTPReply::bad_request, "Charge Point not connected.");
                             return;
                         }
 
-                        if (LConnection->Protocol() != pWebSocket) {
+                        if (pConnection->Protocol() != pWebSocket) {
                             ReplyError(AConnection, CHTTPReply::bad_request, "Incorrect Charge Point protocol version.");
                             return;
                         }
@@ -719,7 +768,6 @@ namespace Apostol {
             const auto& caService = slPath[0];
 
             if (caService == "api") {
-
                 DoAPI(AConnection);
                 return;
 
@@ -784,13 +832,13 @@ namespace Apostol {
                             AConnection->SendWebSocket();
                         }
                     } else {
-                        Log()->Error(APP_LOG_EMERG, 0, "Unknown WebSocket request: %s", csRequest.c_str());
+                        Log()->Error(APP_LOG_ERR, 0, "Unknown WebSocket request: %s", csRequest.c_str());
                     }
                 }
             } catch (std::exception &e) {
                 //AConnection->SendWebSocketClose();
                 AConnection->Clear();
-                Log()->Error(APP_LOG_EMERG, 0, e.what());
+                Log()->Error(APP_LOG_ERR, 0, e.what());
             }
         }
         //--------------------------------------------------------------------------------------------------------------

@@ -57,6 +57,7 @@ namespace Apostol {
             static bool CheckAuthorizationData(CHTTPRequest *ARequest, CAuthorization &Authorization);
             void VerifyToken(const CString &Token);
 
+            void SetPointConnected(CChargingPoint *APoint, bool Value);
             static void DoWebSocketError(CHTTPServerConnection *AConnection, const Delphi::Exception::Exception &E);
 
         protected:
@@ -69,6 +70,7 @@ namespace Apostol {
 
             void DoOCPP(CHTTPServerConnection *AConnection);
 
+            void DoPointConnected(CChargingPoint *APoint);
             void DoPointDisconnected(CObject *Sender);
 
             void DoPostgresQueryExecuted(CPQPollQuery *APollQuery) override;
