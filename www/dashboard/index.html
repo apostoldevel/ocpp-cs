@@ -903,20 +903,22 @@
 
     class Token {
 
-        constructor(hash) {
-            this.parse(hash);
+        constructor(clientId, accessName, refreshName) {
+            this.clientId = clientId;
+            this.accessName = accessName;
+            this.refreshName = refreshName;
         }
 
-        init(accessToken, refreshToken) {
+        save(accessToken, refreshToken) {
             let success = false;
 
             if (!empty(accessToken)) {
-                localStorage.setItem('accessToken', accessToken);
+                localStorage.setItem(this.accessName, accessToken);
                 success = true;
             }
 
             if (!empty(refreshToken)) {
-                localStorage.setItem('refreshToken', refreshToken);
+                localStorage.setItem(this.refreshName, refreshToken);
                 success = true;
             }
 
@@ -924,31 +926,39 @@
         }
 
         getAccess() {
-            return localStorage.getItem('accessToken');
+            return localStorage.getItem(this.accessName);
         }
 
         getRefresh() {
-            return localStorage.getItem('refreshToken');
+            return localStorage.getItem(this.refreshName);
         }
 
         clear() {
-            localStorage.removeItem('accessToken');
-            localStorage.removeItem('refreshToken');
+            localStorage.removeItem(this.accessName);
+            localStorage.removeItem(this.refreshName);
         }
 
         parse(hash) {
-            if (!empty(hash)) {
-                const search = hash.substr(1);
+            if (empty(hash))
+                return false;
 
-                let params = new URLSearchParams(search);
+            const search = hash.substr(1);
 
-                let access_token = params.get("access_token");
-                let refresh_token = decodeURIComponent(params.get("refresh_token"));
+            let params = new URLSearchParams(search);
 
-                if (this.init(access_token, refresh_token)) {
-                    document.location.hash = '';
-                }
+            let access_token = params.get("access_token");
+            let refresh_token = decodeURIComponent(params.get("refresh_token"));
+
+            return this.save(access_token, refresh_token);
+        }
+
+        async new() {
+            const body = {
+                client_id: this.clientId,
+                grant_type: 'client_credentials',
             }
+
+            return await this.fetchToken(body);
         }
 
         async refresh() {
@@ -958,10 +968,15 @@
                 return false;
 
             const body = {
-                'grant_type': 'refresh_token',
-                'refresh_token': refreshToken
+                client_id: this.clientId,
+                grant_type: 'refresh_token',
+                refresh_token: refreshToken
             }
 
+            return await this.fetchToken(body);
+        }
+
+        async fetchToken(body) {
             const response = await fetch('/oauth2/token', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
@@ -971,12 +986,13 @@
                 credentials: 'omit'
             });
 
-            if (response.ok) {
-                const json = await response.json();
-                return this.init(json['access_token'], json['refresh_token']);
+            if (!response.ok) {
+                this.clear();
+                throw new Error(`Fetch token failed: ${response.statusText}`);
             }
 
-            return false;
+            const json = await response.json();
+            return this.save(json['access_token'], json['refresh_token']);
         }
 
         expired(accessToken) {
@@ -989,6 +1005,16 @@
                 }
             }
             return false;
+        }
+
+        async update() {
+            const accessToken = this.getAccess();
+            if (empty(accessToken))
+                return await this.new();
+            if (this.expired(accessToken)) {
+                return await this.refresh();
+            }
+            return true;
         }
 
         async validate() {
@@ -1026,14 +1052,13 @@
             location = '/welcome/';
         } else if (status === 403) {
             // Refresh token
-            const refresh = await token.refresh();
-            if (!refresh) {
-                location = '/welcome/';
-            }
         } else if (status === 404) {
             location = `/error/404/?error=not_found&error_description=${encodeURIComponent(message)}`;
         } else if (status === 500) {
             location = `/error/500/?error=server_error&error_description=${encodeURIComponent(message)}`;
+        } else if (status === 504) {
+            window.alert(message);
+            return undefined;
         } else {
             location = `/error/?code=${status}&error=invalid_request&error_description=${encodeURIComponent(message)}`;
         }
@@ -1769,7 +1794,11 @@
     })();
 
     $(document).ready(function() {
-        token = new Token(document.location.hash);
+        token = new Token($("meta[name='web-client_id']").attr("content"), 'accessToken', 'refreshToken');
+
+        if (token.parse(document.location.hash)) {
+            window.location.hash = '#';
+        }
 
         ChargePointList();
     });
