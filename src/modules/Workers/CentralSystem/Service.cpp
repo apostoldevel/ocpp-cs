@@ -215,8 +215,7 @@ namespace Apostol {
 
             CStringList SQL;
 
-            SQL.Add(CString());
-            SQL.Last().Format("SELECT * FROM ocpp.SetChargePointConnected('%s', %s);", APoint->Identity().c_str(), Value ? "true" : "false");
+            SQL.Add(CString().Format("SELECT * FROM ocpp.SetChargePointConnected('%s', %s);", APoint->Identity().c_str(), Value ? "true" : "false"));
 
             try {
                 ExecSQL(SQL, nullptr, OnExecuted, OnException);
@@ -235,29 +234,41 @@ namespace Apostol {
         void CCSService::DoPointDisconnected(CObject *Sender) {
             auto pConnection = dynamic_cast<CHTTPServerConnection *>(Sender);
             if (pConnection != nullptr) {
+
+                auto pSocket = pConnection->Socket();
                 auto pPoint = CChargingPoint::FindOfConnection(pConnection);
+
                 if (pPoint != nullptr) {
                     if (m_ParseInDataBase) {
                         SetPointConnected(pPoint, false);
                     }
 
-                    if (!pConnection->ClosedGracefully()) {
-                        Log()->Message(_T("[%s:%d] Point \"%s\" closed connection."),
-                                       pConnection->Socket()->Binding()->PeerIP(),
-                                       pConnection->Socket()->Binding()->PeerPort(),
-                                       pPoint->Identity().IsEmpty() ? "(empty)" : pPoint->Identity().c_str()
-                        );
+                    if (pSocket != nullptr) {
+                        auto pHandle = pSocket->Binding();
+                        if (pHandle != nullptr) {
+                            Log()->Message(_T("[%s:%d] Point \"%s\" closed connection."),
+                                           pHandle->PeerIP(), pHandle->PeerPort(),
+                                           pPoint->Identity().IsEmpty() ? "(empty)" : pPoint->Identity().c_str()
+                            );
+                        }
+                    } else {
+                        Log()->Message(_T("Point \"%s\" closed connection."),
+                                       pPoint->Identity().IsEmpty() ? "(empty)" : pPoint->Identity().c_str());
                     }
 
                     if (pPoint->UpdateCount() == 0) {
                         delete pPoint;
                     }
                 } else {
-                    if (!pConnection->ClosedGracefully()) {
-                        Log()->Message(_T("[%s:%d] Unknown point closed connection."),
-                                       pConnection->Socket()->Binding()->PeerIP(),
-                                       pConnection->Socket()->Binding()->PeerPort()
-                        );
+                    if (pSocket != nullptr) {
+                        auto pHandle = pSocket->Binding();
+                        if (pHandle != nullptr) {
+                            Log()->Message(_T("[%s:%d] Unknown point closed connection."),
+                                           pHandle->PeerIP(), pHandle->PeerPort()
+                            );
+                        }
+                    } else {
+                        Log()->Message(_T("Unknown point closed connection."));
                     }
                 }
             }
@@ -268,103 +279,104 @@ namespace Apostol {
 
             Log()->Error(APP_LOG_ERR, 0, E.what());
 
-            if (AConnection->ClosedGracefully())
-                return;
+            if (AConnection != nullptr && !AConnection->ClosedGracefully()) {
+                auto pWSRequest = AConnection->WSRequest();
+                auto pWSReply = AConnection->WSReply();
 
-            auto pWSRequest = AConnection->WSRequest();
-            auto pWSReply = AConnection->WSReply();
+                const CString csRequest(pWSRequest->Payload());
 
-            const CString pRequest(pWSRequest->Payload());
+                CJSONMessage jmRequest;
+                CJSONProtocol::Request(csRequest, jmRequest);
 
-            CJSONMessage jmRequest;
-            CJSONProtocol::Request(pRequest, jmRequest);
+                CJSONMessage jmResponse;
+                CString sResponse;
 
-            CJSONMessage jmResponse;
-            CString sResponse;
+                CJSON jResult;
 
-            CJSON LResult;
+                CJSONProtocol::PrepareResponse(jmRequest, jmResponse);
 
-            CJSONProtocol::PrepareResponse(jmRequest, jmResponse);
+                jmResponse.MessageTypeId = OCPP::mtCallError;
+                jmResponse.ErrorCode = "InternalError";
+                jmResponse.ErrorDescription = E.what();
 
-            jmResponse.MessageTypeId = OCPP::mtCallError;
-            jmResponse.ErrorCode = "InternalError";
-            jmResponse.ErrorDescription = E.what();
+                CJSONProtocol::Response(jmResponse, sResponse);
 
-            CJSONProtocol::Response(jmResponse, sResponse);
-
-            pWSReply->SetPayload(sResponse);
-            AConnection->SendWebSocket(true);
+                pWSReply->SetPayload(sResponse);
+                AConnection->SendWebSocket(true);
+            }
         }
         //--------------------------------------------------------------------------------------------------------------
 
         void CCSService::ParseJSON(CHTTPServerConnection *AConnection, const CString &Identity, const CString &Action,
                 const CJSON &Payload) {
 
-            auto OnExecuted = [AConnection](CPQPollQuery *APollQuery) {
+            auto OnExecuted = [](CPQPollQuery *APollQuery) {
 
-                if (AConnection->ClosedGracefully())
-                    return;
+                CPQResult *pResult;
 
-                CPQResult *Result;
+                auto pConnection = dynamic_cast<CHTTPServerConnection *>(APollQuery->Binding());
 
-                auto pWSRequest = AConnection->WSRequest();
-                auto pWSReply = AConnection->WSReply();
+                if (pConnection != nullptr && !pConnection->ClosedGracefully()) {
 
-                const CString pRequest(pWSRequest->Payload());
+                    auto pWSRequest = pConnection->WSRequest();
+                    auto pWSReply = pConnection->WSReply();
 
-                CJSONMessage jmRequest;
-                CJSONProtocol::Request(pRequest, jmRequest);
+                    const CString csRequest(pWSRequest->Payload());
 
-                CJSONMessage jmResponse;
-                CString sResponse;
+                    CJSONMessage jmRequest;
+                    CJSONProtocol::Request(csRequest, jmRequest);
 
-                CJSON LResult;
+                    CJSONMessage jmResponse;
+                    CString sResponse;
 
-                CJSONProtocol::PrepareResponse(jmRequest, jmResponse);
+                    CJSON jResult;
 
-                try {
-                    for (int I = 0; I < APollQuery->Count(); I++) {
-                        Result = APollQuery->Results(I);
+                    CJSONProtocol::PrepareResponse(jmRequest, jmResponse);
 
-                        if (Result->ExecStatus() != PGRES_TUPLES_OK)
-                            throw Delphi::Exception::EDBError(Result->GetErrorMessage());
+                    try {
+                        for (int I = 0; I < APollQuery->Count(); I++) {
+                            pResult = APollQuery->Results(I);
 
-                        LResult << Result->GetValue(0, 0);
+                            if (pResult->ExecStatus() != PGRES_TUPLES_OK)
+                                throw Delphi::Exception::EDBError(pResult->GetErrorMessage());
 
-                        const auto& Response = LResult["response"];
+                            jResult << pResult->GetValue(0, 0);
 
-                        if (!LResult["result"].AsBoolean()) {
-                            jmResponse.Payload << Response["error"].ToString();
-                            throw Delphi::Exception::EDBError("Database query execution error.");
+                            const auto &Response = jResult["response"];
+
+                            if (!jResult["result"].AsBoolean()) {
+                                jmResponse.Payload << Response["error"].ToString();
+                                throw Delphi::Exception::EDBError("Database query execution error.");
+                            }
+
+                            jmResponse.Payload << Response.ToString();
                         }
+                    } catch (Delphi::Exception::Exception &E) {
+                        jmResponse.MessageTypeId = OCPP::mtCallError;
+                        jmResponse.ErrorCode = "InternalError";
+                        jmResponse.ErrorDescription = E.what();
 
-                        jmResponse.Payload << Response.ToString();
+                        Log()->Error(APP_LOG_ERR, 0, E.what());
                     }
-                } catch (Delphi::Exception::Exception &E) {
-                    jmResponse.MessageTypeId = OCPP::mtCallError;
-                    jmResponse.ErrorCode = "InternalError";
-                    jmResponse.ErrorDescription = E.what();
 
-                    Log()->Error(APP_LOG_ERR, 0, E.what());
+                    CJSONProtocol::Response(jmResponse, sResponse);
+
+                    pWSReply->SetPayload(sResponse);
+                    pConnection->SendWebSocket(true);
                 }
-
-                CJSONProtocol::Response(jmResponse, sResponse);
-
-                pWSReply->SetPayload(sResponse);
-                AConnection->SendWebSocket(true);
             };
 
-            auto OnException = [AConnection](CPQPollQuery *APollQuery, const Delphi::Exception::Exception &E) {
-                DoWebSocketError(AConnection, E);
+            auto OnException = [](CPQPollQuery *APollQuery, const Delphi::Exception::Exception &E) {
+                auto pConnection = dynamic_cast<CHTTPServerConnection *>(APollQuery->Binding());
+                DoWebSocketError(pConnection, E);
             };
 
             CStringList SQL;
 
-            SQL.Add(CString());
-            SQL.Last().Format("SELECT * FROM ocpp.Parse('%s', '%s', '%s'::jsonb);", Identity.c_str(), Action.c_str(), Payload.ToString().c_str());
+            SQL.Add(CString().Format("SELECT * FROM ocpp.Parse('%s', '%s', '%s'::jsonb);", Identity.c_str(), Action.c_str(), Payload.ToString().c_str()));
 
             try {
-                ExecSQL(SQL, nullptr, OnExecuted, OnException);
+                ExecSQL(SQL, AConnection, OnExecuted, OnException);
             } catch (Delphi::Exception::Exception &E) {
                 DoWebSocketError(AConnection, E);
             }
@@ -376,7 +388,7 @@ namespace Apostol {
             const auto& GetSecret = [](const CProvider &Provider, const CString &Application) {
                 const auto &Secret = Provider.Secret(Application);
                 if (Secret.IsEmpty())
-                    throw ExceptionFrm("Not found Secret for \"%s:%s\"", Provider.Name.c_str(), Application.c_str());
+                    throw ExceptionFrm("Not found secret for \"%s:%s\"", Provider.Name.c_str(), Application.c_str());
                 return Secret;
             };
 
@@ -402,19 +414,19 @@ namespace Apostol {
 
             const auto& alg = decoded.get_algorithm();
 
-            const auto& Secret = GetSecret(Provider, Application);
+            const auto& caSecret = GetSecret(Provider, Application);
 
             if (alg == "HS256") {
                 auto verifier = jwt::verify()
-                        .allow_algorithm(jwt::algorithm::hs256{Secret});
+                        .allow_algorithm(jwt::algorithm::hs256{caSecret});
                 verifier.verify(decoded);
             } else if (alg == "HS384") {
                 auto verifier = jwt::verify()
-                        .allow_algorithm(jwt::algorithm::hs384{Secret});
+                        .allow_algorithm(jwt::algorithm::hs384{caSecret});
                 verifier.verify(decoded);
             } else if (alg == "HS512") {
                 auto verifier = jwt::verify()
-                        .allow_algorithm(jwt::algorithm::hs512{Secret});
+                        .allow_algorithm(jwt::algorithm::hs512{caSecret});
                 verifier.verify(decoded);
             }
         }
@@ -422,15 +434,15 @@ namespace Apostol {
 
         bool CCSService::CheckAuthorizationData(CHTTPRequest *ARequest, CAuthorization &Authorization) {
 
-            const auto &LHeaders = ARequest->Headers;
-            const auto &LCookies = ARequest->Cookies;
+            const auto &caHeaders = ARequest->Headers;
+            const auto &caCookies = ARequest->Cookies;
 
-            const auto &LAuthorization = LHeaders.Values(_T("Authorization"));
+            const auto &caAuthorization = caHeaders.Values(_T("Authorization"));
 
-            if (LAuthorization.IsEmpty()) {
+            if (caAuthorization.IsEmpty()) {
 
-                const auto &headerSession = LHeaders.Values(_T("Session"));
-                const auto &headerSecret = LHeaders.Values(_T("Secret"));
+                const auto &headerSession = caHeaders.Values(_T("Session"));
+                const auto &headerSecret = caHeaders.Values(_T("Secret"));
 
                 Authorization.Username = headerSession;
                 Authorization.Password = headerSecret;
@@ -442,7 +454,7 @@ namespace Apostol {
                 Authorization.Type = CAuthorization::atSession;
 
             } else {
-                Authorization << LAuthorization;
+                Authorization << caAuthorization;
             }
 
             return true;
