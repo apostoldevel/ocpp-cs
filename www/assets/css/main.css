@@ -8,10 +8,6 @@ html {
   height: 100%;
 }
 
-body {
-  padding-top: 56px;
-}
-
 .oauth-container {
   height: 100%;
   display: flex;
