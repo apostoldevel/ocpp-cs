@@ -766,6 +766,13 @@
 <script src="/assets/vendor/bootstrap/4.5.0/js/bootstrap.min.js" integrity="sha384-OgVRvuATP1z7JjHLkuOU7Xw704+h835Lr+6QL9UvYjZE3Ipu6Tp75j7Bh/kR0JKI" crossorigin="anonymous"></script>
 <script src="/assets/vendor/crypto-js/hmac-sha256.js" type="text/javascript"></script>
 <script>
+    const spinner = `<div id="spinner" class="text-center">
+                        <div class="spinner-border" role="status">
+                            <span class="sr-only">Loading...</span>
+                        </div>
+                     </div>
+    `;
+
     let token;
 
     $('.nav-tabs a[href="#tab-charge-point-list"]').click(function() {
@@ -1046,7 +1053,6 @@
             if (typeof error === 'string') {
                 token.clear();
             }
-            window.alert(message);
             return undefined;
         } else if (status === 401) {
             location = '/welcome/';
@@ -1057,7 +1063,6 @@
         } else if (status === 500) {
             location = `/error/500/?error=server_error&error_description=${encodeURIComponent(message)}`;
         } else if (status === 504) {
-            window.alert(message);
             return undefined;
         } else {
             location = `/error/?code=${status}&error=invalid_request&error_description=${encodeURIComponent(message)}`;
@@ -1129,17 +1134,18 @@
      * @return {string}
      */
     function JsonToHTML(json) {
-        return '<pre><code>' + JSON.stringify(json, undefined, 4) + '</code></pre>';
+        return '<pre><code>' + JSON.stringify(json, undefined, 2) + '</code></pre>';
     }
 
-    function JsonToTableOne(json) {
+    function JsonToTableOne(json, small = false) {
+        const base = 'table table-hover table-striped text-monospace';
+        const classes = small ? base + ' table-bordered table-sm' : base;
+
         let i, txt;
 
-        txt = '<table class="table table-sm table-striped">';
+        txt = `<table class="${classes}">`;
         txt += '<thead>';
         txt += '<tr>';
-        txt += '<th scope="col">key</th>';
-        txt += `<th scope="col">value</th>`;
         txt += '</tr>';
         txt += '</thead>';
 
@@ -1148,10 +1154,10 @@
             const value = json[i];
             txt += '<tr>';
             txt += `<th scope="row">${i}</th>`;
-            if (typeof value === 'object') {
-                txt += `<td scope="row">${JSON.stringify(value, undefined, 2)}</td>`;
+            if (value && typeof value === 'object') {
+                txt += `<td scope="row" nowrap>${JsonToTableOne(value, true)}</td>`;
             } else {
-                txt += `<td scope="row">${value}</td>`;
+                txt += `<td scope="row" nowrap>${value}</td>`;
             }
             txt += '</tr>';
         }
@@ -1162,10 +1168,13 @@
         return txt;
     }
 
-    function JsonToTable(json) {
+    function JsonToTable(json, small = false) {
+        const base = 'table table-hover table-striped text-monospace';
+        const classes = small ? base + ' table-bordered table-sm' : base;
+
         let obj, x, i, txt, index;
 
-        txt = '<table class="table table-sm table-hover table-striped">';
+        txt = `<table class="${classes}">`;
         txt += '<thead>';
         txt += '<tr>';
 
@@ -1190,10 +1199,10 @@
 
             for (i in obj) {
                 const value = obj[i];
-                if (typeof value === 'object') {
-                    txt += `<td scope="row">${JSON.stringify(value, undefined, 2)}</td>`;
+                if (value && typeof value === 'object') {
+                    txt += `<td scope="row" nowrap>${JsonToTableOne(value, true)}</td>`;
                 } else {
-                    txt += `<td scope="row">${value}</td>`;
+                    txt += `<td scope="row" onclick="onSelectChargePoint('${obj['Identity']}')" nowrap>${value}</td>`;
                 }
             }
 
@@ -1204,6 +1213,11 @@
         txt += '</table>';
 
         return txt;
+    }
+
+    function onSelectChargePoint(Identity) {
+        const points = $("#ChargePoints");
+        points.val(Identity);
     }
 
     function getFormattedDateTime(date) {
@@ -1254,12 +1268,14 @@
             reservationId: NullIfEmpty(reservationId)
         };
 
+        request.html(spinner);
+
         let execute = $("button[id='CancelReservation-execute']");
         execute.prop('disabled', true);
 
         TokenFetch(route, 'POST', JSON.stringify(body), {'Content-Type': 'application/json'})
             .then((json) => {
-                request.html(JsonToHTML(json));
+                request.html(JsonToTableOne(json));
                 execute.prop('disabled', false);
             })
             .catch((e) => {
@@ -1282,12 +1298,14 @@
             type: NullIfEmpty(type)
         };
 
+        request.html(spinner);
+
         let execute = $("button[id='ChangeAvailability-execute']");
         execute.prop('disabled', true);
 
         TokenFetch(route, 'POST', JSON.stringify(body), {'Content-Type': 'application/json'})
             .then((json) => {
-                request.html(JsonToHTML(json));
+                request.html(JsonToTableOne(json));
                 execute.prop('disabled', false);
             })
             .catch((e) => {
@@ -1310,12 +1328,14 @@
             value: NullIfEmpty(value)
         };
 
+        request.html(spinner);
+
         let execute = $("button[id='ChangeConfiguration-execute']");
         execute.prop('disabled', true);
 
         TokenFetch(route, 'POST', JSON.stringify(body), {'Content-Type': 'application/json'})
             .then((json) => {
-                request.html(JsonToHTML(json));
+                request.html(JsonToTableOne(json));
                 execute.prop('disabled', false);
             })
             .catch((e) => {
@@ -1333,9 +1353,11 @@
         let execute = $("button[id='ClearCache-execute']");
         execute.prop('disabled', true);
 
+        request.html(spinner);
+
         TokenFetch(route, 'POST')
             .then((json) => {
-                request.html(JsonToHTML(json));
+                request.html(JsonToTableOne(json));
                 execute.prop('disabled', false);
             })
             .catch((e) => {
@@ -1362,12 +1384,14 @@
             stackLevel: NullIfEmpty(parseInt(stackLevel))
         };
 
+        request.html(spinner);
+
         let execute = $("button[id='ClearChargingProfile-execute']");
         execute.prop('disabled', true);
 
         TokenFetch(route, 'POST', JSON.stringify(body), {'Content-Type': 'application/json'})
             .then((json) => {
-                request.html(JsonToHTML(json));
+                request.html(JsonToTableOne(json));
                 execute.prop('disabled', false);
             })
             .catch((e) => {
@@ -1392,12 +1416,14 @@
             data: NullIfEmpty(data)
         };
 
+        request.html(spinner);
+
         let execute = $("button[id='DataTransfer-execute']");
         execute.prop('disabled', true);
 
         TokenFetch(route, 'POST', JSON.stringify(body), {'Content-Type': 'application/json'})
             .then((json) => {
-                request.html(JsonToHTML(json));
+                request.html(JsonToTableOne(json));
                 execute.prop('disabled', false);
             })
             .catch((e) => {
@@ -1422,12 +1448,14 @@
             chargingRateUnit: NullIfEmpty(chargingRateUnit)
         };
 
+        request.html(spinner);
+
         let execute = $("button[id='GetCompositeSchedule-execute']");
         execute.prop('disabled', true);
 
         TokenFetch(route, 'POST', JSON.stringify(body), {'Content-Type': 'application/json'})
             .then((json) => {
-                request.html(JsonToHTML(json));
+                request.html(JsonToTableOne(json));
                 execute.prop('disabled', false);
             })
             .catch((e) => {
@@ -1448,12 +1476,14 @@
             key: NullIfEmpty(key)
         };
 
+        request.html(spinner);
+
         let execute = $("button[id='GetConfiguration-execute']");
         execute.prop('disabled', true);
 
         TokenFetch(route, 'POST', JSON.stringify(body), {'Content-Type': 'application/json'})
             .then((json) => {
-                request.html(JsonToHTML(json));
+                request.html(JsonToTableOne(json));
                 execute.prop('disabled', false);
             })
             .catch((e) => {
@@ -1482,12 +1512,14 @@
             stopTime: NullIfEmpty(stopTime)
         };
 
+        request.html(spinner);
+
         let execute = $("button[id='GetDiagnostics-execute']");
         execute.prop('disabled', true);
 
         TokenFetch(route, 'POST', JSON.stringify(body), {'Content-Type': 'application/json'})
             .then((json) => {
-                request.html(JsonToHTML(json));
+                request.html(JsonToTableOne(json));
                 execute.prop('disabled', false);
             })
             .catch((e) => {
@@ -1507,7 +1539,7 @@
 
         TokenFetch(route, 'POST')
             .then((json) => {
-                request.html(JsonToHTML(json));
+                request.html(JsonToTableOne(json));
                 execute.prop('disabled', false);
             })
             .catch((e) => {
@@ -1530,12 +1562,14 @@
             idTag: NullIfEmpty(idTag)
         };
 
+        request.html(spinner);
+
         let execute = $("button[id='RemoteStartTransaction-execute']");
         execute.prop('disabled', true);
 
         TokenFetch(route, 'POST', JSON.stringify(body), {'Content-Type': 'application/json'})
             .then((json) => {
-                request.html(JsonToHTML(json));
+                request.html(JsonToTableOne(json));
                 execute.prop('disabled', false);
             })
             .catch((e) => {
@@ -1556,12 +1590,14 @@
             transactionId: NullIfEmpty(parseInt(transactionId))
         };
 
+        request.html(spinner);
+
         let execute = $("button[id='RemoteStopTransaction-execute']");
         execute.prop('disabled', true);
 
         TokenFetch(route, 'POST', JSON.stringify(body), {'Content-Type': 'application/json'})
             .then((json) => {
-                request.html(JsonToHTML(json));
+                request.html(JsonToTableOne(json));
                 execute.prop('disabled', false);
             })
             .catch((e) => {
@@ -1590,12 +1626,14 @@
             reservationId: NullIfEmpty(reservationId)
         };
 
+        request.html(spinner);
+
         let execute = $("button[id='ReserveNow-execute']");
         execute.prop('disabled', true);
 
         TokenFetch(route, 'POST', JSON.stringify(body), {'Content-Type': 'application/json'})
             .then((json) => {
-                request.html(JsonToHTML(json));
+                request.html(JsonToTableOne(json));
                 execute.prop('disabled', false);
             })
             .catch((e) => {
@@ -1616,12 +1654,14 @@
             type: NullIfEmpty(type)
         };
 
+        request.html(spinner);
+
         let execute = $("button[id='Reset-execute']");
         execute.prop('disabled', true);
 
         TokenFetch(route, 'POST', JSON.stringify(body), {'Content-Type': 'application/json'})
             .then((json) => {
-                request.html(JsonToHTML(json));
+                request.html(JsonToTableOne(json));
                 execute.prop('disabled', false);
             })
             .catch((e) => {
@@ -1646,12 +1686,14 @@
             updateType: NullIfEmpty(updateType)
         };
 
+        request.html(spinner);
+
         let execute = $("button[id='SendLocalList-execute']");
         execute.prop('disabled', true);
 
         TokenFetch(route, 'POST', JSON.stringify(body), {'Content-Type': 'application/json'})
             .then((json) => {
-                request.html(JsonToHTML(json));
+                request.html(JsonToTableOne(json));
                 execute.prop('disabled', false);
             })
             .catch((e) => {
@@ -1674,12 +1716,14 @@
             csChargingProfiles: JSON.parse(empty(csChargingProfiles) ? null : csChargingProfiles)
         };
 
+        request.html(spinner);
+
         let execute = $("button[id='SetChargingProfile-execute']");
         execute.prop('disabled', true);
 
         TokenFetch(route, 'POST', JSON.stringify(body), {'Content-Type': 'application/json'})
             .then((json) => {
-                request.html(JsonToHTML(json));
+                request.html(JsonToTableOne(json));
                 execute.prop('disabled', false);
             })
             .catch((e) => {
@@ -1702,12 +1746,14 @@
             connectorId: NullIfEmpty(parseInt(connectorId))
         };
 
+        request.html(spinner);
+
         let execute = $("button[id='TriggerMessage-execute']");
         execute.prop('disabled', true);
 
         TokenFetch(route, 'POST', JSON.stringify(body), {'Content-Type': 'application/json'})
             .then((json) => {
-                request.html(JsonToHTML(json));
+                request.html(JsonToTableOne(json));
                 execute.prop('disabled', false);
             })
             .catch((e) => {
@@ -1728,12 +1774,14 @@
             connectorId: NullIfEmpty(parseInt(connectorId))
         };
 
+        request.html(spinner);
+
         let execute = $("button[id='UnlockConnector-execute']");
         execute.prop('disabled', true);
 
         TokenFetch(route, 'POST', JSON.stringify(body), {'Content-Type': 'application/json'})
             .then((json) => {
-                request.html(JsonToHTML(json));
+                request.html(JsonToTableOne(json));
                 execute.prop('disabled', false);
             })
             .catch((e) => {
@@ -1760,12 +1808,14 @@
             retryInterval: NullIfEmpty(retryInterval)
         };
 
+        request.html(spinner);
+
         let execute = $("button[id='UpdateFirmware-execute']");
         execute.prop('disabled', true);
 
         TokenFetch(route, 'POST', JSON.stringify(body), {'Content-Type': 'application/json'})
             .then((json) => {
-                request.html(JsonToHTML(json));
+                request.html(JsonToTableOne(json));
                 execute.prop('disabled', false);
             })
             .catch((e) => {
