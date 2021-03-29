@@ -1,16 +1,15 @@
 * { -webkit-box-sizing: border-box; -moz-box-sizing: border-box; box-sizing: border-box; outline: none !important }
 :after, :before { -webkit-box-sizing: border-box; -moz-box-sizing: border-box; box-sizing: border-box }
 
-html { 
+html {
   -webkit-text-size-adjust: 100%;
-  -ms-text-size-adjust: 100%; 
+  -ms-text-size-adjust: 100%;
   -webkit-tap-highlight-color: rgba(0, 0, 0, 0);
   height: 100%;
 }
 
 body {
-  font-family: roboto, 'Noto Sans Myanmar UI', ALSStory, Helvetica, 'Tahoma', Arial, sans-serif;
-  height: 100%;
+  padding-top: 56px;
 }
 
 .oauth-container {
@@ -25,6 +24,19 @@ body {
   min-height: 500px;
   padding: 25px;
   margin: 0 auto;
+}
+.confirm-email {
+  width: 650px;
+  min-height: 500px;
+  padding: 25px;
+  margin: 0 auto;
+}
+
+.confirm-email-text {
+  font-weight: 700;
+  font-size: 26px;
+  color: #27343b;
+  margin-bottom: 5px;
 }
 
 .display-4 {
@@ -149,4 +161,30 @@ span.buttonText {
   font-weight: bold;
   /* Use the Roboto font that is loaded in the <head> */
   font-family: 'Roboto', sans-serif;
+}
+
+.alert-arrow {
+  border: 1px solid #60c060;
+  color: #54a754;
+}
+.alert-arrow .alert-icon {
+  position: relative;
+  width: 3rem;
+  background-color: #60c060;
+}
+.alert-arrow .alert-icon::after {
+  content: "";
+  position: absolute;
+  width: 0;
+  height: 0;
+  border-top: .75rem solid transparent;
+  border-bottom: .75rem solid transparent;
+  border-left: .75rem solid #60c060;
+  right: -.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+}
+.alert-arrow .close {
+  font-size: 1rem;
+  color: #cacaca;
 }
