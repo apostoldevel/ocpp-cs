@@ -9,7 +9,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 
     <!-- SignIn -->
-    <meta name="signin-scope" content="api">
+    <meta name="signin-scope" content="plugme">
     <meta name="signin-client_id" content="ocpp-plugme.ru">
 
     <title>Авторизация | Plugme (OCPP)</title>
@@ -91,7 +91,7 @@
             //redirect_uri: 'http://ocpp.plugme.ru/dashboard/',
             redirect_uri: 'http://localhost:9220/dashboard/',
             response_type: 'token',
-            scope: 'api',
+            scope: $("meta[name='signin-scope']").attr("content"),
             state: 'SignIn'
         };
 
