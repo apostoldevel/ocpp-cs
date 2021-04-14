@@ -677,7 +677,7 @@ namespace Apostol {
         CMessageHandler *CMessageManager::Add(COnMessageHandlerEvent &&Handler, const CString &Action, const CJSON &Payload) {
 
             auto pHandler = new CMessageHandler(this, static_cast<COnMessageHandlerEvent &&>(Handler));
-            auto pConnection = m_Point->Connection();
+            auto pConnection = m_pPoint->Connection();
 
             pHandler->Action() = Action;
 
@@ -697,12 +697,12 @@ namespace Apostol {
         //--------------------------------------------------------------------------------------------------------------
 
         CMessageHandler *CMessageManager::FindMessageById(const CString &Value) {
-            CMessageHandler *Handler = nullptr;
+            CMessageHandler *pHandler;
 
             for (int I = 0; I < Count(); ++I) {
-                Handler = Get(I);
-                if (Handler->UniqueId() == Value)
-                    return Handler;
+                pHandler = Get(I);
+                if (pHandler->UniqueId() == Value)
+                    return pHandler;
             }
 
             return nullptr;
@@ -710,10 +710,10 @@ namespace Apostol {
         //--------------------------------------------------------------------------------------------------------------
 
         void CMessageManager::SendAll(CHTTPServerConnection *AConnection) {
-            CMessageHandler *Handler = nullptr;
+            CMessageHandler *pHandler;
             for (int I = 0; I < Count(); ++I) {
-                Handler = Get(I);
-                Handler->Handler(AConnection);
+                pHandler = Get(I);
+                pHandler->Handler(AConnection);
             }
         }
 
@@ -727,7 +727,7 @@ namespace Apostol {
             m_pConnection = AConnection;
             m_TransactionId = 0;
             m_UpdateCount = 0;
-            m_Messages = new CMessageManager(this);
+            m_pMessages = new CMessageManager(this);
             AddToConnection(AConnection);
         }
         //--------------------------------------------------------------------------------------------------------------
@@ -735,7 +735,7 @@ namespace Apostol {
         CChargingPoint::~CChargingPoint() {
             DeleteFromConnection(m_pConnection);
             m_pConnection = nullptr;
-            FreeAndNil(m_Messages);
+            FreeAndNil(m_pMessages);
         }
         //--------------------------------------------------------------------------------------------------------------
 
@@ -1036,7 +1036,7 @@ namespace Apostol {
                     return true;
                 }
             } else {
-                auto pHandler = m_Messages->FindMessageById(LRequest.UniqueId);
+                auto pHandler = m_pMessages->FindMessageById(LRequest.UniqueId);
                 if (Assigned(pHandler)) {
                     pHandler->Handler(m_pConnection);
                     return true;

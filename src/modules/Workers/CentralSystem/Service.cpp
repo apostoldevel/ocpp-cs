@@ -43,10 +43,10 @@ namespace Apostol {
         //--------------------------------------------------------------------------------------------------------------
 
         CCSService::CCSService(CModuleProcess *AProcess) : CApostolModule(AProcess, "ocpp central system service") {
-            m_CPManager = new CChargingPointManager();
+            m_pManager = new CChargingPointManager();
             m_Headers.Add("Authorization");
 
-            m_ParseInDataBase = false;
+            m_bParseInDataBase = false;
 
             CCSService::InitMethods();
             InitOperations();
@@ -54,7 +54,7 @@ namespace Apostol {
         //--------------------------------------------------------------------------------------------------------------
 
         CCSService::~CCSService() {
-            delete m_CPManager;
+            delete m_pManager;
         }
         //--------------------------------------------------------------------------------------------------------------
 
@@ -226,7 +226,7 @@ namespace Apostol {
         //--------------------------------------------------------------------------------------------------------------
 
         void CCSService::DoPointConnected(CChargingPoint *APoint) {
-            if (m_ParseInDataBase)
+            if (m_bParseInDataBase && m_bSetConnected)
                 SetPointConnected(APoint, true);
         }
         //--------------------------------------------------------------------------------------------------------------
@@ -239,7 +239,7 @@ namespace Apostol {
                 auto pPoint = CChargingPoint::FindOfConnection(pConnection);
 
                 if (pPoint != nullptr) {
-                    if (m_ParseInDataBase) {
+                    if (m_bParseInDataBase && m_bSetConnected) {
                         SetPointConnected(pPoint, false);
                     }
 
@@ -519,17 +519,19 @@ namespace Apostol {
 
             AConnection->SwitchingProtocols(csAccept, csProtocol);
 
-            auto pPoint = m_CPManager->FindPointByIdentity(caIdentity);
+            auto pPoint = m_pManager->FindPointByIdentity(caIdentity);
 
             if (pPoint == nullptr) {
-                pPoint = m_CPManager->Add(AConnection);
+                pPoint = m_pManager->Add(AConnection);
                 pPoint->Identity() = caIdentity;
             } else {
+                m_bSetConnected = false;
                 pPoint->SwitchConnection(AConnection);
             }
 
             pPoint->Address() = GetHost(AConnection);
 
+            m_bSetConnected = true;
             DoPointConnected(pPoint);
 
 #if defined(_GLIBCXX_RELEASE) && (_GLIBCXX_RELEASE >= 9)
@@ -585,11 +587,11 @@ namespace Apostol {
                         CJSONObject jsonObject;
                         CJSONValue jsonArray(jvtArray);
 
-                        for (int i = 0; i < m_CPManager->Count(); i++) {
+                        for (int i = 0; i < m_pManager->Count(); i++) {
                             CJSONValue jsonPoint(jvtObject);
                             CJSONValue jsonConnection(jvtObject);
 
-                            auto pPoint = m_CPManager->Points(i);
+                            auto pPoint = m_pManager->Points(i);
 
                             jsonPoint.Object().AddPair("Identity", pPoint->Identity());
                             jsonPoint.Object().AddPair("Address", pPoint->Address());
@@ -665,7 +667,7 @@ namespace Apostol {
                             }
                         }
 
-                        auto pPoint = m_CPManager->FindPointByIdentity(caIdentity);
+                        auto pPoint = m_pManager->FindPointByIdentity(caIdentity);
 
                         if (pPoint == nullptr) {
                             ReplyError(AConnection, CHTTPReply::bad_request, CString().Format("Not found Charge Point by Identity: %s", caIdentity.c_str()));
@@ -785,9 +787,9 @@ namespace Apostol {
 
             } else if (caService == "Ocpp") {
 
-                auto pPoint = m_CPManager->FindPointByConnection(AConnection);
+                auto pPoint = m_pManager->FindPointByConnection(AConnection);
                 if (pPoint == nullptr) {
-                    pPoint = m_CPManager->Add(AConnection);
+                    pPoint = m_pManager->Add(AConnection);
 #if defined(_GLIBCXX_RELEASE) && (_GLIBCXX_RELEASE >= 9)
                     AConnection->OnDisconnected([this](auto && Sender) { DoPointDisconnected(Sender); });
 #else
@@ -816,7 +818,7 @@ namespace Apostol {
             try {
                 auto pPoint = CChargingPoint::FindOfConnection(AConnection);
 
-                if (m_ParseInDataBase) {
+                if (m_bParseInDataBase) {
 
                     CJSONMessage jmRequest;
                     CJSONProtocol::Request(csRequest, jmRequest);
@@ -857,7 +859,7 @@ namespace Apostol {
 
         void CCSService::Initialization(CModuleProcess *AProcess) {
             CApostolModule::Initialization(AProcess);
-            m_ParseInDataBase = Config()->PostgresConnect();
+            m_bParseInDataBase = Config()->PostgresConnect();
         }
         //--------------------------------------------------------------------------------------------------------------
 

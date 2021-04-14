@@ -491,14 +491,14 @@ namespace Apostol {
 
         private:
 
-            CChargingPoint *m_Point;
+            CChargingPoint *m_pPoint;
 
             CMessageHandler *Get(int Index) const;
             void Set(int Index, CMessageHandler *Value);
 
         public:
 
-            explicit CMessageManager(CChargingPoint *APoint): CCollection(this), m_Point(APoint) {
+            explicit CMessageManager(CChargingPoint *APoint): CCollection(this), m_pPoint(APoint) {
 
             }
 
@@ -532,7 +532,7 @@ namespace Apostol {
 
             CHTTPServerConnection *m_pConnection;
 
-            CMessageManager *m_Messages;
+            CMessageManager *m_pMessages;
 
             CString m_Address;
             CString m_Identity;
@@ -571,7 +571,7 @@ namespace Apostol {
 
             void Connection(CHTTPServerConnection *Value) { m_pConnection = Value; };
 
-            CMessageManager *Messages() { return m_Messages; };
+            CMessageManager *Messages() { return m_pMessages; };
 
             CString &Address() { return m_Address; };
             const CString &Address() const { return m_Address; };
