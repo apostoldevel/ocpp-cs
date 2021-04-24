@@ -388,7 +388,7 @@ namespace Apostol {
             const auto& GetSecret = [](const CProvider &Provider, const CString &Application) {
                 const auto &Secret = Provider.Secret(Application);
                 if (Secret.IsEmpty())
-                    throw ExceptionFrm("Not found secret for \"%s:%s\"", Provider.Name.c_str(), Application.c_str());
+                    throw ExceptionFrm("Not found secret for \"%s:%s\"", Provider.Name().c_str(), Application.c_str());
                 return Secret;
             };
 
