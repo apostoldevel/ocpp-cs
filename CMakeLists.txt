@@ -145,6 +145,7 @@ target_compile_definitions(${CORE_LIB_NAME} PUBLIC
         APP_ERROR_LOG_FILE="logs/error.log"
         APP_ACCESS_LOG_FILE="logs/access.log"
         APP_POSTGRES_LOG_FILE="logs/postgres.log"
+        APP_STREAM_LOG_FILE="logs/stream.log"
         APP_DOC_ROOT="www"
         )
 
