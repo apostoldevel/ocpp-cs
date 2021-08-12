@@ -307,6 +307,58 @@ namespace Apostol {
         }
         //--------------------------------------------------------------------------------------------------------------
 
+        void CCSService::ParseSOAP(CHTTPServerConnection *AConnection, const CString &Payload) {
+
+            auto OnExecuted = [](CPQPollQuery *APollQuery) {
+
+                CPQResult *pResult;
+
+                auto pConnection = dynamic_cast<CHTTPServerConnection *>(APollQuery->Binding());
+
+                if (pConnection != nullptr && !pConnection->ClosedGracefully()) {
+
+                    auto pRequest = pConnection->Request();
+                    auto pReply = pConnection->Reply();
+
+                    try {
+                        for (int i = 0; i < APollQuery->Count(); i++) {
+                            pResult = APollQuery->Results(i);
+
+                            if (pResult->ExecStatus() != PGRES_TUPLES_OK)
+                                throw Delphi::Exception::EDBError(pResult->GetErrorMessage());
+
+                            pReply->ContentType = CHTTPReply::xml;
+
+                            pReply->Content = pResult->GetValue(0, 0);
+
+                            pConnection->SendReply(CHTTPReply::ok, "application/soap+xml", true);
+                        }
+                    } catch (Delphi::Exception::Exception &E) {
+                        ReplyError(pConnection, CHTTPReply::internal_server_error, E.what());
+                        Log()->Error(APP_LOG_ERR, 0, E.what());
+                    }
+
+                    pConnection->CloseConnection(true);
+                }
+            };
+
+            auto OnException = [](CPQPollQuery *APollQuery, const Delphi::Exception::Exception &E) {
+                auto pConnection = dynamic_cast<CHTTPServerConnection *>(APollQuery->Binding());
+                ReplyError(pConnection, CHTTPReply::internal_server_error, E.what());
+            };
+
+            CStringList SQL;
+
+            SQL.Add(CString().Format("SELECT * FROM ocpp.ParseXML('%s'::xml);", Payload.c_str()));
+
+            try {
+                ExecSQL(SQL, AConnection, OnExecuted, OnException);
+            } catch (Delphi::Exception::Exception &E) {
+                ReplyError(AConnection, CHTTPReply::internal_server_error, E.what());
+            }
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
         void CCSService::ParseJSON(CHTTPServerConnection *AConnection, const CString &Identity, const CString &Action,
                 const CJSON &Payload) {
 
@@ -334,22 +386,22 @@ namespace Apostol {
                     CJSONProtocol::PrepareResponse(jmRequest, jmResponse);
 
                     try {
-                        for (int I = 0; I < APollQuery->Count(); I++) {
-                            pResult = APollQuery->Results(I);
+                        for (int i = 0; i < APollQuery->Count(); i++) {
+                            pResult = APollQuery->Results(i);
 
                             if (pResult->ExecStatus() != PGRES_TUPLES_OK)
                                 throw Delphi::Exception::EDBError(pResult->GetErrorMessage());
 
                             jResult << pResult->GetValue(0, 0);
 
-                            const auto &Response = jResult["response"];
+                            const auto &caResponse = jResult["response"];
 
                             if (!jResult["result"].AsBoolean()) {
-                                jmResponse.Payload << Response["error"].ToString();
-                                throw Delphi::Exception::EDBError("Database query execution error.");
+                                jmResponse.Payload << caResponse["error"].ToString();
+                                throw Delphi::Exception::EDBError("Database query execution.");
                             }
 
-                            jmResponse.Payload << Response.ToString();
+                            jmResponse.Payload << caResponse.ToString();
                         }
                     } catch (Delphi::Exception::Exception &E) {
                         jmResponse.MessageTypeId = OCPP::mtCallError;
@@ -491,12 +543,36 @@ namespace Apostol {
         }
         //--------------------------------------------------------------------------------------------------------------
 
-        void CCSService::DoOCPP(CHTTPServerConnection *AConnection) {
+        void CCSService::DoGet(CHTTPServerConnection *AConnection) {
+
+            auto pRequest = AConnection->Request();
+
+            CString sPath(pRequest->Location.pathname);
+
+            // Request path must be absolute and not contain "..".
+            if (sPath.empty() || sPath.front() != '/' || sPath.find(_T("..")) != CString::npos) {
+                AConnection->SendStockReply(CHTTPReply::bad_request);
+                return;
+            }
+
+            if (sPath.SubString(0, 6) == "/ocpp/") {
+                DoOCPP(AConnection);
+                return;
+            }
+
+            if (sPath.SubString(0, 5) == "/api/") {
+                DoAPI(AConnection);
+                return;
+            }
+
+            SendResource(AConnection, sPath);
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
+        void CCSService::DoPost(CHTTPServerConnection *AConnection) {
 
             auto pRequest = AConnection->Request();
             auto pReply = AConnection->Reply();
-
-            pReply->ContentType = CHTTPReply::html;
 
             CStringList slPath;
             SplitColumns(pRequest->Location.pathname, slPath, '/');
@@ -506,39 +582,17 @@ namespace Apostol {
                 return;
             }
 
-            const auto& caSecWebSocketKey = pRequest->Headers.Values("sec-websocket-key");
-            if (caSecWebSocketKey.IsEmpty()) {
-                AConnection->SendStockReply(CHTTPReply::bad_request);
+            const auto& caService = slPath[0];
+
+            if (caService == "api") {
+                DoAPI(AConnection);
+                return;
+            } else if (caService == "Ocpp") {
+                DoSOAP(AConnection);
                 return;
             }
 
-            const auto& caIdentity = slPath[1];
-            const CString csAccept(SHA1(caSecWebSocketKey + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"));
-            const auto& caSecWebSocketProtocol = pRequest->Headers.Values("sec-websocket-protocol");
-            const CString csProtocol(caSecWebSocketProtocol.IsEmpty() ? "" : caSecWebSocketProtocol.SubString(0, caSecWebSocketProtocol.Find(',')));
-
-            AConnection->SwitchingProtocols(csAccept, csProtocol);
-
-            auto pPoint = m_pManager->FindPointByIdentity(caIdentity);
-
-            if (pPoint == nullptr) {
-                pPoint = m_pManager->Add(AConnection);
-                pPoint->Identity() = caIdentity;
-            } else {
-                m_bSetConnected = false;
-                pPoint->SwitchConnection(AConnection);
-            }
-
-            pPoint->Address() = GetHost(AConnection);
-
-            m_bSetConnected = true;
-            DoPointConnected(pPoint);
-
-#if defined(_GLIBCXX_RELEASE) && (_GLIBCXX_RELEASE >= 9)
-            AConnection->OnDisconnected([this](auto && Sender) { DoPointDisconnected(Sender); });
-#else
-            AConnection->OnDisconnected(std::bind(&CCSService::DoPointDisconnected, this, _1));
-#endif
+            AConnection->SendStockReply(CHTTPReply::not_found);
         }
         //--------------------------------------------------------------------------------------------------------------
 
@@ -713,7 +767,7 @@ namespace Apostol {
                                                    CString().Format("%s: %s",
                                                                     jsonMessage.ErrorCode.c_str(),
                                                                     jsonMessage.ErrorDescription.c_str()
-                                        ));
+                                                                    ));
                                     } else {
                                         pReply->Content = jsonMessage.Payload.ToString();
                                         AConnection->SendReply(Status, nullptr, true);
@@ -740,36 +794,37 @@ namespace Apostol {
         }
         //--------------------------------------------------------------------------------------------------------------
 
-        void CCSService::DoGet(CHTTPServerConnection *AConnection) {
-
-            auto pRequest = AConnection->Request();
-
-            CString sPath(pRequest->Location.pathname);
-
-            // Request path must be absolute and not contain "..".
-            if (sPath.empty() || sPath.front() != '/' || sPath.find(_T("..")) != CString::npos) {
-                AConnection->SendStockReply(CHTTPReply::bad_request);
-                return;
-            }
-
-            if (sPath.SubString(0, 6) == "/ocpp/") {
-                DoOCPP(AConnection);
-                return;
-            }
-
-            if (sPath.SubString(0, 5) == "/api/") {
-                DoAPI(AConnection);
-                return;
-            }
-
-            SendResource(AConnection, sPath);
-        }
-        //--------------------------------------------------------------------------------------------------------------
-
-        void CCSService::DoPost(CHTTPServerConnection *AConnection) {
+        void CCSService::DoSOAP(CHTTPServerConnection *AConnection) {
 
             auto pRequest = AConnection->Request();
             auto pReply = AConnection->Reply();
+
+            auto pPoint = m_pManager->FindPointByConnection(AConnection);
+            if (pPoint == nullptr) {
+                pPoint = m_pManager->Add(AConnection);
+#if defined(_GLIBCXX_RELEASE) && (_GLIBCXX_RELEASE >= 9)
+                AConnection->OnDisconnected([this](auto && Sender) { DoPointDisconnected(Sender); });
+#else
+                AConnection->OnDisconnected(std::bind(&CCSService::DoPointDisconnected, this, _1));
+#endif
+            }
+
+            if (m_bParseInDataBase) {
+                // Обработаем запрос в СУБД
+                ParseSOAP(AConnection, pRequest->Content);
+            } else {
+                pPoint->Parse(ptSOAP, pRequest->Content, pReply->Content);
+                AConnection->SendReply(CHTTPReply::ok, "application/soap+xml");
+            }
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
+        void CCSService::DoOCPP(CHTTPServerConnection *AConnection) {
+
+            auto pRequest = AConnection->Request();
+            auto pReply = AConnection->Reply();
+
+            pReply->ContentType = CHTTPReply::html;
 
             CStringList slPath;
             SplitColumns(pRequest->Location.pathname, slPath, '/');
@@ -779,32 +834,39 @@ namespace Apostol {
                 return;
             }
 
-            const auto& caService = slPath[0];
-
-            if (caService == "api") {
-                DoAPI(AConnection);
-                return;
-
-            } else if (caService == "Ocpp") {
-
-                auto pPoint = m_pManager->FindPointByConnection(AConnection);
-                if (pPoint == nullptr) {
-                    pPoint = m_pManager->Add(AConnection);
-#if defined(_GLIBCXX_RELEASE) && (_GLIBCXX_RELEASE >= 9)
-                    AConnection->OnDisconnected([this](auto && Sender) { DoPointDisconnected(Sender); });
-#else
-                    AConnection->OnDisconnected(std::bind(&CCSService::DoPointDisconnected, this, _1));
-#endif
-                }
-
-                pPoint->Parse(ptSOAP, pRequest->Content, pReply->Content);
-
-                AConnection->SendReply(CHTTPReply::ok, "application/soap+xml");
-
+            const auto& caSecWebSocketKey = pRequest->Headers.Values("sec-websocket-key");
+            if (caSecWebSocketKey.IsEmpty()) {
+                AConnection->SendStockReply(CHTTPReply::bad_request);
                 return;
             }
 
-            AConnection->SendStockReply(CHTTPReply::not_found);
+            const auto& caIdentity = slPath[1];
+            const CString csAccept(SHA1(caSecWebSocketKey + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"));
+            const auto& caSecWebSocketProtocol = pRequest->Headers.Values("sec-websocket-protocol");
+            const CString csProtocol(caSecWebSocketProtocol.IsEmpty() ? "" : caSecWebSocketProtocol.SubString(0, caSecWebSocketProtocol.Find(',')));
+
+            AConnection->SwitchingProtocols(csAccept, csProtocol);
+
+            auto pPoint = m_pManager->FindPointByIdentity(caIdentity);
+
+            if (pPoint == nullptr) {
+                pPoint = m_pManager->Add(AConnection);
+                pPoint->Identity() = caIdentity;
+            } else {
+                m_bSetConnected = false;
+                pPoint->SwitchConnection(AConnection);
+            }
+
+            pPoint->Address() = GetHost(AConnection);
+
+            m_bSetConnected = true;
+            DoPointConnected(pPoint);
+
+#if defined(_GLIBCXX_RELEASE) && (_GLIBCXX_RELEASE >= 9)
+            AConnection->OnDisconnected([this](auto && Sender) { DoPointDisconnected(Sender); });
+#else
+            AConnection->OnDisconnected(std::bind(&CCSService::DoPointDisconnected, this, _1));
+#endif
         }
         //--------------------------------------------------------------------------------------------------------------
 

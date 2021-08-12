@@ -54,6 +54,7 @@ namespace Apostol {
             void InitOperations();
 
             void ParseJSON(CHTTPServerConnection *AConnection, const CString &Identity, const CString &Action, const CJSON &Payload);
+            void ParseSOAP(CHTTPServerConnection *AConnection, const CString &Payload);
 
             static bool CheckAuthorizationData(CHTTPRequest *ARequest, CAuthorization &Authorization);
             void VerifyToken(const CString &Token);
@@ -69,6 +70,7 @@ namespace Apostol {
             void DoGet(CHTTPServerConnection *AConnection) override;
             void DoPost(CHTTPServerConnection *AConnection);
 
+            void DoSOAP(CHTTPServerConnection *AConnection);
             void DoOCPP(CHTTPServerConnection *AConnection);
 
             void DoPointConnected(CChargingPoint *APoint);
