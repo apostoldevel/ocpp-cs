@@ -309,7 +309,7 @@ namespace Apostol {
 
         void CCSService::ParseSOAP(CHTTPServerConnection *AConnection, const CString &Payload) {
 
-            auto OnExecuted = [](CPQPollQuery *APollQuery) {
+            auto OnExecuted = [this](CPQPollQuery *APollQuery) {
 
                 CPQResult *pResult;
 
@@ -327,9 +327,34 @@ namespace Apostol {
                             if (pResult->ExecStatus() != PGRES_TUPLES_OK)
                                 throw Delphi::Exception::EDBError(pResult->GetErrorMessage());
 
+                            const CString caIdentity(pResult->GetValue(0, 0));
+                            const CString caAddress(pResult->GetValue(0, 1));
+                            const CString caPayload(pResult->GetValue(0, 2));
+
+                            auto pPoint = m_pManager->FindPointByIdentity(caIdentity);
+
+                            if (pPoint == nullptr) {
+                                pPoint = m_pManager->Add(pConnection);
+                                pPoint->Identity() = caIdentity;
+                            } else {
+                                m_bSetConnected = false;
+                                pPoint->SwitchConnection(pConnection);
+                            }
+
+                            pPoint->Address() = caAddress;
+
+                            m_bSetConnected = true;
+                            DoPointConnected(pPoint);
+
+#if defined(_GLIBCXX_RELEASE) && (_GLIBCXX_RELEASE >= 9)
+                            pConnection->OnDisconnected([this](auto && Sender) { DoPointDisconnected(Sender); });
+#else
+                            pConnection->OnDisconnected(std::bind(&CCSService::DoPointDisconnected, this, _1));
+#endif
                             pReply->ContentType = CHTTPReply::xml;
 
-                            pReply->Content = pResult->GetValue(0, 0);
+                            pReply->Content = R"(<?xml version="1.0" encoding="UTF-8"?>)" LINEFEED;
+                            pReply->Content << caPayload;
 
                             pConnection->SendReply(CHTTPReply::ok, "application/soap+xml", true);
                         }
@@ -338,7 +363,7 @@ namespace Apostol {
                         Log()->Error(APP_LOG_ERR, 0, E.what());
                     }
 
-                    pConnection->CloseConnection(true);
+                    //pConnection->CloseConnection(true);
                 }
             };
 
@@ -799,21 +824,22 @@ namespace Apostol {
             auto pRequest = AConnection->Request();
             auto pReply = AConnection->Reply();
 
-            auto pPoint = m_pManager->FindPointByConnection(AConnection);
-            if (pPoint == nullptr) {
-                pPoint = m_pManager->Add(AConnection);
-#if defined(_GLIBCXX_RELEASE) && (_GLIBCXX_RELEASE >= 9)
-                AConnection->OnDisconnected([this](auto && Sender) { DoPointDisconnected(Sender); });
-#else
-                AConnection->OnDisconnected(std::bind(&CCSService::DoPointDisconnected, this, _1));
-#endif
-            }
-
             if (m_bParseInDataBase) {
                 // Обработаем запрос в СУБД
                 ParseSOAP(AConnection, pRequest->Content);
             } else {
+                auto pPoint = m_pManager->FindPointByConnection(AConnection);
+                if (pPoint == nullptr) {
+                    pPoint = m_pManager->Add(AConnection);
+#if defined(_GLIBCXX_RELEASE) && (_GLIBCXX_RELEASE >= 9)
+                    AConnection->OnDisconnected([this](auto && Sender) { DoPointDisconnected(Sender); });
+#else
+                    AConnection->OnDisconnected(std::bind(&CCSService::DoPointDisconnected, this, _1));
+#endif
+                }
+
                 pPoint->Parse(ptSOAP, pRequest->Content, pReply->Content);
+
                 AConnection->SendReply(CHTTPReply::ok, "application/soap+xml");
             }
         }
