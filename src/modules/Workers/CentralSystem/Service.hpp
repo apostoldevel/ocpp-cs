@@ -70,6 +70,9 @@ namespace Apostol {
 
         protected:
 
+            void DoChargePoint(CHTTPServerConnection *AConnection, const CString &Identity, const CString &Operation);
+            void DoChargePointList(CHTTPServerConnection *AConnection);
+
             void DoWebSocket(CHTTPServerConnection *AConnection);
             void DoAPI(CHTTPServerConnection *AConnection);
 

@@ -334,7 +334,6 @@ namespace Apostol {
 
                     auto pRequest = pConnection->Request();
                     auto pReply = pConnection->Reply();
-                    bool bBootNotification = false;
 
                     try {
                         for (int i = 0; i < APollQuery->Count(); i++) {
@@ -351,36 +350,16 @@ namespace Apostol {
                             if (caIdentity.IsEmpty())
                                 throw Delphi::Exception::EDBError("Identity cannot by empty.");
 
-                            bBootNotification = caAction == "BootNotification";
-
                             auto pPoint = m_PointManager.FindPointByIdentity(caIdentity);
 
                             if (pPoint == nullptr) {
-                                pPoint = m_PointManager.Add(pConnection);
+                                pPoint = m_PointManager.Add(nullptr);
                                 pPoint->Identity() = caIdentity;
                                 pPoint->Address() = caAddress;
-                                bBootNotification = true;
-                            } else {
-                                if (bBootNotification) {
-                                    pPoint->Address() = caAddress;
-                                    pPoint->UpdateConnected(false);
-                                    pPoint->SwitchConnection(pConnection);
-                                }
+                                pPoint->UpdateConnected(true);
+
+                                DoPointConnected(pPoint);
                             }
-                            
-                            if (bBootNotification) {
-                                pRequest->AddHeader(_T("Connection"), _T("keep-alive"));
-
-#if defined(_GLIBCXX_RELEASE) && (_GLIBCXX_RELEASE >= 9)
-                                pConnection->OnDisconnected([this](auto && Sender) { DoPointDisconnected(Sender); });
-#else
-                                pConnection->OnDisconnected(std::bind(&CCSService::DoPointDisconnected, this, _1));
-#endif
-                            }
-
-                            pPoint->UpdateConnected(true);
-
-                            DoPointConnected(pPoint);
 
                             pReply->ContentType = CHTTPReply::xml;
 
@@ -700,6 +679,118 @@ namespace Apostol {
         }
         //--------------------------------------------------------------------------------------------------------------
 
+        void CCSService::DoChargePoint(CHTTPServerConnection *AConnection, const CString &Identity, const CString &Operation) {
+
+            auto pRequest = AConnection->Request();
+            auto pReply = AConnection->Reply();
+
+            CAuthorization Authorization;
+            if (!CheckAuthorization(AConnection, Authorization)) {
+                return;
+            }
+
+            const auto Index = m_Operations.IndexOfName(Operation);
+            if (Index == -1) {
+                ReplyError(AConnection, CHTTPReply::bad_request, CString().Format("Invalid operation: %s", Operation.c_str()));
+                return;
+            }
+
+            CJSON Json;
+            ContentToJson(pRequest, Json);
+
+            const auto &caFields = m_Operations[Index].Value();
+            auto &Object = Json.Object();
+
+            for (int i = 0; i < Object.Count(); i++) {
+
+                const auto& caMember = Object.Members(i);
+                const auto& caKey = caMember.String();
+
+                if (caFields.IndexOfName(caKey) == -1) {
+                    ReplyError(AConnection, CHTTPReply::bad_request, CString().Format("Invalid key: %s", caKey.c_str()));
+                    return;
+                }
+
+                const auto& caValue = caMember.Value();
+                if (caValue.IsNull() || caValue.IsEmpty()) {
+                    Object.Delete(i);
+                }
+            }
+
+            for (int i = 0; i < caFields.Count(); i++) {
+                const auto& caKey = caFields.Names(i);
+                const auto bRequired = caFields.ValueFromIndex(i) == "true";
+                if (bRequired && Json[caKey].IsNull()) {
+                    ReplyError(AConnection, CHTTPReply::bad_request, CString().Format("Not found required key: %s", caKey.c_str()));
+                    return;
+                }
+            }
+
+            auto pPoint = m_PointManager.FindPointByIdentity(Identity);
+
+            if (pPoint == nullptr) {
+                ReplyError(AConnection, CHTTPReply::bad_request, CString().Format("Not found Charge Point by Identity: %s", Identity.c_str()));
+                return;
+            }
+
+            auto pConnection = pPoint->Connection();
+
+            if (pConnection->Protocol() == pWebSocket) {
+                if (pConnection == nullptr) {
+                    ReplyError(AConnection, CHTTPReply::bad_request, "Charge Point offline.");
+                    return;
+                }
+
+                if (!pConnection->Connected()) {
+                    ReplyError(AConnection, CHTTPReply::bad_request, "Charge Point not connected.");
+                    return;
+                }
+
+                SendJSON(AConnection, pPoint, Operation, Json);
+            } else {
+                SendSOAP(AConnection, pPoint, Operation, Json);
+            }
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
+        void CCSService::DoChargePointList(CHTTPServerConnection *AConnection) {
+
+            auto pRequest = AConnection->Request();
+            auto pReply = AConnection->Reply();
+
+            CJSONObject jsonObject;
+            CJSONValue jsonArray(jvtArray);
+
+            for (int i = 0; i < m_PointManager.Count(); i++) {
+                CJSONValue jsonPoint(jvtObject);
+                CJSONValue jsonConnection(jvtObject);
+
+                auto pPoint = m_PointManager.Points(i);
+
+                jsonPoint.Object().AddPair("Identity", pPoint->Identity());
+                jsonPoint.Object().AddPair("Address", pPoint->Address());
+
+                auto pConnection = pPoint->Connection();
+
+                if (pConnection != nullptr && pConnection->Connected()) {
+                    jsonConnection.Object().AddPair("Socket", pConnection->Socket()->Binding()->Handle());
+                    jsonConnection.Object().AddPair("IP", pConnection->Socket()->Binding()->PeerIP());
+                    jsonConnection.Object().AddPair("Port", pConnection->Socket()->Binding()->PeerPort());
+
+                    jsonPoint.Object().AddPair("Connection", jsonConnection);
+                }
+
+                jsonArray.Array().Add(jsonPoint);
+            }
+
+            jsonObject.AddPair("ChargePointList", jsonArray);
+
+            pReply->Content = jsonObject.ToString();
+
+            AConnection->SendReply(CHTTPReply::ok);
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
         void CCSService::DoAPI(CHTTPServerConnection *AConnection) {
 
             auto pRequest = AConnection->Request();
@@ -730,125 +821,23 @@ namespace Apostol {
                     pReply->ContentType = CHTTPReply::json;
 
                     if (caCommand == "ping") {
-
                         AConnection->SendStockReply(CHTTPReply::ok);
                         return;
-
                     } else if (caCommand == "time") {
-
                         pReply->Content << "{\"serverTime\": " << LongToString(MsEpoch()) << "}";
                         AConnection->SendReply(CHTTPReply::ok);
                         return;
-
                     } else if (caCommand == "ChargePointList") {
-
-                        CJSONObject jsonObject;
-                        CJSONValue jsonArray(jvtArray);
-
-                        for (int i = 0; i < m_PointManager.Count(); i++) {
-                            CJSONValue jsonPoint(jvtObject);
-                            CJSONValue jsonConnection(jvtObject);
-
-                            auto pPoint = m_PointManager.Points(i);
-
-                            jsonPoint.Object().AddPair("Identity", pPoint->Identity());
-                            jsonPoint.Object().AddPair("Address", pPoint->Address());
-
-                            if (pPoint->Connection()->Connected()) {
-                                jsonConnection.Object().AddPair("Socket", pPoint->Connection()->Socket()->Binding()->Handle());
-                                jsonConnection.Object().AddPair("IP", pPoint->Connection()->Socket()->Binding()->PeerIP());
-                                jsonConnection.Object().AddPair("Port", pPoint->Connection()->Socket()->Binding()->PeerPort());
-
-                                jsonPoint.Object().AddPair("Connection", jsonConnection);
-                            }
-
-                            jsonArray.Array().Add(jsonPoint);
-                        }
-
-                        jsonObject.AddPair("ChargePointList", jsonArray);
-
-                        pReply->Content = jsonObject.ToString();
-
-                        AConnection->SendReply(CHTTPReply::ok);
-
+                        DoChargePointList(AConnection);
                         return;
-
                     } else if (caCommand == "ChargePoint") {
-
-                        CAuthorization Authorization;
-                        if (!CheckAuthorization(AConnection, Authorization)) {
-                            return;
-                        }
 
                         if (slPath.Count() < 5) {
                             AConnection->SendStockReply(CHTTPReply::not_found);
                             return;
                         }
 
-                        const auto &caIdentity = slPath[3];
-                        const auto &caOperation = slPath[4];
-
-                        const auto Index = m_Operations.IndexOfName(caOperation);
-                        if (Index == -1) {
-                            ReplyError(AConnection, CHTTPReply::bad_request, CString().Format("Invalid operation: %s", caOperation.c_str()));
-                            return;
-                        }
-
-                        CJSON Json;
-                        ContentToJson(pRequest, Json);
-
-                        const auto &caFields = m_Operations[Index].Value();
-                        auto &Object = Json.Object();
-
-                        for (int i = 0; i < Object.Count(); i++) {
-
-                            const auto& caMember = Object.Members(i);
-                            const auto& caKey = caMember.String();
-
-                            if (caFields.IndexOfName(caKey) == -1) {
-                                ReplyError(AConnection, CHTTPReply::bad_request, CString().Format("Invalid key: %s", caKey.c_str()));
-                                return;
-                            }
-
-                            const auto& caValue = caMember.Value();
-                            if (caValue.IsNull() || caValue.IsEmpty()) {
-                                Object.Delete(i);
-                            }
-                        }
-
-                        for (int i = 0; i < caFields.Count(); i++) {
-                            const auto& caKey = caFields.Names(i);
-                            const auto bRequired = caFields.ValueFromIndex(i) == "true";
-                            if (bRequired && Json[caKey].IsNull()) {
-                                ReplyError(AConnection, CHTTPReply::bad_request, CString().Format("Not found required key: %s", caKey.c_str()));
-                                return;
-                            }
-                        }
-
-                        auto pPoint = m_PointManager.FindPointByIdentity(caIdentity);
-
-                        if (pPoint == nullptr) {
-                            ReplyError(AConnection, CHTTPReply::bad_request, CString().Format("Not found Charge Point by Identity: %s", caIdentity.c_str()));
-                            return;
-                        }
-
-                        auto pConnection = pPoint->Connection();
-                        if (pConnection == nullptr) {
-                            ReplyError(AConnection, CHTTPReply::bad_request, "Charge Point offline.");
-                            return;
-                        }
-
-                        if (!pConnection->Connected()) {
-                            ReplyError(AConnection, CHTTPReply::bad_request, "Charge Point not connected.");
-                            return;
-                        }
-
-                        if (pConnection->Protocol() == pWebSocket) {
-                            SendJSON(AConnection, pPoint, caOperation, Json);
-                        } else {
-                            SendSOAP(AConnection, pPoint, caOperation, Json);
-                        }
-
+                        DoChargePoint(AConnection, slPath[3], slPath[4]);
                         return;
                     }
                 }
