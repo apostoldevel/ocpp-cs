@@ -727,6 +727,7 @@ namespace Apostol {
             m_pConnection = AConnection;
             m_TransactionId = 0;
             m_UpdateCount = 0;
+            m_bUpdateConnected = false;
             m_pMessages = new CMessageManager(this);
             AddToConnection(AConnection);
         }
@@ -787,6 +788,13 @@ namespace Apostol {
                 throw Delphi::Exception::Exception("Charging point is null");
 
             return Point;
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
+        void CChargingPoint::SetUpdateConnected(bool Value) {
+            if (Value != m_bUpdateConnected) {
+              m_bUpdateConnected = Value;
+            }
         }
         //--------------------------------------------------------------------------------------------------------------
 

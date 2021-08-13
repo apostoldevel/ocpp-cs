@@ -47,7 +47,6 @@ namespace Apostol {
             CChargingPointManager *m_pManager;
 
             bool m_bParseInDataBase;
-            bool m_bSetConnected;
 
             void InitMethods() override;
 

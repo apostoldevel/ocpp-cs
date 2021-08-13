@@ -226,7 +226,7 @@ namespace Apostol {
         //--------------------------------------------------------------------------------------------------------------
 
         void CCSService::DoPointConnected(CChargingPoint *APoint) {
-            if (m_bParseInDataBase && m_bSetConnected)
+            if (m_bParseInDataBase && APoint->UpdateConnected())
                 SetPointConnected(APoint, true);
         }
         //--------------------------------------------------------------------------------------------------------------
@@ -236,40 +236,45 @@ namespace Apostol {
             if (pConnection != nullptr) {
 
                 auto pSocket = pConnection->Socket();
-                auto pPoint = CChargingPoint::FindOfConnection(pConnection);
 
-                if (pPoint != nullptr) {
-                    if (m_bParseInDataBase && m_bSetConnected) {
-                        SetPointConnected(pPoint, false);
-                    }
+                try {
+                    auto pPoint = CChargingPoint::FindOfConnection(pConnection);
 
-                    if (pSocket != nullptr) {
-                        auto pHandle = pSocket->Binding();
-                        if (pHandle != nullptr) {
-                            Log()->Message(_T("[%s:%d] Point \"%s\" closed connection."),
-                                           pHandle->PeerIP(), pHandle->PeerPort(),
-                                           pPoint->Identity().IsEmpty() ? "(empty)" : pPoint->Identity().c_str()
-                            );
+                    if (pPoint != nullptr) {
+                        if (m_bParseInDataBase && pPoint->UpdateConnected()) {
+                            SetPointConnected(pPoint, false);
+                        }
+
+                        if (pSocket != nullptr) {
+                            auto pHandle = pSocket->Binding();
+                            if (pHandle != nullptr) {
+                                Log()->Message(_T("[%s:%d] Point \"%s\" closed connection."),
+                                               pHandle->PeerIP(), pHandle->PeerPort(),
+                                               pPoint->Identity().IsEmpty() ? "(empty)" : pPoint->Identity().c_str()
+                                               );
+                            }
+                        } else {
+                            Log()->Message(_T("Point \"%s\" closed connection."),
+                                           pPoint->Identity().IsEmpty() ? "(empty)" : pPoint->Identity().c_str());
+                        }
+
+                        if (pPoint->UpdateCount() == 0) {
+                            delete pPoint;
                         }
                     } else {
-                        Log()->Message(_T("Point \"%s\" closed connection."),
-                                       pPoint->Identity().IsEmpty() ? "(empty)" : pPoint->Identity().c_str());
-                    }
-
-                    if (pPoint->UpdateCount() == 0) {
-                        delete pPoint;
-                    }
-                } else {
-                    if (pSocket != nullptr) {
-                        auto pHandle = pSocket->Binding();
-                        if (pHandle != nullptr) {
-                            Log()->Message(_T("[%s:%d] Unknown point closed connection."),
-                                           pHandle->PeerIP(), pHandle->PeerPort()
-                            );
+                        if (pSocket != nullptr) {
+                            auto pHandle = pSocket->Binding();
+                            if (pHandle != nullptr) {
+                                Log()->Message(_T("[%s:%d] Unknown point closed connection."),
+                                               pHandle->PeerIP(), pHandle->PeerPort()
+                                               );
+                            }
+                        } else {
+                            Log()->Message(_T("Unknown point closed connection."));
                         }
-                    } else {
-                        Log()->Message(_T("Unknown point closed connection."));
                     }
+                } catch (Delphi::Exception::Exception &E) {
+                    Log()->Error(APP_LOG_ERR, 0, E.what());
                 }
             }
         }
@@ -337,13 +342,13 @@ namespace Apostol {
                                 pPoint = m_pManager->Add(pConnection);
                                 pPoint->Identity() = caIdentity;
                             } else {
-                                m_bSetConnected = false;
+                                pPoint->UpdateConnected(false);
                                 pPoint->SwitchConnection(pConnection);
                             }
 
                             pPoint->Address() = caAddress;
 
-                            m_bSetConnected = true;
+                            pPoint->UpdateConnected(true);
                             DoPointConnected(pPoint);
 
 #if defined(_GLIBCXX_RELEASE) && (_GLIBCXX_RELEASE >= 9)
@@ -356,14 +361,13 @@ namespace Apostol {
                             pReply->Content = R"(<?xml version="1.0" encoding="UTF-8"?>)" LINEFEED;
                             pReply->Content << caPayload;
 
+                            pRequest->AddHeader(_T("Connection"), _T("keep-alive"));
                             pConnection->SendReply(CHTTPReply::ok, "application/soap+xml", true);
                         }
                     } catch (Delphi::Exception::Exception &E) {
                         ReplyError(pConnection, CHTTPReply::internal_server_error, E.what());
                         Log()->Error(APP_LOG_ERR, 0, E.what());
                     }
-
-                    //pConnection->CloseConnection(true);
                 }
             };
 
@@ -879,13 +883,13 @@ namespace Apostol {
                 pPoint = m_pManager->Add(AConnection);
                 pPoint->Identity() = caIdentity;
             } else {
-                m_bSetConnected = false;
+                pPoint->UpdateConnected(false);
                 pPoint->SwitchConnection(AConnection);
             }
 
             pPoint->Address() = GetHost(AConnection);
 
-            m_bSetConnected = true;
+            pPoint->UpdateConnected(true);
             DoPointConnected(pPoint);
 
 #if defined(_GLIBCXX_RELEASE) && (_GLIBCXX_RELEASE >= 9)

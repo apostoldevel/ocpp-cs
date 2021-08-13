@@ -538,8 +538,9 @@ namespace Apostol {
             CString m_Identity;
 
             int m_TransactionId;
-
             int m_UpdateCount;
+
+            bool m_bUpdateConnected;
 
             CAuthorizeRequest m_AuthorizeRequest;
             CStartTransactionRequest m_StartTransactionRequest;
@@ -553,6 +554,8 @@ namespace Apostol {
 
             bool ParseSOAP(const CString &Request, CString &Response);
             bool ParseJSON(const CString &Request, CString &Response);
+
+            void SetUpdateConnected(bool Value);
 
         public:
 
@@ -578,6 +581,9 @@ namespace Apostol {
 
             CString &Identity() { return m_Identity; };
             const CString &Identity() const { return m_Identity; };
+
+            void UpdateConnected(bool Value) { SetUpdateConnected(Value); };
+            bool UpdateConnected() const { return m_bUpdateConnected; };
 
             const CAuthorizeRequest &AuthorizeRequest() const { return m_AuthorizeRequest; }
             const CStartTransactionRequest &StartTransactionRequest() const { return m_StartTransactionRequest; }
