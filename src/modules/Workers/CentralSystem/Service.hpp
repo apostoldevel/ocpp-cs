@@ -59,7 +59,11 @@ namespace Apostol {
             void VerifyToken(const CString &Token);
 
             void SetPointConnected(CChargingPoint *APoint, bool Value);
+
             static void DoWebSocketError(CHTTPServerConnection *AConnection, const Delphi::Exception::Exception &E);
+
+            static void SOAPError(CHTTPServerConnection *AConnection, const CString &Code, const CString &SubCode,
+                                    const CString &Reason, const CString &Message);
 
         protected:
 

@@ -312,6 +312,22 @@ namespace Apostol {
         }
         //--------------------------------------------------------------------------------------------------------------
 
+        void CCSService::SOAPError(CHTTPServerConnection *AConnection, const CString &Code, const CString &SubCode,
+                const CString &Reason, const CString &Message) {
+
+            auto pReply = AConnection->Reply();
+
+            pReply->ContentType = CHTTPReply::xml;
+
+            pReply->Content.Clear();
+            pReply->Content.Format(R"(<?xml version="1.0" encoding="UTF-8"?>)" LINEFEED R"(<se:Envelope xmlns:se="http://www.w3.org/2003/05/soap-envelope" xmlns:wsa5="http://www.w3.org/2005/08/addressing" xmlns:cp="urn://Ocpp/Cp/2015/10/" xmlns:cs="urn://Ocpp/Cs/2015/10/"><se:Body><se:Fault><se:Code><se:Value>se:%s</se:Value><cs:SubCode>cs:%s</cs:SubCode></se:Code><se:Reason>%s</se:Reason><se:Detail>%s</se:Detail></se:Fault></se:Body></se:Envelope>)", Code.c_str(), SubCode.c_str(), Reason.c_str(), Delphi::Json::EncodeJsonString(Message).c_str());
+
+            AConnection->SendReply(CHTTPReply::ok, "application/soap+xml", true);
+
+            Log()->Error(APP_LOG_ERR, 0, _T("SOAPError: %s"), Message.c_str());
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
         void CCSService::ParseSOAP(CHTTPServerConnection *AConnection, const CString &Payload) {
 
             auto OnExecuted = [this](CPQPollQuery *APollQuery) {
@@ -365,7 +381,7 @@ namespace Apostol {
                             pConnection->SendReply(CHTTPReply::ok, "application/soap+xml", true);
                         }
                     } catch (Delphi::Exception::Exception &E) {
-                        ReplyError(pConnection, CHTTPReply::internal_server_error, E.what());
+                        SOAPError(pConnection, "Receiver", "InternalError", "Parser exception", E.what());
                         Log()->Error(APP_LOG_ERR, 0, E.what());
                     }
                 }
@@ -373,7 +389,7 @@ namespace Apostol {
 
             auto OnException = [](CPQPollQuery *APollQuery, const Delphi::Exception::Exception &E) {
                 auto pConnection = dynamic_cast<CHTTPServerConnection *>(APollQuery->Binding());
-                ReplyError(pConnection, CHTTPReply::internal_server_error, E.what());
+                SOAPError(pConnection, "Receiver", "InternalError", "SQL exception.", E.what());
             };
 
             CStringList SQL;
@@ -383,7 +399,7 @@ namespace Apostol {
             try {
                 ExecSQL(SQL, AConnection, OnExecuted, OnException);
             } catch (Delphi::Exception::Exception &E) {
-                ReplyError(AConnection, CHTTPReply::internal_server_error, E.what());
+                SOAPError(AConnection, "Receiver", "InternalError", "ExecSQL call failed.", E.what());
             }
         }
         //--------------------------------------------------------------------------------------------------------------
