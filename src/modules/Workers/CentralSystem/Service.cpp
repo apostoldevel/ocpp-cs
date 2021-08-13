@@ -43,7 +43,6 @@ namespace Apostol {
         //--------------------------------------------------------------------------------------------------------------
 
         CCSService::CCSService(CModuleProcess *AProcess) : CApostolModule(AProcess, "ocpp central system service") {
-            m_pManager = new CChargingPointManager();
             m_Headers.Add("Authorization");
 
             m_bParseInDataBase = false;
@@ -52,12 +51,7 @@ namespace Apostol {
             InitOperations();
         }
         //--------------------------------------------------------------------------------------------------------------
-
-        CCSService::~CCSService() {
-            delete m_pManager;
-        }
-        //--------------------------------------------------------------------------------------------------------------
-
+        
         void CCSService::InitMethods() {
 #if defined(_GLIBCXX_RELEASE) && (_GLIBCXX_RELEASE >= 9)
             m_pMethods->AddObject(_T("GET")    , (CObject *) new CMethodHandler(true , [this](auto && Connection) { DoGet(Connection); }));
@@ -340,6 +334,7 @@ namespace Apostol {
 
                     auto pRequest = pConnection->Request();
                     auto pReply = pConnection->Reply();
+                    bool bBootNotification = false;
 
                     try {
                         for (int i = 0; i < APollQuery->Count(); i++) {
@@ -349,35 +344,49 @@ namespace Apostol {
                                 throw Delphi::Exception::EDBError(pResult->GetErrorMessage());
 
                             const CString caIdentity(pResult->GetValue(0, 0));
-                            const CString caAddress(pResult->GetValue(0, 1));
-                            const CString caPayload(pResult->GetValue(0, 2));
+                            const CString caAction(pResult->GetValue(0, 1));
+                            const CString caAddress(pResult->GetValue(0, 2));
+                            const CString caPayload(pResult->GetValue(0, 3));
 
-                            auto pPoint = m_pManager->FindPointByIdentity(caIdentity);
+                            if (caIdentity.IsEmpty())
+                                throw Delphi::Exception::EDBError("Identity cannot by empty.");
+
+                            bBootNotification = caAction == "BootNotification";
+
+                            auto pPoint = m_PointManager.FindPointByIdentity(caIdentity);
 
                             if (pPoint == nullptr) {
-                                pPoint = m_pManager->Add(pConnection);
+                                pPoint = m_PointManager.Add(pConnection);
                                 pPoint->Identity() = caIdentity;
+                                pPoint->Address() = caAddress;
+                                bBootNotification = true;
                             } else {
-                                pPoint->UpdateConnected(false);
-                                pPoint->SwitchConnection(pConnection);
+                                if (bBootNotification) {
+                                    pPoint->Address() = caAddress;
+                                    pPoint->UpdateConnected(false);
+                                    pPoint->SwitchConnection(pConnection);
+                                }
                             }
-
-                            pPoint->Address() = caAddress;
-
-                            pPoint->UpdateConnected(true);
-                            DoPointConnected(pPoint);
+                            
+                            if (bBootNotification) {
+                                pRequest->AddHeader(_T("Connection"), _T("keep-alive"));
 
 #if defined(_GLIBCXX_RELEASE) && (_GLIBCXX_RELEASE >= 9)
-                            pConnection->OnDisconnected([this](auto && Sender) { DoPointDisconnected(Sender); });
+                                pConnection->OnDisconnected([this](auto && Sender) { DoPointDisconnected(Sender); });
 #else
-                            pConnection->OnDisconnected(std::bind(&CCSService::DoPointDisconnected, this, _1));
+                                pConnection->OnDisconnected(std::bind(&CCSService::DoPointDisconnected, this, _1));
 #endif
+                            }
+
+                            pPoint->UpdateConnected(true);
+
+                            DoPointConnected(pPoint);
+
                             pReply->ContentType = CHTTPReply::xml;
 
                             pReply->Content = R"(<?xml version="1.0" encoding="UTF-8"?>)" LINEFEED;
                             pReply->Content << caPayload;
 
-                            pRequest->AddHeader(_T("Connection"), _T("keep-alive"));
                             pConnection->SendReply(CHTTPReply::ok, "application/soap+xml", true);
                         }
                     } catch (Delphi::Exception::Exception &E) {
@@ -588,6 +597,56 @@ namespace Apostol {
         }
         //--------------------------------------------------------------------------------------------------------------
 
+        void CCSService::SendJSON(CHTTPServerConnection *AConnection, CChargingPoint *APoint, const CString &Operation,
+                const CJSON &Payload) {
+
+            auto OnRequest = [AConnection](OCPP::CMessageHandler *AHandler, CHTTPServerConnection *AWSConnection) {
+
+                auto pWSRequest = AWSConnection->WSRequest();
+
+                if (!AConnection->ClosedGracefully()) {
+
+                    auto pReply = AConnection->Reply();
+                    const CString pRequest(pWSRequest->Payload());
+
+                    CHTTPReply::CStatusType Status = CHTTPReply::ok;
+
+                    try {
+                        CJSONMessage jsonMessage;
+
+                        if (!CJSONProtocol::Request(pRequest, jsonMessage)) {
+                            Status = CHTTPReply::bad_request;
+                        }
+
+                        if (jsonMessage.MessageTypeId == OCPP::mtCallError) {
+                            ReplyError(AConnection, CHTTPReply::bad_request,
+                                       CString().Format("%s: %s",
+                                                        jsonMessage.ErrorCode.c_str(),
+                                                        jsonMessage.ErrorDescription.c_str()
+                                                        ));
+                        } else {
+                            pReply->Content = jsonMessage.Payload.ToString();
+                            AConnection->SendReply(Status, nullptr, true);
+                        }
+                    } catch (std::exception &e) {
+                        ReplyError(AConnection, CHTTPReply::internal_server_error, e.what());
+                    }
+                }
+
+                AWSConnection->ConnectionStatus(csReplySent);
+                pWSRequest->Clear();
+            };
+
+            APoint->Messages()->Add(OnRequest, Operation, Payload);
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
+        void CCSService::SendSOAP(CHTTPServerConnection *AConnection, CChargingPoint *APoint, const CString &Operation,
+                const CJSON &Payload) {
+            ReplyError(AConnection, CHTTPReply::bad_request, "Not supported.");
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
         void CCSService::DoGet(CHTTPServerConnection *AConnection) {
 
             auto pRequest = AConnection->Request();
@@ -686,11 +745,11 @@ namespace Apostol {
                         CJSONObject jsonObject;
                         CJSONValue jsonArray(jvtArray);
 
-                        for (int i = 0; i < m_pManager->Count(); i++) {
+                        for (int i = 0; i < m_PointManager.Count(); i++) {
                             CJSONValue jsonPoint(jvtObject);
                             CJSONValue jsonConnection(jvtObject);
 
-                            auto pPoint = m_pManager->Points(i);
+                            auto pPoint = m_PointManager.Points(i);
 
                             jsonPoint.Object().AddPair("Identity", pPoint->Identity());
                             jsonPoint.Object().AddPair("Address", pPoint->Address());
@@ -738,35 +797,35 @@ namespace Apostol {
                         CJSON Json;
                         ContentToJson(pRequest, Json);
 
-                        const auto &Fields = m_Operations[Index].Value();
+                        const auto &caFields = m_Operations[Index].Value();
                         auto &Object = Json.Object();
 
                         for (int i = 0; i < Object.Count(); i++) {
 
-                            const auto& Member = Object.Members(i);
-                            const auto& Key = Member.String();
+                            const auto& caMember = Object.Members(i);
+                            const auto& caKey = caMember.String();
 
-                            if (Fields.IndexOfName(Key) == -1) {
-                                ReplyError(AConnection, CHTTPReply::bad_request, CString().Format("Invalid key: %s", Key.c_str()));
+                            if (caFields.IndexOfName(caKey) == -1) {
+                                ReplyError(AConnection, CHTTPReply::bad_request, CString().Format("Invalid key: %s", caKey.c_str()));
                                 return;
                             }
 
-                            const auto& Value = Member.Value();
-                            if (Value.IsNull() || Value.IsEmpty()) {
+                            const auto& caValue = caMember.Value();
+                            if (caValue.IsNull() || caValue.IsEmpty()) {
                                 Object.Delete(i);
                             }
                         }
 
-                        for (int i = 0; i < Fields.Count(); i++) {
-                            const auto& Key = Fields.Names(i);
-                            const auto Required = Fields.ValueFromIndex(i) == "true";
-                            if (Required && Json[Key].IsNull()) {
-                                ReplyError(AConnection, CHTTPReply::bad_request, CString().Format("Not found required key: %s", Key.c_str()));
+                        for (int i = 0; i < caFields.Count(); i++) {
+                            const auto& caKey = caFields.Names(i);
+                            const auto bRequired = caFields.ValueFromIndex(i) == "true";
+                            if (bRequired && Json[caKey].IsNull()) {
+                                ReplyError(AConnection, CHTTPReply::bad_request, CString().Format("Not found required key: %s", caKey.c_str()));
                                 return;
                             }
                         }
 
-                        auto pPoint = m_pManager->FindPointByIdentity(caIdentity);
+                        auto pPoint = m_PointManager.FindPointByIdentity(caIdentity);
 
                         if (pPoint == nullptr) {
                             ReplyError(AConnection, CHTTPReply::bad_request, CString().Format("Not found Charge Point by Identity: %s", caIdentity.c_str()));
@@ -784,49 +843,11 @@ namespace Apostol {
                             return;
                         }
 
-                        if (pConnection->Protocol() != pWebSocket) {
-                            ReplyError(AConnection, CHTTPReply::bad_request, "Incorrect Charge Point protocol version.");
-                            return;
+                        if (pConnection->Protocol() == pWebSocket) {
+                            SendJSON(AConnection, pPoint, caOperation, Json);
+                        } else {
+                            SendSOAP(AConnection, pPoint, caOperation, Json);
                         }
-
-                        auto OnRequest = [AConnection](OCPP::CMessageHandler *AHandler, CHTTPServerConnection *AWSConnection) {
-
-                            auto pWSRequest = AWSConnection->WSRequest();
-
-                            if (!AConnection->ClosedGracefully()) {
-
-                                auto pReply = AConnection->Reply();
-                                const CString pRequest(pWSRequest->Payload());
-
-                                CHTTPReply::CStatusType Status = CHTTPReply::ok;
-
-                                try {
-                                    CJSONMessage jsonMessage;
-
-                                    if (!CJSONProtocol::Request(pRequest, jsonMessage)) {
-                                        Status = CHTTPReply::bad_request;
-                                    }
-
-                                    if (jsonMessage.MessageTypeId == OCPP::mtCallError) {
-                                        ReplyError(AConnection, CHTTPReply::bad_request,
-                                                   CString().Format("%s: %s",
-                                                                    jsonMessage.ErrorCode.c_str(),
-                                                                    jsonMessage.ErrorDescription.c_str()
-                                                                    ));
-                                    } else {
-                                        pReply->Content = jsonMessage.Payload.ToString();
-                                        AConnection->SendReply(Status, nullptr, true);
-                                    }
-                                } catch (std::exception &e) {
-                                    ReplyError(AConnection, CHTTPReply::internal_server_error, e.what());
-                                }
-                            }
-
-                            AWSConnection->ConnectionStatus(csReplySent);
-                            pWSRequest->Clear();
-                        };
-
-                        pPoint->Messages()->Add(OnRequest, caOperation, Json);
 
                         return;
                     }
@@ -848,9 +869,9 @@ namespace Apostol {
                 // Обработаем запрос в СУБД
                 ParseSOAP(AConnection, pRequest->Content);
             } else {
-                auto pPoint = m_pManager->FindPointByConnection(AConnection);
+                auto pPoint = m_PointManager.FindPointByConnection(AConnection);
                 if (pPoint == nullptr) {
-                    pPoint = m_pManager->Add(AConnection);
+                    pPoint = m_PointManager.Add(AConnection);
 #if defined(_GLIBCXX_RELEASE) && (_GLIBCXX_RELEASE >= 9)
                     AConnection->OnDisconnected([this](auto && Sender) { DoPointDisconnected(Sender); });
 #else
@@ -893,10 +914,10 @@ namespace Apostol {
 
             AConnection->SwitchingProtocols(csAccept, csProtocol);
 
-            auto pPoint = m_pManager->FindPointByIdentity(caIdentity);
+            auto pPoint = m_PointManager.FindPointByIdentity(caIdentity);
 
             if (pPoint == nullptr) {
-                pPoint = m_pManager->Add(AConnection);
+                pPoint = m_PointManager.Add(AConnection);
                 pPoint->Identity() = caIdentity;
             } else {
                 pPoint->UpdateConnected(false);

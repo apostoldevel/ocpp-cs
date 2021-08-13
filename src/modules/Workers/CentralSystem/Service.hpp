@@ -44,7 +44,7 @@ namespace Apostol {
 
             COperations m_Operations;
 
-            CChargingPointManager *m_pManager;
+            CChargingPointManager m_PointManager;
 
             bool m_bParseInDataBase;
 
@@ -64,6 +64,9 @@ namespace Apostol {
 
             static void SOAPError(CHTTPServerConnection *AConnection, const CString &Code, const CString &SubCode,
                                     const CString &Reason, const CString &Message);
+
+            static void SendJSON(CHTTPServerConnection *AConnection, CChargingPoint *APoint, const CString &Operation, const CJSON &Payload);
+            static void SendSOAP(CHTTPServerConnection *AConnection, CChargingPoint *APoint, const CString &Operation, const CJSON &Payload);
 
         protected:
 
@@ -86,7 +89,7 @@ namespace Apostol {
 
             explicit CCSService(CModuleProcess *AProcess);
 
-            ~CCSService() override;
+            ~CCSService() override = default;
 
             static class CCSService *CreateModule(CModuleProcess *AProcess) {
                 return new CCSService(AProcess);
@@ -100,7 +103,6 @@ namespace Apostol {
             bool Execute(CHTTPServerConnection *AConnection) override;
 
             bool Enabled() override;
-
         };
     }
 }
