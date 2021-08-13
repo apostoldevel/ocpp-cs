@@ -736,11 +736,6 @@ namespace Apostol {
             auto pConnection = pPoint->Connection();
 
             if (pConnection != nullptr && pConnection->Protocol() == pWebSocket) {
-                if (pConnection == nullptr) {
-                    ReplyError(AConnection, CHTTPReply::bad_request, "Charge Point offline.");
-                    return;
-                }
-
                 if (!pConnection->Connected()) {
                     ReplyError(AConnection, CHTTPReply::bad_request, "Charge Point not connected.");
                     return;
