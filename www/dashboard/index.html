@@ -1242,7 +1242,7 @@
     }
 
     function ChargePointList() {
-        TokenFetch('/ChargePointList')
+        AsyncFetch('/ChargePointList')
             .then((json) => {
                 let points = $("#ChargePoints");
                 let selected = 'selected';

@@ -140,7 +140,7 @@ namespace Apostol {
             CString idTag;
 
             AuthorizeRequest& operator<< (const CStringPairs& Value) {
-                idTag = Value.Values("idTag");
+                idTag = Value["idTag"];
                 return *this;
             }
 
@@ -162,19 +162,19 @@ namespace Apostol {
 
             StartTransactionRequest& operator<< (const CStringPairs& Value) {
 
-                if (!Value.Values("connectorId").IsEmpty())
-                    connectorId = StrToInt(Value.Values("connectorId").c_str());
+                if (!Value["connectorId"].IsEmpty())
+                    connectorId = StrToInt(Value["connectorId"].c_str());
 
-                idTag = Value.Values("idTag");
+                idTag = Value["idTag"];
 
-                if (!Value.Values("timestamp").IsEmpty())
-                    timestamp = StrToDateTimeDef(Value.Values("timestamp").c_str(), 0, "%04d-%02d-%02dT%02d:%02d:%02d");
+                if (!Value["timestamp"].IsEmpty())
+                    timestamp = StrToDateTimeDef(Value["timestamp"].c_str(), 0, "%04d-%02d-%02dT%02d:%02d:%02d");
 
-                if (!Value.Values("meterStart").IsEmpty())
-                    meterStart = StrToInt(Value.Values("meterStart").c_str());
+                if (!Value["meterStart"].IsEmpty())
+                    meterStart = StrToInt(Value["meterStart"].c_str());
 
-                if (!Value.Values("reservationId").IsEmpty())
-                    reservationId = StrToInt(Value.Values("reservationId").c_str());
+                if (!Value["reservationId"].IsEmpty())
+                    reservationId = StrToInt(Value["reservationId"].c_str());
 
                 return *this;
             }
@@ -212,13 +212,13 @@ namespace Apostol {
 
             SampledValue& operator<< (const CStringPairs& Value) {
 
-                value = Value.Values("value");
-                context = Value.Values("context");
-                format = Value.Values("format");
-                measurand = Value.Values("measurand");
-                phase = Value.Values("phase");
-                location = Value.Values("location");
-                unit = Value.Values("unit");
+                value = Value["value"];
+                context = Value["context"];
+                format = Value["format"];
+                measurand = Value["measurand"];
+                phase = Value["phase"];
+                location = Value["location"];
+                unit = Value["unit"];
 
                 return *this;
             }
@@ -258,21 +258,21 @@ namespace Apostol {
 
             StopTransactionRequest& operator<< (const CStringPairs& Value) {
 
-                if (!Value.Values("transactionId").IsEmpty())
-                    transactionId = StrToInt(Value.Values("transactionId").c_str());
+                if (!Value["transactionId"].IsEmpty())
+                    transactionId = StrToInt(Value["transactionId"].c_str());
 
-                idTag = Value.Values("idTag");
+                idTag = Value["idTag"];
 
-                if (!Value.Values("timestamp").IsEmpty())
-                    timestamp = StrToDateTimeDef(Value.Values("timestamp").c_str(), 0, "%04d-%02d-%02dT%02d:%02d:%02d");
+                if (!Value["timestamp"].IsEmpty())
+                    timestamp = StrToDateTimeDef(Value["timestamp"].c_str(), 0, "%04d-%02d-%02dT%02d:%02d:%02d");
 
-                if (!Value.Values("meterStop").IsEmpty())
-                    meterStop = StrToInt(Value.Values("meterStop").c_str());
+                if (!Value["meterStop"].IsEmpty())
+                    meterStop = StrToInt(Value["meterStop"].c_str());
 
-                reason = Value.Values("reason");
+                reason = Value["reason"];
 
-                if (!Value.Values("transactionData").IsEmpty())
-                    XMLToMeterValue(Value.Values("transactionData"), transactionData);
+                if (!Value["transactionData"].IsEmpty())
+                    XMLToMeterValue(Value["transactionData"], transactionData);
 
                 return *this;
             }
@@ -315,15 +315,15 @@ namespace Apostol {
 
             BootNotificationRequest& operator<< (const CStringPairs& Value) {
 
-                imsi = Value.Values("imsi");
-                iccid = Value.Values("iccid");
-                chargePointVendor = Value.Values("chargePointVendor");
-                chargePointModel = Value.Values("chargePointModel");
-                chargePointSerialNumber = Value.Values("chargePointSerialNumber");
-                chargeBoxSerialNumber = Value.Values("chargeBoxSerialNumber");
-                firmwareVersion = Value.Values("firmwareVersion");
-                meterType = Value.Values("meterType");
-                meterSerialNumber = Value.Values("meterSerialNumber");
+                imsi = Value["imsi"];
+                iccid = Value["iccid"];
+                chargePointVendor = Value["chargePointVendor"];
+                chargePointModel = Value["chargePointModel"];
+                chargePointSerialNumber = Value["chargePointSerialNumber"];
+                chargeBoxSerialNumber = Value["chargeBoxSerialNumber"];
+                firmwareVersion = Value["firmwareVersion"];
+                meterType = Value["meterType"];
+                meterSerialNumber = Value["meterSerialNumber"];
 
                 return *this;
             }
@@ -375,13 +375,13 @@ namespace Apostol {
 
             StatusNotificationRequest& operator<< (const CStringPairs& Value) {
 
-                connectorId = StrToInt(Value.Values("connectorId").c_str());
-                status = COCPPMessage::StringToChargePointStatus(Value.Values("status"));
-                errorCode = COCPPMessage::StringToChargePointErrorCode(Value.Values("errorCode"));
-                info = Value.Values("info");
-                timestamp = StrToDateTimeDef(Value.Values("timestamp").c_str(), 0, "%04d-%02d-%02dT%02d:%02d:%02d");
-                vendorId = Value.Values("vendorId");
-                vendorErrorCode = Value.Values("vendorErrorCode");
+                connectorId = StrToInt(Value["connectorId"].c_str());
+                status = COCPPMessage::StringToChargePointStatus(Value["status"]);
+                errorCode = COCPPMessage::StringToChargePointErrorCode(Value["errorCode"]);
+                info = Value["info"];
+                timestamp = StrToDateTimeDef(Value["timestamp"].c_str(), 0, "%04d-%02d-%02dT%02d:%02d:%02d");
+                vendorId = Value["vendorId"];
+                vendorErrorCode = Value["vendorErrorCode"];
 
                 return *this;
             }
@@ -428,9 +428,9 @@ namespace Apostol {
 
             DataTransferRequest& operator<< (const CStringPairs& Value) {
 
-                vendorId = Value.Values("vendorId");
-                messageId = Value.Values("messageId");
-                data = Value.Values("data");
+                vendorId = Value["vendorId"];
+                messageId = Value["messageId"];
+                data = Value["data"];
 
                 return *this;
             }
@@ -530,6 +530,8 @@ namespace Apostol {
         class CChargingPoint: public CCollectionItem {
         private:
 
+            CProtocolType m_ProtocolType;
+
             CHTTPServerConnection *m_pConnection;
 
             CMessageManager *m_pMessages;
@@ -555,6 +557,7 @@ namespace Apostol {
             bool ParseSOAP(const CString &Request, CString &Response);
             bool ParseJSON(const CString &Request, CString &Response);
 
+            void SetProtocolType(CProtocolType Value);
             void SetUpdateConnected(bool Value);
 
         public:
@@ -585,6 +588,9 @@ namespace Apostol {
             void UpdateConnected(bool Value) { SetUpdateConnected(Value); };
             bool UpdateConnected() const { return m_bUpdateConnected; };
 
+            void ProtocolType(CProtocolType Value) { SetProtocolType(Value); };
+            CProtocolType ProtocolType() const { return m_ProtocolType; };
+
             const CAuthorizeRequest &AuthorizeRequest() const { return m_AuthorizeRequest; }
             const CStartTransactionRequest &StartTransactionRequest() const { return m_StartTransactionRequest; }
             const CStopTransactionRequest &StopTransactionRequest() const { return m_StopTransactionRequest; }
@@ -613,7 +619,7 @@ namespace Apostol {
             void Heartbeat(const CSOAPMessage &Request, CSOAPMessage &Response);
             void Heartbeat(const CJSONMessage &Request, CJSONMessage &Response);
 
-            bool Parse(CProtocolType Protocol, const CString &Request, CString &Response);
+            bool Parse(const CString &Request, CString &Response);
 
             static CChargingPoint *FindOfConnection(CHTTPServerConnection *AConnection);
 

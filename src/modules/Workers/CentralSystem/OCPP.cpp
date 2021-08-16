@@ -119,9 +119,9 @@ namespace Apostol {
             const CStringPairs &Values = Message.Values;
 
             xmlString =  R"(<?xml version="1.0" encoding="UTF-8"?>)" LINEFEED;
-            xmlString << R"(<s:Envelope xmlns:a="http://www.w3.org/2005/08/addressing")" LINEFEED;
-            xmlString << R"(xmlns:s="http://www.w3.org/2003/05/soap-envelope")" LINEFEED;
-            xmlString << R"(xmlns="urn://Ocpp/Cs/2012/06/">)" LINEFEED;
+            xmlString << R"(<s:Envelope xmlns:s="http://www.w3.org/2003/05/soap-envelope")" LINEFEED;
+            xmlString << R"(xmlns:a="http://www.w3.org/2005/08/addressing")" LINEFEED;
+            xmlString << R"(xmlns="urn://Ocpp/Cs/2015/10/">)" LINEFEED;
 
             xmlString << R"(<s:Header>)" LINEFEED;
 
@@ -724,6 +724,7 @@ namespace Apostol {
         //--------------------------------------------------------------------------------------------------------------
 
         CChargingPoint::CChargingPoint(CHTTPServerConnection *AConnection, CChargingPointManager *AManager) : CCollectionItem(AManager) {
+            m_ProtocolType = ptJSON;
             m_pConnection = AConnection;
             m_TransactionId = 0;
             m_UpdateCount = 0;
@@ -788,6 +789,13 @@ namespace Apostol {
                 throw Delphi::Exception::Exception("Charging point is null");
 
             return Point;
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
+        void CChargingPoint::SetProtocolType(CProtocolType Value) {
+            if (Value != m_ProtocolType) {
+                m_ProtocolType = Value;
+            }
         }
         //--------------------------------------------------------------------------------------------------------------
 
@@ -1055,8 +1063,8 @@ namespace Apostol {
         }
         //--------------------------------------------------------------------------------------------------------------
 
-        bool CChargingPoint::Parse(CProtocolType Protocol, const CString &Request, CString &Response) {
-            switch (Protocol) {
+        bool CChargingPoint::Parse(const CString &Request, CString &Response) {
+            switch (m_ProtocolType) {
                 case ptSOAP:
                     return ParseSOAP(Request, Response);
                 case ptJSON:
