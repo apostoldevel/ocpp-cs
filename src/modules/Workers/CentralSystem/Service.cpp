@@ -314,7 +314,7 @@ namespace Apostol {
             pReply->ContentType = CHTTPReply::xml;
 
             pReply->Content.Clear();
-            pReply->Content.Format(R"(<?xml version="1.0" encoding="UTF-8"?>)" LINEFEED R"(<se:Envelope xmlns:se="http://www.w3.org/2003/05/soap-envelope" xmlns:wsa5="http://www.w3.org/2005/08/addressing" xmlns:cp="urn://Ocpp/Cp/2015/10/" xmlns:cs="urn://Ocpp/Cs/2015/10/"><se:Body><se:Fault><se:Code><se:Value>se:%s</se:Value><cs:SubCode>cs:%s</cs:SubCode></se:Code><se:Reason>%s</se:Reason><se:Detail>%s</se:Detail></se:Fault></se:Body></se:Envelope>)", Code.c_str(), SubCode.c_str(), Reason.c_str(), Delphi::Json::EncodeJsonString(Message).c_str());
+            pReply->Content.Format(R"(<?xml version="1.0" encoding="UTF-8"?>)" LINEFEED R"(<se:Envelope xmlns:se="http://www.w3.org/2003/05/soap-envelope" xmlns:wsa5="http://www.w3.org/2005/08/addressing" xmlns:cp="urn://Ocpp/Cp/2015/10/" xmlns:cs="urn://Ocpp/Cs/2015/10/"><se:Body><se:Fault><se:Code><se:Value>se:%s</se:Value><cs:SubCode><se:Value>cs:%s</se:Value></cs:SubCode></se:Code><se:Reason><se:Text>%s<se:/Text></se:Reason><se:Detail><se:Text>%s</se:Text></se:Detail></se:Fault></se:Body></se:Envelope>)", Code.c_str(), SubCode.c_str(), Reason.c_str(), Delphi::Json::EncodeJsonString(Message).c_str());
 
             AConnection->SendReply(CHTTPReply::ok, "application/soap+xml", true);
 
@@ -624,11 +624,12 @@ namespace Apostol {
         void CCSService::SendSOAP(CHTTPServerConnection *AConnection, CChargingPoint *APoint, const CString &Operation,
                 const CString &Payload) {
 
-            auto OnRequest = [&Payload](CHTTPClient *Sender, CHTTPRequest *Request) {
+            auto OnRequest = [](CHTTPClient *Sender, CHTTPRequest *Request) {
 
                 const auto &uri = Sender->Data()["uri"];
+                const auto &payload = Sender->Data()["payload"];
 
-                Request->Content = Payload;
+                Request->Content = payload;
 
                 CHTTPRequest::Prepare(Request, "POST", uri.c_str(), "application/soap+xml");
 
@@ -638,11 +639,21 @@ namespace Apostol {
             auto OnExecute = [this, AConnection](CTCPConnection *AClientConnection) {
 
                 auto pConnection = dynamic_cast<CHTTPClientConnection *> (AClientConnection);
-                auto pReply = pConnection->Reply();
+                auto pClientReply = pConnection->Reply();
+                auto pReply = AConnection->Reply();
+
+                DebugReply(pClientReply);
+                //                SOAPToJSON(AConnection, pClientReply->Content);
+
+                pReply->ContentType = CHTTPReply::json;
+
+                CJSON Json;
+                CSOAPProtocol::SOAPToJSON(pClientReply->Content, Json);
+
+                pReply->Content = Json.ToString();
+                AConnection->SendReply(CHTTPReply::ok, "application/json", true);
 
                 DebugReply(pReply);
-
-                SOAPToJSON(AConnection, pReply->Content);
 
                 pConnection->CloseConnection(true);
                 return true;
@@ -660,7 +671,8 @@ namespace Apostol {
 
             auto pClient = GetClient(uri.hostname, uri.port);
 
-            pClient->Data().Values("uri", uri.pathname);
+            pClient->Data().Values("uri", uri.href());
+            pClient->Data().Values("payload", Payload);
 
             pClient->OnRequest(OnRequest);
             pClient->OnExecute(OnExecute);

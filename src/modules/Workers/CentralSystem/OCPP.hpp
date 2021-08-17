@@ -68,6 +68,9 @@ namespace Apostol {
         class CSOAPProtocol {
         public:
 
+            static void JSONToSOAP(const CString &Identity, const CString &Action, const CString &MessageId, const CString &From, const CString &To, const CJSON &Json, CString &xmlString);
+            static void SOAPToJSON(const CString &xmlString, CJSON &Json);
+
             static void Request(const CString &xmlString, CSOAPMessage &Message);
             static void Response(const CSOAPMessage &Message, CString &xmlString);
 

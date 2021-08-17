@@ -65,11 +65,10 @@ namespace Apostol {
             static void SOAPError(CHTTPServerConnection *AConnection, const CString &Code, const CString &SubCode,
                                     const CString &Reason, const CString &Message);
 
-            static void SendJSON(CHTTPServerConnection *AConnection, CChargingPoint *APoint, const CString &Operation, const CJSON &Payload);
-
             void JSONToSOAP(CHTTPServerConnection *AConnection, CChargingPoint *APoint, const CString &Operation, const CJSON &Payload);
             void SOAPToJSON(CHTTPServerConnection *AConnection, const CString &Payload);
 
+            static void SendJSON(CHTTPServerConnection *AConnection, CChargingPoint *APoint, const CString &Operation, const CJSON &Payload);
             void SendSOAP(CHTTPServerConnection *AConnection, CChargingPoint *APoint, const CString &Operation, const CString &Payload);
 
         protected:

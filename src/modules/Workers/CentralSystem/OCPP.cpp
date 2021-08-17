@@ -28,6 +28,12 @@ Author:
 #include "OCPP.hpp"
 //----------------------------------------------------------------------------------------------------------------------
 
+#include "rapidxml.hpp"
+
+using namespace rapidxml;
+//----------------------------------------------------------------------------------------------------------------------
+
+
 extern "C++" {
 
 namespace Apostol {
@@ -81,6 +87,61 @@ namespace Apostol {
 
         //-- CSOAPProtocol ---------------------------------------------------------------------------------------------
 
+        //--------------------------------------------------------------------------------------------------------------
+
+        void XMLToJSON(xml_node<> *node, CJSON &Json) {
+            if (node == nullptr)
+                return;
+
+            if (node->type() == node_element) {
+                CJSONValue Value;
+
+                XMLToJSON(node->first_node(), Value);
+
+                if (node->value_size() != 0) {
+                    Json.Object().AddPair(node->name(), node->value());
+                } else {
+                    Json.Object().AddPair(node->name(), Value);
+                }
+
+                XMLToJSON(node->next_sibling(), Json);
+            }
+        };
+        //--------------------------------------------------------------------------------------------------------------
+
+        void CSOAPProtocol::JSONToSOAP(const CString &Identity, const CString &Action, const CString &MessageId, const CString &From, const CString &To, const CJSON &Json, CString &xmlString) {
+
+            const auto& caObject = Json.Object();
+
+            xmlString.Clear();
+
+            xmlString =  R"(<?xml version="1.0" encoding="utf-8"?>)" LINEFEED;
+            xmlString << R"(<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://www.w3.org/2003/05/soap-envelope" xmlns:wsa5="http://www.w3.org/2005/08/addressing" xmlns:cp="urn://Ocpp/Cp/2015/10/" xmlns:cs="urn://Ocpp/Cs/2015/10/">)" LINEFEED;
+            xmlString << CString().Format(R"(<SOAP-ENV:Header><cs:chargeBoxIdentity SOAP-ENV:mustUnderstand="true">%s</cs:chargeBoxIdentity><wsa5:Action SOAP-ENV:mustUnderstand="true">%s</wsa5:Action><wsa5:MessageID>urn:uuid:%s</wsa5:MessageID><wsa5:From><wsa5:Address>%s</wsa5:Address></wsa5:From><wsa5:To SOAP-ENV:mustUnderstand="true">%s</wsa5:To></SOAP-ENV:Header>)" LINEFEED, Identity.c_str(), Action.c_str(), MessageId.c_str(), From.c_str(), To.c_str());
+            xmlString << R"(  <SOAP-ENV:Body>)" LINEFEED;
+
+            for (int i = 0; i < caObject.Count(); i++) {
+                const auto& caMember = caObject.Members(i);
+                const auto& caString = caMember.String();
+                const auto& caValue = caMember.Value().AsString();
+                xmlString << CString().Format(R"(    <%s>%s</%s>)" LINEFEED, caString.c_str(), caValue.c_str(), caString.c_str());
+            }
+
+            xmlString << R"(  </SOAP-ENV:Body>)" LINEFEED;
+            xmlString << R"(</SOAP-ENV:Envelope>)" LINEFEED;
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
+        void CSOAPProtocol::SOAPToJSON(const CString &xmlString, CJSON &Json) {
+            xml_document<> xmlDocument;
+            xmlDocument.parse<parse_default>((char *) xmlString.c_str());
+
+            xml_node<> *Envelope = xmlDocument.first_node("SOAP-ENV:Envelope");
+            xml_node<> *Body = Envelope->first_node("SOAP-ENV:Body");
+            xml_node<> *Response = Body->first_node();
+
+            XMLToJSON(Response->first_node(), Json);
+        }
         //--------------------------------------------------------------------------------------------------------------
 
         void CSOAPProtocol::Request(const CString &xmlString, CSOAPMessage &Message) {
