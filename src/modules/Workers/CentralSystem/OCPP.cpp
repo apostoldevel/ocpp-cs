@@ -140,7 +140,7 @@ namespace Apostol {
             xml_node<> *Body = Envelope->first_node("SOAP-ENV:Body");
             xml_node<> *Response = Body->first_node();
 
-            XMLToJSON(Response->first_node(), Json);
+            XMLToJSON(Response, Json);
         }
         //--------------------------------------------------------------------------------------------------------------
 

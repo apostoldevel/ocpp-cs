@@ -356,16 +356,16 @@ namespace Apostol {
                                 pPoint = m_PointManager.Add(nullptr);
                                 pPoint->ProtocolType(OCPP::ptSOAP);
                                 pPoint->Identity() = caIdentity;
-                                pPoint->Address() = caAddress;
-                                pPoint->UpdateConnected(true);
-
-                                DoPointConnected(pPoint);
                             }
 
-                            pReply->ContentType = CHTTPReply::xml;
+                            pPoint->Address() = caAddress;
 
+                            pReply->ContentType = CHTTPReply::xml;
                             pReply->Content = R"(<?xml version="1.0" encoding="UTF-8"?>)" LINEFEED;
                             pReply->Content << caPayload;
+
+                            pPoint->UpdateConnected(true);
+                            DoPointConnected(pPoint);
 
                             pConnection->SendReply(CHTTPReply::ok, "application/soap+xml", true);
                         }
@@ -636,14 +636,13 @@ namespace Apostol {
                 DebugRequest(Request);
             };
 
-            auto OnExecute = [this, AConnection](CTCPConnection *AClientConnection) {
+            auto OnExecute = [AConnection](CTCPConnection *AClientConnection) {
 
                 auto pConnection = dynamic_cast<CHTTPClientConnection *> (AClientConnection);
                 auto pClientReply = pConnection->Reply();
                 auto pReply = AConnection->Reply();
 
                 DebugReply(pClientReply);
-                //                SOAPToJSON(AConnection, pClientReply->Content);
 
                 pReply->ContentType = CHTTPReply::json;
 
@@ -651,9 +650,22 @@ namespace Apostol {
                 CSOAPProtocol::SOAPToJSON(pClientReply->Content, Json);
 
                 pReply->Content = Json.ToString();
-                AConnection->SendReply(CHTTPReply::ok, "application/json", true);
+                AConnection->SendReply(pReply->Content.IsEmpty() ? CHTTPReply::no_content : CHTTPReply::ok, "application/json", true);
 
                 DebugReply(pReply);
+
+                pConnection->CloseConnection(true);
+                return true;
+            };
+
+            auto OnExecuteDB = [this, AConnection](CTCPConnection *AClientConnection) {
+
+                auto pConnection = dynamic_cast<CHTTPClientConnection *> (AClientConnection);
+                auto pReply = pConnection->Reply();
+
+                DebugReply(pReply);
+
+                SOAPToJSON(AConnection, pReply->Content);
 
                 pConnection->CloseConnection(true);
                 return true;
