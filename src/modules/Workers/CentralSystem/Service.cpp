@@ -383,7 +383,9 @@ namespace Apostol {
 
             CStringList SQL;
 
-            SQL.Add(CString().Format("SELECT * FROM ocpp.ParseXML('%s'::xml);", Payload.c_str()));
+            SQL.Add(CString()
+                .MaxFormatSize(256 + Payload.Size())
+                .Format("SELECT * FROM ocpp.ParseXML(%s::xml);", PQQuoteLiteral(Payload).c_str()));
 
             try {
                 ExecSQL(SQL, AConnection, OnExecuted, OnException);
@@ -459,7 +461,15 @@ namespace Apostol {
 
             CStringList SQL;
 
-            SQL.Add(CString().Format("SELECT * FROM ocpp.Parse('%s', '%s', '%s'::jsonb);", Identity.c_str(), Action.c_str(), Payload.ToString().c_str()));
+            auto const &payload = Payload.ToString();
+
+            SQL.Add(CString()
+                .MaxFormatSize(256 + Identity.Size() + Action.Size() + payload.Size())
+                .Format("SELECT * FROM ocpp.Parse(%s, %s, %s::jsonb);",
+                        PQQuoteLiteral(Identity).c_str(),
+                        PQQuoteLiteral(Action).c_str(),
+                        PQQuoteLiteral(payload).c_str())
+            );
 
             try {
                 ExecSQL(SQL, AConnection, OnExecuted, OnException);
@@ -636,7 +646,7 @@ namespace Apostol {
                 DebugRequest(Request);
             };
 
-            auto OnExecute = [AConnection](CTCPConnection *AClientConnection) {
+            auto OnExecuteLocal = [AConnection](CTCPConnection *AClientConnection) {
 
                 auto pConnection = dynamic_cast<CHTTPClientConnection *> (AClientConnection);
                 auto pClientReply = pConnection->Reply();
@@ -658,7 +668,7 @@ namespace Apostol {
                 return true;
             };
 
-            auto OnExecuteDB = [this, AConnection](CTCPConnection *AClientConnection) {
+            auto OnExecute = [this, AConnection](CTCPConnection *AClientConnection) {
 
                 auto pConnection = dynamic_cast<CHTTPClientConnection *> (AClientConnection);
                 auto pReply = pConnection->Reply();
@@ -744,7 +754,12 @@ namespace Apostol {
             Data.Object().AddPair("header", Header);
             Data.Object().AddPair("payload", Payload.Object());
 
-            SQL.Add(CString().Format("SELECT * FROM ocpp.JSONToSOAP('%s'::jsonb);", Data.ToString().c_str()));
+            const auto &data = Data.ToString();
+
+            SQL.Add(CString()
+                .MaxFormatSize(256 + data.Size())
+                .Format("SELECT * FROM ocpp.JSONToSOAP(%s::jsonb);", PQQuoteLiteral(data).c_str())
+            );
 
             try {
                 ExecSQL(SQL, AConnection, OnExecuted, OnException);
@@ -795,7 +810,10 @@ namespace Apostol {
 
             CStringList SQL;
 
-            SQL.Add(CString().Format("SELECT * FROM ocpp.SOAPToJSON('%s'::xml);", Payload.c_str()));
+            SQL.Add(CString()
+                .MaxFormatSize(256 + Payload.Size())
+                .Format("SELECT * FROM ocpp.SOAPToJSON(%s::xml);", PQQuoteLiteral(Payload).c_str())
+            );
 
             try {
                 ExecSQL(SQL, AConnection, OnExecuted, OnException);
