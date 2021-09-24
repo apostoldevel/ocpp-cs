@@ -45,17 +45,10 @@ To install (with Git) you need:
 git clone https://github.com/ufocomp/apostol-ocpp.git
 ~~~
 
-To add [libdelphi](https://github.com/ufocomp/libdelphi/) to a project using Git, do:
-~~~
-cd apostol-ocpp/src/lib
-git clone https://github.com/ufocomp/libdelphi.git delphi
-cd ../../../
-~~~
-
 ###### Build:
 ~~~
 cd apostol-ocpp
-cmake -DCMAKE_BUILD_TYPE=Release . -B cmake-build-release
+./configure
 ~~~
 
 ###### Compilation and installation:
@@ -65,7 +58,7 @@ make
 sudo make install
 ~~~
 
-By default **ocpp** will be set to:
+By default, **ocpp** will be set to:
 ~~~
 /usr/sbin
 ~~~
