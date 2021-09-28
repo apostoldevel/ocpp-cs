@@ -1108,7 +1108,9 @@ namespace Apostol {
 
             pPoint->UpdateConnected(true);
             DoPointConnected(pPoint);
-
+#ifdef _DEBUG
+            WSDebugConnection(AConnection);
+#endif
 #if defined(_GLIBCXX_RELEASE) && (_GLIBCXX_RELEASE >= 9)
             AConnection->OnDisconnected([this](auto && Sender) { DoPointDisconnected(Sender); });
 #else
