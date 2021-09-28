@@ -1135,10 +1135,10 @@ namespace Apostol {
                     CJSONProtocol::Request(csRequest, jmRequest);
 
                     if (jmRequest.MessageTypeId == OCPP::mtCall) {
-                        // Обработаем запрос в СУБД
+                        // Let's process the request in the DBMS
                         ParseJSON(AConnection, pPoint->Identity(), jmRequest.Action, jmRequest.Payload);
                     } else {
-                        // Ответ от зарядной станции отправим в обработчик
+                        // We will send the response from the charging station to the handler
                         auto pHandler = pPoint->Messages()->FindMessageById(jmRequest.UniqueId);
                         if (Assigned(pHandler)) {
                             pHandler->Handler(AConnection);
@@ -1161,7 +1161,6 @@ namespace Apostol {
                     }
                 }
             } catch (std::exception &e) {
-                //AConnection->SendWebSocketClose();
                 AConnection->Clear();
                 Log()->Error(APP_LOG_ERR, 0, e.what());
             }
@@ -1181,11 +1180,7 @@ namespace Apostol {
 
         bool CCSService::Execute(CHTTPServerConnection *AConnection) {
             if (AConnection->Protocol() == pWebSocket) {
-#ifdef _DEBUG
-                WSDebugConnection(AConnection);
-#endif
                 DoWebSocket(AConnection);
-
                 return true;
             } else {
                 return CApostolModule::Execute(AConnection);
