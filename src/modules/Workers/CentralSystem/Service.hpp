@@ -52,22 +52,22 @@ namespace Apostol {
 
             void InitOperations();
 
-            void ParseJSON(CHTTPServerConnection *AConnection, const CString &Identity, const CString &Action, const CJSON &Payload);
-            void ParseSOAP(CHTTPServerConnection *AConnection, const CString &Payload);
-
             static bool CheckAuthorizationData(CHTTPRequest *ARequest, CAuthorization &Authorization);
             void VerifyToken(const CString &Token);
-
-            void SetPointConnected(CChargingPoint *APoint, bool Value);
 
             static void DoWebSocketError(CHTTPServerConnection *AConnection, const Delphi::Exception::Exception &E);
 
             static void SOAPError(CHTTPServerConnection *AConnection, const CString &Code, const CString &SubCode,
                                     const CString &Reason, const CString &Message);
+#ifdef WITH_POSTGRESQL
+            void ParseJSON(CHTTPServerConnection *AConnection, const CString &Identity, const CString &Action, const CJSON &Payload);
+            void ParseSOAP(CHTTPServerConnection *AConnection, const CString &Payload);
 
             void JSONToSOAP(CHTTPServerConnection *AConnection, CChargingPoint *APoint, const CString &Operation, const CJSON &Payload);
             void SOAPToJSON(CHTTPServerConnection *AConnection, const CString &Payload);
 
+            void SetPointConnected(CChargingPoint *APoint, bool Value);
+#endif
             static void SendJSON(CHTTPServerConnection *AConnection, CChargingPoint *APoint, const CString &Operation, const CJSON &Payload);
             void SendSOAP(CHTTPServerConnection *AConnection, CChargingPoint *APoint, const CString &Operation, const CString &Payload);
 
@@ -87,10 +87,10 @@ namespace Apostol {
 
             void DoPointConnected(CChargingPoint *APoint);
             void DoPointDisconnected(CObject *Sender);
-
+#ifdef WITH_POSTGRESQL
             void DoPostgresQueryExecuted(CPQPollQuery *APollQuery) override;
             void DoPostgresQueryException(CPQPollQuery *APollQuery, const Delphi::Exception::Exception &E) override;
-
+#endif
         public:
 
             explicit CCSService(CModuleProcess *AProcess);

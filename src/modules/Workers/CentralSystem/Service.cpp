@@ -161,7 +161,7 @@ namespace Apostol {
             m_Operations.Last().Value().Add("retryInterval=false");
         }
         //--------------------------------------------------------------------------------------------------------------
-
+#ifdef WITH_POSTGRESQL
         void CCSService::DoPostgresQueryExecuted(CPQPollQuery *APollQuery) {
 
             CPQResult *Result;
@@ -216,109 +216,6 @@ namespace Apostol {
             } catch (Delphi::Exception::Exception &E) {
                 Log()->Error(APP_LOG_ERR, 0, E.what());
             }
-        }
-        //--------------------------------------------------------------------------------------------------------------
-
-        void CCSService::DoPointConnected(CChargingPoint *APoint) {
-            if (m_bParseInDataBase && APoint->UpdateConnected())
-                SetPointConnected(APoint, true);
-        }
-        //--------------------------------------------------------------------------------------------------------------
-
-        void CCSService::DoPointDisconnected(CObject *Sender) {
-            auto pConnection = dynamic_cast<CHTTPServerConnection *>(Sender);
-            if (pConnection != nullptr) {
-
-                auto pSocket = pConnection->Socket();
-
-                try {
-                    auto pPoint = CChargingPoint::FindOfConnection(pConnection);
-
-                    if (pPoint != nullptr) {
-                        if (m_bParseInDataBase && pPoint->UpdateConnected()) {
-                            SetPointConnected(pPoint, false);
-                        }
-
-                        if (pSocket != nullptr) {
-                            auto pHandle = pSocket->Binding();
-                            if (pHandle != nullptr) {
-                                Log()->Message(_T("[%s:%d] Point \"%s\" closed connection."),
-                                               pHandle->PeerIP(), pHandle->PeerPort(),
-                                               pPoint->Identity().IsEmpty() ? "(empty)" : pPoint->Identity().c_str()
-                                               );
-                            }
-                        } else {
-                            Log()->Message(_T("Point \"%s\" closed connection."),
-                                           pPoint->Identity().IsEmpty() ? "(empty)" : pPoint->Identity().c_str());
-                        }
-
-                        if (pPoint->UpdateCount() == 0) {
-                            delete pPoint;
-                        }
-                    } else {
-                        if (pSocket != nullptr) {
-                            auto pHandle = pSocket->Binding();
-                            if (pHandle != nullptr) {
-                                Log()->Message(_T("[%s:%d] Unknown point closed connection."),
-                                               pHandle->PeerIP(), pHandle->PeerPort()
-                                               );
-                            }
-                        } else {
-                            Log()->Message(_T("Unknown point closed connection."));
-                        }
-                    }
-                } catch (Delphi::Exception::Exception &E) {
-                    Log()->Error(APP_LOG_ERR, 0, E.what());
-                }
-            }
-        }
-        //--------------------------------------------------------------------------------------------------------------
-
-        void CCSService::DoWebSocketError(CHTTPServerConnection *AConnection, const Delphi::Exception::Exception &E) {
-
-            Log()->Error(APP_LOG_ERR, 0, E.what());
-
-            if (AConnection != nullptr && !AConnection->ClosedGracefully()) {
-                auto pWSRequest = AConnection->WSRequest();
-                auto pWSReply = AConnection->WSReply();
-
-                const CString csRequest(pWSRequest->Payload());
-
-                CJSONMessage jmRequest;
-                CJSONProtocol::Request(csRequest, jmRequest);
-
-                CJSONMessage jmResponse;
-                CString sResponse;
-
-                CJSON jResult;
-
-                CJSONProtocol::PrepareResponse(jmRequest, jmResponse);
-
-                jmResponse.MessageTypeId = OCPP::mtCallError;
-                jmResponse.ErrorCode = "InternalError";
-                jmResponse.ErrorDescription = E.what();
-
-                CJSONProtocol::Response(jmResponse, sResponse);
-
-                pWSReply->SetPayload(sResponse);
-                AConnection->SendWebSocket(true);
-            }
-        }
-        //--------------------------------------------------------------------------------------------------------------
-
-        void CCSService::SOAPError(CHTTPServerConnection *AConnection, const CString &Code, const CString &SubCode,
-                const CString &Reason, const CString &Message) {
-
-            auto pReply = AConnection->Reply();
-
-            pReply->ContentType = CHTTPReply::xml;
-
-            pReply->Content.Clear();
-            pReply->Content.Format(R"(<?xml version="1.0" encoding="UTF-8"?>)" LINEFEED R"(<se:Envelope xmlns:se="http://www.w3.org/2003/05/soap-envelope" xmlns:wsa5="http://www.w3.org/2005/08/addressing" xmlns:cp="urn://Ocpp/Cp/2015/10/" xmlns:cs="urn://Ocpp/Cs/2015/10/"><se:Body><se:Fault><se:Code><se:Value>se:%s</se:Value><cs:SubCode><se:Value>cs:%s</se:Value></cs:SubCode></se:Code><se:Reason><se:Text>%s<se:/Text></se:Reason><se:Detail><se:Text>%s</se:Text></se:Detail></se:Fault></se:Body></se:Envelope>)", Code.c_str(), SubCode.c_str(), Reason.c_str(), Delphi::Json::EncodeJsonString(Message).c_str());
-
-            AConnection->SendReply(CHTTPReply::ok, "application/soap+xml", true);
-
-            Log()->Error(APP_LOG_ERR, 0, _T("SOAPError: %s"), Message.c_str());
         }
         //--------------------------------------------------------------------------------------------------------------
 
@@ -476,6 +373,231 @@ namespace Apostol {
             } catch (Delphi::Exception::Exception &E) {
                 DoWebSocketError(AConnection, E);
             }
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
+        void CCSService::JSONToSOAP(CHTTPServerConnection *AConnection, CChargingPoint *APoint, const CString &Operation,
+            const CJSON &Payload) {
+
+            auto OnExecuted = [this, APoint, &Operation](CPQPollQuery *APollQuery) {
+
+                CPQResult *pResult;
+
+                auto pConnection = dynamic_cast<CHTTPServerConnection *>(APollQuery->Binding());
+
+                if (pConnection != nullptr && !pConnection->ClosedGracefully()) {
+
+                    auto pRequest = pConnection->Request();
+                    auto pReply = pConnection->Reply();
+
+                    try {
+                        for (int i = 0; i < APollQuery->Count(); i++) {
+                            pResult = APollQuery->Results(i);
+
+                            if (pResult->ExecStatus() != PGRES_TUPLES_OK)
+                                throw Delphi::Exception::EDBError(pResult->GetErrorMessage());
+
+                            CString caPayload(R"(<?xml version="1.0" encoding="UTF-8"?>)" LINEFEED);
+                            caPayload << pResult->GetValue(0, 0);
+
+                            SendSOAP(pConnection, APoint, Operation, caPayload);
+                        }
+                    } catch (Delphi::Exception::Exception &E) {
+                        ReplyError(pConnection, CHTTPReply::bad_request, E.what());
+                        Log()->Error(APP_LOG_ERR, 0, E.what());
+                    }
+                }
+            };
+
+            auto OnException = [](CPQPollQuery *APollQuery, const Delphi::Exception::Exception &E) {
+                auto pConnection = dynamic_cast<CHTTPServerConnection *>(APollQuery->Binding());
+                ReplyError(pConnection, CHTTPReply::internal_server_error, E.what());
+            };
+
+            CStringList SQL;
+
+            CJSON Data;
+            CJSONObject Header;
+
+            Header.AddPair("chargeBoxIdentity", APoint->Identity());
+            Header.AddPair("Action", Operation);
+            Header.AddPair("To", APoint->Address());
+
+            Data.Object().AddPair("header", Header);
+            Data.Object().AddPair("payload", Payload.Object());
+
+            const auto &data = Data.ToString();
+
+            SQL.Add(CString()
+                .MaxFormatSize(256 + data.Size())
+                .Format("SELECT * FROM ocpp.JSONToSOAP(%s::jsonb);", PQQuoteLiteral(data).c_str())
+            );
+
+            try {
+                ExecSQL(SQL, AConnection, OnExecuted, OnException);
+            } catch (Delphi::Exception::Exception &E) {
+                ReplyError(AConnection, CHTTPReply::internal_server_error, E.what());
+            }
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
+        void CCSService::SOAPToJSON(CHTTPServerConnection *AConnection, const CString &Payload) {
+
+            auto OnExecuted = [](CPQPollQuery *APollQuery) {
+
+                CPQResult *pResult;
+
+                auto pConnection = dynamic_cast<CHTTPServerConnection *>(APollQuery->Binding());
+
+                if (pConnection != nullptr && !pConnection->ClosedGracefully()) {
+
+                    auto pRequest = pConnection->Request();
+                    auto pReply = pConnection->Reply();
+
+                    pReply->ContentType = CHTTPReply::json;
+
+                    try {
+                        for (int i = 0; i < APollQuery->Count(); i++) {
+                            pResult = APollQuery->Results(i);
+
+                            if (pResult->ExecStatus() != PGRES_TUPLES_OK)
+                                throw Delphi::Exception::EDBError(pResult->GetErrorMessage());
+
+                            pReply->Content = pResult->GetValue(0, 0);
+                            pConnection->SendReply(CHTTPReply::ok, "application/json", true);
+
+                            DebugReply(pReply);
+                        }
+                    } catch (Delphi::Exception::Exception &E) {
+                        ReplyError(pConnection, CHTTPReply::bad_request, E.what());
+                        Log()->Error(APP_LOG_ERR, 0, E.what());
+                    }
+                }
+            };
+
+            auto OnException = [](CPQPollQuery *APollQuery, const Delphi::Exception::Exception &E) {
+                auto pConnection = dynamic_cast<CHTTPServerConnection *>(APollQuery->Binding());
+                ReplyError(pConnection, CHTTPReply::internal_server_error, E.what());
+            };
+
+            CStringList SQL;
+
+            SQL.Add(CString()
+                .MaxFormatSize(256 + Payload.Size())
+                .Format("SELECT * FROM ocpp.SOAPToJSON(%s::xml);", PQQuoteLiteral(Payload).c_str())
+            );
+
+            try {
+                ExecSQL(SQL, AConnection, OnExecuted, OnException);
+            } catch (Delphi::Exception::Exception &E) {
+                ReplyError(AConnection, CHTTPReply::internal_server_error, E.what());
+            }
+        }
+#endif
+        //--------------------------------------------------------------------------------------------------------------
+        void CCSService::DoPointConnected(CChargingPoint *APoint) {
+#ifdef WITH_POSTGRESQL
+            if (m_bParseInDataBase && APoint->UpdateConnected())
+                SetPointConnected(APoint, true);
+#endif
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
+        void CCSService::DoPointDisconnected(CObject *Sender) {
+            auto pConnection = dynamic_cast<CHTTPServerConnection *>(Sender);
+            if (pConnection != nullptr) {
+
+                auto pSocket = pConnection->Socket();
+
+                try {
+                    auto pPoint = CChargingPoint::FindOfConnection(pConnection);
+
+                    if (pPoint != nullptr) {
+#ifdef WITH_POSTGRESQL
+                        if (m_bParseInDataBase && pPoint->UpdateConnected()) {
+                            SetPointConnected(pPoint, false);
+                        }
+#endif
+                        if (pSocket != nullptr) {
+                            auto pHandle = pSocket->Binding();
+                            if (pHandle != nullptr) {
+                                Log()->Message(_T("[%s:%d] Point \"%s\" closed connection."),
+                                               pHandle->PeerIP(), pHandle->PeerPort(),
+                                               pPoint->Identity().IsEmpty() ? "(empty)" : pPoint->Identity().c_str()
+                                               );
+                            }
+                        } else {
+                            Log()->Message(_T("Point \"%s\" closed connection."),
+                                           pPoint->Identity().IsEmpty() ? "(empty)" : pPoint->Identity().c_str());
+                        }
+
+                        if (pPoint->UpdateCount() == 0) {
+                            delete pPoint;
+                        }
+                    } else {
+                        if (pSocket != nullptr) {
+                            auto pHandle = pSocket->Binding();
+                            if (pHandle != nullptr) {
+                                Log()->Message(_T("[%s:%d] Unknown point closed connection."),
+                                               pHandle->PeerIP(), pHandle->PeerPort()
+                                               );
+                            }
+                        } else {
+                            Log()->Message(_T("Unknown point closed connection."));
+                        }
+                    }
+                } catch (Delphi::Exception::Exception &E) {
+                    Log()->Error(APP_LOG_ERR, 0, E.what());
+                }
+            }
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
+        void CCSService::DoWebSocketError(CHTTPServerConnection *AConnection, const Delphi::Exception::Exception &E) {
+
+            Log()->Error(APP_LOG_ERR, 0, E.what());
+
+            if (AConnection != nullptr && !AConnection->ClosedGracefully()) {
+                auto pWSRequest = AConnection->WSRequest();
+                auto pWSReply = AConnection->WSReply();
+
+                const CString csRequest(pWSRequest->Payload());
+
+                CJSONMessage jmRequest;
+                CJSONProtocol::Request(csRequest, jmRequest);
+
+                CJSONMessage jmResponse;
+                CString sResponse;
+
+                CJSON jResult;
+
+                CJSONProtocol::PrepareResponse(jmRequest, jmResponse);
+
+                jmResponse.MessageTypeId = OCPP::mtCallError;
+                jmResponse.ErrorCode = "InternalError";
+                jmResponse.ErrorDescription = E.what();
+
+                CJSONProtocol::Response(jmResponse, sResponse);
+
+                pWSReply->SetPayload(sResponse);
+                AConnection->SendWebSocket(true);
+            }
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
+        void CCSService::SOAPError(CHTTPServerConnection *AConnection, const CString &Code, const CString &SubCode,
+                const CString &Reason, const CString &Message) {
+
+            auto pReply = AConnection->Reply();
+
+            pReply->ContentType = CHTTPReply::xml;
+
+            pReply->Content.Clear();
+            pReply->Content.Format(R"(<?xml version="1.0" encoding="UTF-8"?>)" LINEFEED R"(<se:Envelope xmlns:se="http://www.w3.org/2003/05/soap-envelope" xmlns:wsa5="http://www.w3.org/2005/08/addressing" xmlns:cp="urn://Ocpp/Cp/2015/10/" xmlns:cs="urn://Ocpp/Cs/2015/10/"><se:Body><se:Fault><se:Code><se:Value>se:%s</se:Value><cs:SubCode><se:Value>cs:%s</se:Value></cs:SubCode></se:Code><se:Reason><se:Text>%s<se:/Text></se:Reason><se:Detail><se:Text>%s</se:Text></se:Detail></se:Fault></se:Body></se:Envelope>)", Code.c_str(), SubCode.c_str(), Reason.c_str(), Delphi::Json::EncodeJsonString(Message).c_str());
+
+            AConnection->SendReply(CHTTPReply::ok, "application/soap+xml", true);
+
+            Log()->Error(APP_LOG_ERR, 0, _T("SOAPError: %s"), Message.c_str());
         }
         //--------------------------------------------------------------------------------------------------------------
 
@@ -675,8 +797,11 @@ namespace Apostol {
 
                 DebugReply(pReply);
 
+#ifdef WITH_POSTGRESQL
                 SOAPToJSON(AConnection, pReply->Content);
-
+#else
+                AConnection->SendStockReply(CHTTPReply::not_implemented);
+#endif
                 pConnection->CloseConnection(true);
                 return true;
             };
@@ -697,129 +822,14 @@ namespace Apostol {
             pClient->Data().Values("payload", Payload);
 
             pClient->OnRequest(OnRequest);
+#ifdef WITH_POSTGRESQL
             pClient->OnExecute(OnExecute);
+#else
+            pClient->OnExecute(OnExecuteLocal);
+#endif
             pClient->OnException(OnException);
 
             pClient->Active(true);
-        }
-        //--------------------------------------------------------------------------------------------------------------
-
-        void CCSService::JSONToSOAP(CHTTPServerConnection *AConnection, CChargingPoint *APoint, const CString &Operation,
-            const CJSON &Payload) {
-
-            auto OnExecuted = [this, APoint, &Operation](CPQPollQuery *APollQuery) {
-
-                CPQResult *pResult;
-
-                auto pConnection = dynamic_cast<CHTTPServerConnection *>(APollQuery->Binding());
-
-                if (pConnection != nullptr && !pConnection->ClosedGracefully()) {
-
-                    auto pRequest = pConnection->Request();
-                    auto pReply = pConnection->Reply();
-
-                    try {
-                        for (int i = 0; i < APollQuery->Count(); i++) {
-                            pResult = APollQuery->Results(i);
-
-                            if (pResult->ExecStatus() != PGRES_TUPLES_OK)
-                                throw Delphi::Exception::EDBError(pResult->GetErrorMessage());
-
-                            CString caPayload(R"(<?xml version="1.0" encoding="UTF-8"?>)" LINEFEED);
-                            caPayload << pResult->GetValue(0, 0);
-
-                            SendSOAP(pConnection, APoint, Operation, caPayload);
-                        }
-                    } catch (Delphi::Exception::Exception &E) {
-                        ReplyError(pConnection, CHTTPReply::bad_request, E.what());
-                        Log()->Error(APP_LOG_ERR, 0, E.what());
-                    }
-                }
-            };
-
-            auto OnException = [](CPQPollQuery *APollQuery, const Delphi::Exception::Exception &E) {
-                auto pConnection = dynamic_cast<CHTTPServerConnection *>(APollQuery->Binding());
-                ReplyError(pConnection, CHTTPReply::internal_server_error, E.what());
-            };
-
-            CStringList SQL;
-
-            CJSON Data;
-            CJSONObject Header;
-
-            Header.AddPair("chargeBoxIdentity", APoint->Identity());
-            Header.AddPair("Action", Operation);
-            Header.AddPair("To", APoint->Address());
-
-            Data.Object().AddPair("header", Header);
-            Data.Object().AddPair("payload", Payload.Object());
-
-            const auto &data = Data.ToString();
-
-            SQL.Add(CString()
-                .MaxFormatSize(256 + data.Size())
-                .Format("SELECT * FROM ocpp.JSONToSOAP(%s::jsonb);", PQQuoteLiteral(data).c_str())
-            );
-
-            try {
-                ExecSQL(SQL, AConnection, OnExecuted, OnException);
-            } catch (Delphi::Exception::Exception &E) {
-                ReplyError(AConnection, CHTTPReply::internal_server_error, E.what());
-            }
-        }
-        //--------------------------------------------------------------------------------------------------------------
-
-        void CCSService::SOAPToJSON(CHTTPServerConnection *AConnection, const CString &Payload) {
-
-            auto OnExecuted = [](CPQPollQuery *APollQuery) {
-
-                CPQResult *pResult;
-
-                auto pConnection = dynamic_cast<CHTTPServerConnection *>(APollQuery->Binding());
-
-                if (pConnection != nullptr && !pConnection->ClosedGracefully()) {
-
-                    auto pRequest = pConnection->Request();
-                    auto pReply = pConnection->Reply();
-
-                    pReply->ContentType = CHTTPReply::json;
-
-                    try {
-                        for (int i = 0; i < APollQuery->Count(); i++) {
-                            pResult = APollQuery->Results(i);
-
-                            if (pResult->ExecStatus() != PGRES_TUPLES_OK)
-                                throw Delphi::Exception::EDBError(pResult->GetErrorMessage());
-
-                            pReply->Content = pResult->GetValue(0, 0);
-                            pConnection->SendReply(CHTTPReply::ok, "application/json", true);
-
-                            DebugReply(pReply);
-                        }
-                    } catch (Delphi::Exception::Exception &E) {
-                        ReplyError(pConnection, CHTTPReply::bad_request, E.what());
-                        Log()->Error(APP_LOG_ERR, 0, E.what());
-                    }
-                }
-            };
-
-            auto OnException = [](CPQPollQuery *APollQuery, const Delphi::Exception::Exception &E) {
-                auto pConnection = dynamic_cast<CHTTPServerConnection *>(APollQuery->Binding());
-                ReplyError(pConnection, CHTTPReply::internal_server_error, E.what());
-            };
-
-            CStringList SQL;
-
-            SQL.Add(CString()
-                .MaxFormatSize(256 + Payload.Size())
-                .Format("SELECT * FROM ocpp.SOAPToJSON(%s::xml);", PQQuoteLiteral(Payload).c_str())
-            );
-
-            try {
-                ExecSQL(SQL, AConnection, OnExecuted, OnException);
-            } catch (Delphi::Exception::Exception &E) {
-                ReplyError(AConnection, CHTTPReply::internal_server_error, E.what());
-            }
         }
         //--------------------------------------------------------------------------------------------------------------
 
@@ -936,7 +946,11 @@ namespace Apostol {
 
                 SendJSON(AConnection, pPoint, Operation, Json);
             } else {
+#ifdef WITH_POSTGRESQL
                 JSONToSOAP(AConnection, pPoint, Operation, Json);
+#else
+                AConnection->SendStockReply(CHTTPReply::not_implemented);
+#endif
             }
         }
         //--------------------------------------------------------------------------------------------------------------
@@ -1043,8 +1057,12 @@ namespace Apostol {
             auto pReply = AConnection->Reply();
 
             if (m_bParseInDataBase) {
+#ifdef WITH_POSTGRESQL
                 // Обработаем запрос в СУБД
                 ParseSOAP(AConnection, pRequest->Content);
+#else
+                AConnection->SendStockReply(CHTTPReply::not_implemented);
+#endif
             } else {
                 auto pPoint = m_PointManager.FindPointByConnection(AConnection);
 
@@ -1135,8 +1153,12 @@ namespace Apostol {
                     CJSONProtocol::Request(csRequest, jmRequest);
 
                     if (jmRequest.MessageTypeId == OCPP::mtCall) {
+#ifdef WITH_POSTGRESQL
                         // Let's process the request in the DBMS
                         ParseJSON(AConnection, pPoint->Identity(), jmRequest.Action, jmRequest.Payload);
+#else
+                        AConnection->SendStockReply(CHTTPReply::not_implemented);
+#endif
                     } else {
                         // We will send the response from the charging station to the handler
                         auto pHandler = pPoint->Messages()->FindMessageById(jmRequest.UniqueId);
