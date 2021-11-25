@@ -1167,11 +1167,12 @@ namespace Apostol {
         void CCSService::DoWebSocket(CHTTPServerConnection *AConnection) {
             try {
                 auto pPoint = dynamic_cast<CCSChargingPoint *> (CCSChargingPoint::FindOfConnection(AConnection));
-#ifdef WITH_POSTGRESQL
+
                 auto pWSRequest = AConnection->WSRequest();
 
                 const CString request(pWSRequest->Payload());
 
+#ifdef WITH_POSTGRESQL
                 CJSONMessage message;
                 CJSONProtocol::Request(request, message);
 
@@ -1190,15 +1191,15 @@ namespace Apostol {
 #else
                 auto pWSReply = AConnection->WSReply();
 
-                CString sResponse;
+                CString response;
 
-                if (pPoint->Parse(csRequest, sResponse)) {
-                    if (!sResponse.IsEmpty()) {
-                        pWSReply->SetPayload(sResponse);
+                if (pPoint->Parse(request, response)) {
+                    if (!response.IsEmpty()) {
+                        pWSReply->SetPayload(response);
                         AConnection->SendWebSocket();
                     }
                 } else {
-                    Log()->Error(APP_LOG_ERR, 0, "Unknown WebSocket request: %s", csRequest.c_str());
+                    Log()->Error(APP_LOG_ERR, 0, "Unknown WebSocket request: %s", request.c_str());
                 }
 #endif
             } catch (std::exception &e) {
