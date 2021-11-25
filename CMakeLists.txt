@@ -12,11 +12,12 @@ message(STATUS "Project description: ${PROJECT_DESCRIPTION}")
 
 # Settings
 # ----------------------------------------------------------------------------------------------------------------------
-set(INSTALL_AS_ROOT  ON  CACHE BOOL "Install as root")
-set(WITH_POSTGRESQL  ON  CACHE BOOL "Build with PostgreSQL")
-set(WITH_SSL         ON  CACHE BOOL "Build with SSL")
-set(WITH_CURL        OFF CACHE BOOL "Build with cURL")
-set(WITH_SQLITE3     OFF CACHE BOOL "Build with Sqlite3")
+set(INSTALL_AS_ROOT    ON  CACHE BOOL "Install as root")
+set(WITH_AUTHORIZATION ON  CACHE BOOL "Build with authorization")
+set(WITH_POSTGRESQL    ON  CACHE BOOL "Build with PostgreSQL")
+set(WITH_SSL           ON  CACHE BOOL "Build with SSL")
+set(WITH_CURL          OFF CACHE BOOL "Build with cURL")
+set(WITH_SQLITE3       OFF CACHE BOOL "Build with Sqlite3")
 # ----------------------------------------------------------------------------------------------------------------------
 
 if (INSTALL_AS_ROOT)
@@ -54,6 +55,10 @@ include_directories(${DELPHI_LIB_DIR}/src)
 
 add_compile_options("-DDELPHI_LIB_EXPORTS")
 add_compile_options(-DWWWServerName="${PROJECT_DESCRIPTION}")
+
+if (WITH_AUTHORIZATION)
+    add_compile_options("-DWITH_AUTHORIZATION")
+endif()
 
 if (WITH_POSTGRESQL)
     set(PQ_LIB_NAME "pq")
@@ -176,6 +181,7 @@ install(DIRECTORY DESTINATION ${INSTALL_PATH}/oauth2)
 install(DIRECTORY DESTINATION ${INSTALL_PATH}/conf)
 install(DIRECTORY DESTINATION ${INSTALL_PATH}/logs)
 install(DIRECTORY DESTINATION ${INSTALL_PATH}/sites)
+install(DIRECTORY DESTINATION ${INSTALL_PATH}/cp)
 install(DIRECTORY conf/oauth2/ DESTINATION ${INSTALL_PATH}/oauth2)
 install(DIRECTORY conf/sites/ DESTINATION ${INSTALL_PATH}/sites)
 install(DIRECTORY www/ DESTINATION ${INSTALL_PATH}/www)

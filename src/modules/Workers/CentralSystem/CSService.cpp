@@ -10,7 +10,7 @@ Module Name:
 
 Notices:
 
-  Module CSService
+  Module: Central System Service
 
 Author:
 
@@ -24,7 +24,7 @@ Author:
 //----------------------------------------------------------------------------------------------------------------------
 
 #include "Core.hpp"
-#include "Service.hpp"
+#include "CSService.hpp"
 //----------------------------------------------------------------------------------------------------------------------
 
 #include "jwt.h"
@@ -45,9 +45,8 @@ namespace Apostol {
         CCSService::CCSService(CModuleProcess *AProcess) : CApostolModule(AProcess, "ocpp central system service") {
             m_Headers.Add("Authorization");
 
-            m_bParseInDataBase = false;
-
             CCSService::InitMethods();
+
             InitOperations();
         }
         //--------------------------------------------------------------------------------------------------------------
@@ -79,86 +78,122 @@ namespace Apostol {
 
         void CCSService::InitOperations() {
             
-            m_Operations.AddPair("CancelReservation", CStringList());
-            m_Operations.Last().Value().Add("reservationId=true");
+            m_Operations.AddPair("CancelReservation", {});
+            m_Operations.Last().Value().Add({"reservationId", "integer", true});
 
-            m_Operations.AddPair("ChangeAvailability", CStringList());
-            m_Operations.Last().Value().Add("connectorId=true");
-            m_Operations.Last().Value().Add("type=true");
+            m_Operations.AddPair("ChangeAvailability", {});
+            m_Operations.Last().Value().Add({"connectorId", "integer", true});
+            m_Operations.Last().Value().Add({"type", "AvailabilityType", true});
 
-            m_Operations.AddPair("ChangeConfiguration", CStringList());
-            m_Operations.Last().Value().Add("key=true");
-            m_Operations.Last().Value().Add("value=true");
+            m_Operations.AddPair("ChangeConfiguration", {});
+            m_Operations.Last().Value().Add({"key", "CiString50Type", true});
+            m_Operations.Last().Value().Add({"value", "CiString500Type", true});
 
-            m_Operations.AddPair("ClearCache", CStringList());
+            m_Operations.AddPair("ClearCache", {});
 
-            m_Operations.AddPair("ClearChargingProfile", CStringList());
-            m_Operations.Last().Value().Add("id=false");
-            m_Operations.Last().Value().Add("connectorId=false");
-            m_Operations.Last().Value().Add("chargingProfilePurpose=false");
-            m_Operations.Last().Value().Add("stackLevel=false");
+            m_Operations.AddPair("ClearChargingProfile", {});
+            m_Operations.Last().Value().Add({"id", "integer", false});
+            m_Operations.Last().Value().Add({"connectorId", "integer", false});
+            m_Operations.Last().Value().Add({"chargingProfilePurpose", "ChargingProfilePurposeType", false});
+            m_Operations.Last().Value().Add({"stackLevel", "integer", false});
 
-            m_Operations.AddPair("DataTransfer", CStringList());
-            m_Operations.Last().Value().Add("vendorId=true");
-            m_Operations.Last().Value().Add("messageId=false");
-            m_Operations.Last().Value().Add("data=false");
+            m_Operations.AddPair("DataTransfer", {});
+            m_Operations.Last().Value().Add({"vendorId", "CiString255Type", true});
+            m_Operations.Last().Value().Add({"messageId", "CiString50Type", false});
+            m_Operations.Last().Value().Add({"data", "Text", false});
 
-            m_Operations.AddPair("GetCompositeSchedule", CStringList());
-            m_Operations.Last().Value().Add("connectorId=true");
-            m_Operations.Last().Value().Add("duration=true");
-            m_Operations.Last().Value().Add("chargingRateUnit=false");
+            m_Operations.AddPair("DiagnosticsStatusNotification", {});
+            m_Operations.Last().Value().Add({"status", "DiagnosticsStatus", true});
 
-            m_Operations.AddPair("GetConfiguration", CStringList());
-            m_Operations.Last().Value().Add("key=false");
+            m_Operations.AddPair("FirmwareStatusNotification", {});
+            m_Operations.Last().Value().Add({"vendorId", "FirmwareStatus", true});
 
-            m_Operations.AddPair("GetDiagnostics", CStringList());
-            m_Operations.Last().Value().Add("location=true");
-            m_Operations.Last().Value().Add("retries=false");
-            m_Operations.Last().Value().Add("retryInterval=false");
-            m_Operations.Last().Value().Add("startTime=false");
-            m_Operations.Last().Value().Add("stopTime=false");
+            m_Operations.AddPair("GetCompositeSchedule", {});
+            m_Operations.Last().Value().Add({"connectorId", "integer", true});
+            m_Operations.Last().Value().Add({"duration", "integer", true});
+            m_Operations.Last().Value().Add({"chargingRateUnit", "ChargingRateUnitType", false});
 
-            m_Operations.AddPair("GetLocalListVersion", CStringList());
+            m_Operations.AddPair("GetConfiguration", {});
+            m_Operations.Last().Value().Add({"key", "CiString50Type", false});
 
-            m_Operations.AddPair("RemoteStartTransaction", CStringList());
-            m_Operations.Last().Value().Add("connectorId=false");
-            m_Operations.Last().Value().Add("idTag=true");
-            m_Operations.Last().Value().Add("chargingProfile=false");
+            m_Operations.AddPair("GetDiagnostics", {});
+            m_Operations.Last().Value().Add({"location", "anyURI", true});
+            m_Operations.Last().Value().Add({"retries", "integer", false});
+            m_Operations.Last().Value().Add({"retryInterval", "integer", false});
+            m_Operations.Last().Value().Add({"startTime", "dateTime", false});
+            m_Operations.Last().Value().Add({"stopTime", "dateTime", false});
 
-            m_Operations.AddPair("RemoteStopTransaction", CStringList());
-            m_Operations.Last().Value().Add("transactionId=true");
+            m_Operations.AddPair("GetLocalListVersion", {});
+            m_Operations.AddPair("Heartbeat", {});
 
-            m_Operations.AddPair("ReserveNow", CStringList());
-            m_Operations.Last().Value().Add("connectorId=true");
-            m_Operations.Last().Value().Add("expiryDate=true");
-            m_Operations.Last().Value().Add("idTag=true");
-            m_Operations.Last().Value().Add("parentIdTag=false");
-            m_Operations.Last().Value().Add("reservationId=true");
+            m_Operations.AddPair("MeterValues", {});
+            m_Operations.Last().Value().Add({"connectorId", "integer", true});
+            m_Operations.Last().Value().Add({"transactionId", "integer", true});
+            m_Operations.Last().Value().Add({"meterValue", "MeterValue", false});
 
-            m_Operations.AddPair("Reset", CStringList());
-            m_Operations.Last().Value().Add("type=true");
+            m_Operations.AddPair("RemoteStartTransaction", {});
+            m_Operations.Last().Value().Add({"connectorId", "integer", false});
+            m_Operations.Last().Value().Add({"idTag", "IdToken", true});
+            m_Operations.Last().Value().Add({"chargingProfile", "ChargingProfile", false});
 
-            m_Operations.AddPair("SendLocalList", CStringList());
-            m_Operations.Last().Value().Add("listVersion=true");
-            m_Operations.Last().Value().Add("localAuthorizationList=false");
-            m_Operations.Last().Value().Add("updateType=true");
+            m_Operations.AddPair("RemoteStopTransaction", {});
+            m_Operations.Last().Value().Add({"transactionId", "integer", true});
 
-            m_Operations.AddPair("SetChargingProfile", CStringList());
-            m_Operations.Last().Value().Add("connectorId=true");
-            m_Operations.Last().Value().Add("csChargingProfiles=true");
+            m_Operations.AddPair("ReserveNow", {});
+            m_Operations.Last().Value().Add({"connectorId", "integer", true});
+            m_Operations.Last().Value().Add({"expiryDate", "dateTime", true});
+            m_Operations.Last().Value().Add({"idTag", "IdToken", true});
+            m_Operations.Last().Value().Add({"parentIdTag", "IdToken", false});
+            m_Operations.Last().Value().Add({"reservationId", "integer", true});
 
-            m_Operations.AddPair("TriggerMessage", CStringList());
-            m_Operations.Last().Value().Add("requestedMessage=true");
-            m_Operations.Last().Value().Add("connectorId=false");
+            m_Operations.AddPair("Reset", {});
+            m_Operations.Last().Value().Add({"type", "ResetType", true});
 
-            m_Operations.AddPair("UnlockConnector", CStringList());
-            m_Operations.Last().Value().Add("connectorId=true");
+            m_Operations.AddPair("SendLocalList", {});
+            m_Operations.Last().Value().Add({"listVersion", "integer", true});
+            m_Operations.Last().Value().Add({"localAuthorizationList", "AuthorizationData", false});
+            m_Operations.Last().Value().Add({"updateType", "UpdateType", true});
 
-            m_Operations.AddPair("UpdateFirmware", CStringList());
-            m_Operations.Last().Value().Add("location=true");
-            m_Operations.Last().Value().Add("retries=false");
-            m_Operations.Last().Value().Add("retrieveDate=true");
-            m_Operations.Last().Value().Add("retryInterval=false");
+            m_Operations.AddPair("SetChargingProfile", {});
+            m_Operations.Last().Value().Add({"connectorId", "integer", true});
+            m_Operations.Last().Value().Add({"csChargingProfiles", "ChargingProfile", true});
+
+            m_Operations.AddPair("StartTransaction", {});
+            m_Operations.Last().Value().Add({"connectorId", "integer", true});
+            m_Operations.Last().Value().Add({"idTag", "IdToken", true});
+            m_Operations.Last().Value().Add({"meterStart", "integer", true});
+            m_Operations.Last().Value().Add({"reservationId", "integer", false});
+            m_Operations.Last().Value().Add({"timestamp", "dateTime", true});
+
+            m_Operations.AddPair("StatusNotification", {});
+            m_Operations.Last().Value().Add({"connectorId", "integer", true});
+            m_Operations.Last().Value().Add({"errorCode", "ChargePointErrorCode", true});
+            m_Operations.Last().Value().Add({"info", "CiString50Type", false});
+            m_Operations.Last().Value().Add({"status", "ChargePointStatus", true});
+            m_Operations.Last().Value().Add({"timestamp", "dateTime", false});
+            m_Operations.Last().Value().Add({"vendorId", "CiString255Type", false});
+            m_Operations.Last().Value().Add({"vendorErrorCode", "CiString50Type", false});
+
+            m_Operations.AddPair("StopTransaction", {});
+            m_Operations.Last().Value().Add({"idTag", "IdToken", false});
+            m_Operations.Last().Value().Add({"meterStop", "integer", true});
+            m_Operations.Last().Value().Add({"timestamp", "dateTime", true});
+            m_Operations.Last().Value().Add({"transactionId", "integer", true});
+            m_Operations.Last().Value().Add({"reason", "Reason", false});
+            m_Operations.Last().Value().Add({"transactionData", "MeterValue", false});
+
+            m_Operations.AddPair("TriggerMessage", {});
+            m_Operations.Last().Value().Add({"requestedMessage", "MessageTrigger", true});
+            m_Operations.Last().Value().Add({"connectorId", "integer", false});
+
+            m_Operations.AddPair("UnlockConnector", {});
+            m_Operations.Last().Value().Add({"connectorId", "integer", true});
+
+            m_Operations.AddPair("UpdateFirmware", {});
+            m_Operations.Last().Value().Add({"location", "anyURI", true});
+            m_Operations.Last().Value().Add({"retries", "integer", false});
+            m_Operations.Last().Value().Add({"retrieveDate", "dateTime", true});
+            m_Operations.Last().Value().Add({"retryInterval", "integer", false});
         }
         //--------------------------------------------------------------------------------------------------------------
 #ifdef WITH_POSTGRESQL
@@ -184,7 +219,7 @@ namespace Apostol {
         }
         //--------------------------------------------------------------------------------------------------------------
 
-        void CCSService::SetPointConnected(CChargingPoint *APoint, bool Value) {
+        void CCSService::SetPointConnected(CCSChargingPoint *APoint, bool Value) {
 
             auto OnExecuted = [](CPQPollQuery *APollQuery) {
 
@@ -251,7 +286,7 @@ namespace Apostol {
 
                             if (pPoint == nullptr) {
                                 pPoint = m_PointManager.Add(nullptr);
-                                pPoint->ProtocolType(OCPP::ptSOAP);
+                                pPoint->ProtocolType(ChargePoint::ptSOAP);
                                 pPoint->Identity() = caIdentity;
                             }
 
@@ -292,8 +327,7 @@ namespace Apostol {
         }
         //--------------------------------------------------------------------------------------------------------------
 
-        void CCSService::ParseJSON(CHTTPServerConnection *AConnection, const CString &Identity, const CString &Action,
-                const CJSON &Payload) {
+        void CCSService::ParseJSON(CHTTPServerConnection *AConnection, const CString &Identity, const CJSONMessage &Message) {
 
             auto OnExecuted = [](CPQPollQuery *APollQuery) {
 
@@ -303,20 +337,12 @@ namespace Apostol {
 
                 if (pConnection != nullptr && !pConnection->ClosedGracefully()) {
 
-                    auto pWSRequest = pConnection->WSRequest();
                     auto pWSReply = pConnection->WSReply();
 
-                    const CString csRequest(pWSRequest->Payload());
-
-                    CJSONMessage jmRequest;
-                    CJSONProtocol::Request(csRequest, jmRequest);
-
-                    CJSONMessage jmResponse;
-                    CString sResponse;
-
-                    CJSON jResult;
-
-                    CJSONProtocol::PrepareResponse(jmRequest, jmResponse);
+                    CJSONMessage message;
+                    CString identity;
+                    CString response;
+                    CJSON result;
 
                     try {
                         for (int i = 0; i < APollQuery->Count(); i++) {
@@ -325,29 +351,36 @@ namespace Apostol {
                             if (pResult->ExecStatus() != PGRES_TUPLES_OK)
                                 throw Delphi::Exception::EDBError(pResult->GetErrorMessage());
 
-                            jResult << pResult->GetValue(0, 0);
+                            result << pResult->GetValue(0, 0);
 
-                            const auto &caResponse = jResult["response"];
+                            identity = result["identity"].AsString();
 
-                            if (!jResult["result"].AsBoolean()) {
-                                jmResponse.Payload << caResponse["error"].ToString();
-                                throw Delphi::Exception::EDBError("Database query execution.");
+                            message.MessageTypeId = COCPPMessage::StringToMessageTypeId(result["messageTypeId"].AsString());
+                            message.UniqueId = result["uniqueId"].AsString();
+                            message.Action = result["action"].AsString();
+
+                            if (message.MessageTypeId == ChargePoint::mtCallError) {
+                                message.ErrorCode = result["errorCode"].AsString();
+                                message.ErrorDescription = result["errorDescription"].AsString();
+                                message.Payload << result["errorDescription"];
+                            } else {
+                                message.Payload << result["payload"].ToString();
                             }
-
-                            jmResponse.Payload << caResponse.ToString();
                         }
                     } catch (Delphi::Exception::Exception &E) {
-                        jmResponse.MessageTypeId = OCPP::mtCallError;
-                        jmResponse.ErrorCode = "InternalError";
-                        jmResponse.ErrorDescription = E.what();
+                        message.MessageTypeId = ChargePoint::mtCallError;
+                        message.ErrorCode = "InternalError";
+                        message.ErrorDescription = E.what();
 
                         Log()->Error(APP_LOG_ERR, 0, E.what());
                     }
 
-                    CJSONProtocol::Response(jmResponse, sResponse);
+                    CJSONProtocol::Response(message, response);
 
-                    pWSReply->SetPayload(sResponse);
+                    pWSReply->SetPayload(response);
                     pConnection->SendWebSocket(true);
+
+                    LogJSONMessage(identity, message);
                 }
             };
 
@@ -356,15 +389,18 @@ namespace Apostol {
                 DoWebSocketError(pConnection, E);
             };
 
+            LogJSONMessage(Identity, Message);
+
+            auto const &payload = Message.Payload.ToString();
+
             CStringList SQL;
 
-            auto const &payload = Payload.ToString();
-
             SQL.Add(CString()
-                .MaxFormatSize(256 + Identity.Size() + Action.Size() + payload.Size())
-                .Format("SELECT * FROM ocpp.Parse(%s, %s, %s::jsonb);",
+                .MaxFormatSize(256 + Identity.Size() + Message.Size() + payload.Size())
+                .Format("SELECT * FROM ocpp.Parse(%s, %s, %s, %s::jsonb);",
                         PQQuoteLiteral(Identity).c_str(),
-                        PQQuoteLiteral(Action).c_str(),
+                        PQQuoteLiteral(Message.UniqueId).c_str(),
+                        PQQuoteLiteral(Message.Action).c_str(),
                         PQQuoteLiteral(payload).c_str())
             );
 
@@ -376,7 +412,7 @@ namespace Apostol {
         }
         //--------------------------------------------------------------------------------------------------------------
 
-        void CCSService::JSONToSOAP(CHTTPServerConnection *AConnection, CChargingPoint *APoint, const CString &Operation,
+        void CCSService::JSONToSOAP(CHTTPServerConnection *AConnection, CCSChargingPoint *APoint, const CString &Operation,
             const CJSON &Payload) {
 
             auto OnExecuted = [this, APoint, &Operation](CPQPollQuery *APollQuery) {
@@ -386,10 +422,6 @@ namespace Apostol {
                 auto pConnection = dynamic_cast<CHTTPServerConnection *>(APollQuery->Binding());
 
                 if (pConnection != nullptr && !pConnection->ClosedGracefully()) {
-
-                    auto pRequest = pConnection->Request();
-                    auto pReply = pConnection->Reply();
-
                     try {
                         for (int i = 0; i < APollQuery->Count(); i++) {
                             pResult = APollQuery->Results(i);
@@ -495,9 +527,34 @@ namespace Apostol {
         }
 #endif
         //--------------------------------------------------------------------------------------------------------------
-        void CCSService::DoPointConnected(CChargingPoint *APoint) {
+
+        void CCSService::LogJSONMessage(const CString &Identity, const CJSONMessage &Message) {
+            Log()->Message("[%s] [%s] [%s] [%s] %s",
+                Identity.IsEmpty() ? "(empty)" : Identity.c_str(),
+                Message.UniqueId.IsEmpty() ? "(empty)" : Message.UniqueId.c_str(),
+                Message.Action.IsEmpty() ? "(empty)" : Message.Action.c_str(),
+                COCPPMessage::MessageTypeIdToString(Message.MessageTypeId).c_str(),
+                Message.Payload.IsNull() ? "{}" : Message.Payload.ToString().c_str()
+            );
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
+        void CCSService::OnChargePointMessageSOAP(CObject *Sender, const CSOAPMessage &Message) {
+            auto pPoint = dynamic_cast<CCSChargingPoint *> (Sender);
+            chASSERT(pPoint);
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
+        void CCSService::OnChargePointMessageJSON(CObject *Sender, const CJSONMessage &Message) {
+            auto pPoint = dynamic_cast<CCSChargingPoint *> (Sender);
+            chASSERT(pPoint);
+            LogJSONMessage(pPoint->Identity(), Message);
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
+        void CCSService::DoPointConnected(CCSChargingPoint *APoint) {
 #ifdef WITH_POSTGRESQL
-            if (m_bParseInDataBase && APoint->UpdateConnected())
+            if (APoint->UpdateConnected())
                 SetPointConnected(APoint, true);
 #endif
         }
@@ -510,24 +567,24 @@ namespace Apostol {
                 auto pSocket = pConnection->Socket();
 
                 try {
-                    auto pPoint = CChargingPoint::FindOfConnection(pConnection);
+                    auto pPoint = dynamic_cast<CCSChargingPoint *> (CCSChargingPoint::FindOfConnection(pConnection));
 
                     if (pPoint != nullptr) {
 #ifdef WITH_POSTGRESQL
-                        if (m_bParseInDataBase && pPoint->UpdateConnected()) {
+                        if (pPoint->UpdateConnected()) {
                             SetPointConnected(pPoint, false);
                         }
 #endif
                         if (pSocket != nullptr) {
                             auto pHandle = pSocket->Binding();
                             if (pHandle != nullptr) {
-                                Log()->Message(_T("[%s:%d] Point \"%s\" closed connection."),
+                                Log()->Notice(_T("[%s:%d] Point \"%s\" closed connection."),
                                                pHandle->PeerIP(), pHandle->PeerPort(),
                                                pPoint->Identity().IsEmpty() ? "(empty)" : pPoint->Identity().c_str()
                                                );
                             }
                         } else {
-                            Log()->Message(_T("Point \"%s\" closed connection."),
+                            Log()->Notice(_T("Point \"%s\" closed connection."),
                                            pPoint->Identity().IsEmpty() ? "(empty)" : pPoint->Identity().c_str());
                         }
 
@@ -538,12 +595,12 @@ namespace Apostol {
                         if (pSocket != nullptr) {
                             auto pHandle = pSocket->Binding();
                             if (pHandle != nullptr) {
-                                Log()->Message(_T("[%s:%d] Unknown point closed connection."),
+                                Log()->Notice(_T("[%s:%d] Unknown point closed connection."),
                                                pHandle->PeerIP(), pHandle->PeerPort()
                                                );
                             }
                         } else {
-                            Log()->Message(_T("Unknown point closed connection."));
+                            Log()->Warning(_T("Unknown point closed connection."));
                         }
                     }
                 } catch (Delphi::Exception::Exception &E) {
@@ -573,7 +630,7 @@ namespace Apostol {
 
                 CJSONProtocol::PrepareResponse(jmRequest, jmResponse);
 
-                jmResponse.MessageTypeId = OCPP::mtCallError;
+                jmResponse.MessageTypeId = ChargePoint::mtCallError;
                 jmResponse.ErrorCode = "InternalError";
                 jmResponse.ErrorDescription = E.what();
 
@@ -581,6 +638,16 @@ namespace Apostol {
 
                 pWSReply->SetPayload(sResponse);
                 AConnection->SendWebSocket(true);
+
+                auto pPoint = dynamic_cast<CCSChargingPoint *> (CCSChargingPoint::FindOfConnection(AConnection));
+
+                if (pPoint != nullptr) {
+                    Log()->Message("[%s] [%s] [%s] [%s] %s", pPoint->Identity().c_str(),
+                                   jmResponse.UniqueId.c_str(),
+                                   jmResponse.Action.IsEmpty() ? "Unknown" : jmResponse.Action.c_str(),
+                                   COCPPMessage::MessageTypeIdToString(jmResponse.MessageTypeId).c_str(),
+                                   jmResponse.Payload.IsNull() ? "{}" : jmResponse.Payload.ToString().c_str());
+                }
             }
         }
         //--------------------------------------------------------------------------------------------------------------
@@ -600,7 +667,7 @@ namespace Apostol {
             Log()->Error(APP_LOG_ERR, 0, _T("SOAPError: %s"), Message.c_str());
         }
         //--------------------------------------------------------------------------------------------------------------
-
+#ifdef WITH_AUTHORIZATION
         void CCSService::VerifyToken(const CString &Token) {
 
             const auto& GetSecret = [](const CProvider &Provider, const CString &Application) {
@@ -617,11 +684,11 @@ namespace Apostol {
 
             const auto& Providers = Server().Providers();
 
-            const auto Index = OAuth2::Helper::ProviderByClientId(Providers, aud, Application);
-            if (Index == -1)
+            const auto index = OAuth2::Helper::ProviderByClientId(Providers, aud, Application);
+            if (index == -1)
                 throw COAuth2Error(_T("Not found provider by Client ID."));
 
-            const auto& Provider = Providers[Index].Value();
+            const auto& Provider = Providers[index].Value();
 
             const auto& iss = CString(decoded.get_issuer());
 
@@ -708,15 +775,14 @@ namespace Apostol {
             return false;
         }
         //--------------------------------------------------------------------------------------------------------------
+#endif
+        void CCSService::SendJSON(CHTTPServerConnection *AConnection, CCSChargingPoint *APoint, const CJSONMessage &Message) {
 
-        void CCSService::SendJSON(CHTTPServerConnection *AConnection, CChargingPoint *APoint, const CString &Operation,
-                const CJSON &Payload) {
-
-            auto OnRequest = [AConnection](OCPP::CMessageHandler *AHandler, CHTTPServerConnection *AWSConnection) {
+            auto OnRequest = [AConnection, APoint](COCPPMessageHandler *AHandler, CWebSocketConnection *AWSConnection) {
 
                 auto pWSRequest = AWSConnection->WSRequest();
 
-                if (!AConnection->ClosedGracefully()) {
+                if (AConnection != nullptr && !AConnection->ClosedGracefully()) {
 
                     auto pReply = AConnection->Reply();
                     const CString pRequest(pWSRequest->Payload());
@@ -724,20 +790,26 @@ namespace Apostol {
                     CHTTPReply::CStatusType Status = CHTTPReply::ok;
 
                     try {
-                        CJSONMessage jsonMessage;
+                        CJSONMessage jmMessage;
 
-                        if (!CJSONProtocol::Request(pRequest, jsonMessage)) {
+                        CJSONProtocol::PrepareResponse(AHandler->Message(), jmMessage);
+
+                        if (!CJSONProtocol::Request(pRequest, jmMessage)) {
                             Status = CHTTPReply::bad_request;
                         }
 
-                        if (jsonMessage.MessageTypeId == OCPP::mtCallError) {
+                        if (APoint != nullptr) {
+                            LogJSONMessage(APoint->Identity(), jmMessage);
+                        }
+
+                        if (jmMessage.MessageTypeId == ChargePoint::mtCallError) {
                             ReplyError(AConnection, CHTTPReply::bad_request,
                                        CString().Format("%s: %s",
-                                                        jsonMessage.ErrorCode.c_str(),
-                                                        jsonMessage.ErrorDescription.c_str()
+                                                        jmMessage.ErrorCode.c_str(),
+                                                        jmMessage.ErrorDescription.c_str()
                                                         ));
                         } else {
-                            pReply->Content = jsonMessage.Payload.ToString();
+                            pReply->Content = jmMessage.Payload.ToString();
                             AConnection->SendReply(Status, "application/json", true);
                         }
                     } catch (std::exception &e) {
@@ -749,11 +821,11 @@ namespace Apostol {
                 pWSRequest->Clear();
             };
 
-            APoint->Messages()->Add(OnRequest, Operation, Payload);
+            APoint->Messages().Send(Message, OnRequest);
         }
         //--------------------------------------------------------------------------------------------------------------
 
-        void CCSService::SendSOAP(CHTTPServerConnection *AConnection, CChargingPoint *APoint, const CString &Operation,
+        void CCSService::SendSOAP(CHTTPServerConnection *AConnection, CCSChargingPoint *APoint, const CString &Operation,
                 const CString &Payload) {
 
             auto OnRequest = [](CHTTPClient *Sender, CHTTPRequest *Request) {
@@ -862,7 +934,6 @@ namespace Apostol {
         void CCSService::DoPost(CHTTPServerConnection *AConnection) {
 
             auto pRequest = AConnection->Request();
-            auto pReply = AConnection->Reply();
 
             CStringList slPath;
             SplitColumns(pRequest->Location.pathname, slPath, '/');
@@ -889,10 +960,9 @@ namespace Apostol {
         void CCSService::DoChargePoint(CHTTPServerConnection *AConnection, const CString &Identity, const CString &Operation) {
 
             auto pRequest = AConnection->Request();
-            auto pReply = AConnection->Reply();
 
-            const auto Index = m_Operations.IndexOfName(Operation);
-            if (Index == -1) {
+            const auto index = m_Operations.IndexOfName(Operation);
+            if (index == -1) {
                 ReplyError(AConnection, CHTTPReply::bad_request, CString().Format("Invalid operation: %s", Operation.c_str()));
                 return;
             }
@@ -904,18 +974,26 @@ namespace Apostol {
                 return;
             }
 
-            CJSON Json;
-            ContentToJson(pRequest, Json);
+            auto IndexOfName = [](const CFields &Fields, const CString &Name) {
+                for (int i = 0; i < Fields.Count(); ++i) {
+                    const auto &field = Fields[i];
+                    if (field.name == Name)
+                        return i;
+                }
+                return -1;
+            };
 
-            const auto &caFields = m_Operations[Index].Value();
-            auto &Object = Json.Object();
+            CJSON Payload;
+            ContentToJson(pRequest, Payload);
+
+            const auto &caFields = m_Operations[index].Value();
+            auto &Object = Payload.Object();
 
             for (int i = 0; i < Object.Count(); i++) {
-
                 const auto& caMember = Object.Members(i);
                 const auto& caKey = caMember.String();
 
-                if (caFields.IndexOfName(caKey) == -1) {
+                if (IndexOfName(caFields, caKey) == -1) {
                     ReplyError(AConnection, CHTTPReply::bad_request, CString().Format("Invalid key: %s", caKey.c_str()));
                     return;
                 }
@@ -927,10 +1005,9 @@ namespace Apostol {
             }
 
             for (int i = 0; i < caFields.Count(); i++) {
-                const auto& caKey = caFields.Names(i);
-                const auto bRequired = caFields.ValueFromIndex(i) == "true";
-                if (bRequired && Json[caKey].IsNull()) {
-                    ReplyError(AConnection, CHTTPReply::bad_request, CString().Format("Not found required key: %s", caKey.c_str()));
+                const auto &field = caFields[i];
+                if (field.required && Payload[field.name].IsNull()) {
+                    ReplyError(AConnection, CHTTPReply::bad_request, CString().Format("Not found required key: %s (%s)", field.name.c_str(), field.type.c_str()));
                     return;
                 }
             }
@@ -944,10 +1021,19 @@ namespace Apostol {
                     return;
                 }
 
-                SendJSON(AConnection, pPoint, Operation, Json);
+                CJSONMessage jmMessage;
+
+                jmMessage.MessageTypeId = ChargePoint::mtCall;
+                jmMessage.UniqueId = GenUniqueId();
+                jmMessage.Action = Operation;
+                jmMessage.Payload = Payload;
+
+                LogJSONMessage(pPoint->Identity(), jmMessage);
+
+                SendJSON(AConnection, pPoint, jmMessage);
             } else {
 #ifdef WITH_POSTGRESQL
-                JSONToSOAP(AConnection, pPoint, Operation, Json);
+                JSONToSOAP(AConnection, pPoint, Operation, Payload);
 #else
                 AConnection->SendStockReply(CHTTPReply::not_implemented);
 #endif
@@ -957,7 +1043,6 @@ namespace Apostol {
 
         void CCSService::DoChargePointList(CHTTPServerConnection *AConnection) {
 
-            auto pRequest = AConnection->Request();
             auto pReply = AConnection->Reply();
 
             CJSONObject jsonObject;
@@ -1033,12 +1118,12 @@ namespace Apostol {
                         DoChargePointList(AConnection);
                         return;
                     } else if (caCommand == "ChargePoint" && slPath.Count() >= 5) {
-
+#ifdef WITH_AUTHORIZATION
                         CAuthorization Authorization;
                         if (!CheckAuthorization(AConnection, Authorization)) {
                             return;
                         }
-
+#endif
                         DoChargePoint(AConnection, slPath[3], slPath[4]);
                         return;
                     }
@@ -1056,29 +1141,69 @@ namespace Apostol {
             auto pRequest = AConnection->Request();
             auto pReply = AConnection->Reply();
 
-            if (m_bParseInDataBase) {
 #ifdef WITH_POSTGRESQL
-                // Обработаем запрос в СУБД
-                ParseSOAP(AConnection, pRequest->Content);
+            // Let's process the request in the DBMS
+            ParseSOAP(AConnection, pRequest->Content);
 #else
-                AConnection->SendStockReply(CHTTPReply::not_implemented);
-#endif
-            } else {
-                auto pPoint = m_PointManager.FindPointByConnection(AConnection);
+            auto pPoint = m_PointManager.FindPointByConnection(AConnection);
 
-                if (pPoint == nullptr) {
-                    pPoint = m_PointManager.Add(AConnection);
-                    pPoint->ProtocolType(OCPP::ptSOAP);
+            if (pPoint == nullptr) {
+                pPoint = m_PointManager.Add(AConnection);
+                pPoint->ProtocolType(ChargePoint::ptSOAP);
 #if defined(_GLIBCXX_RELEASE) && (_GLIBCXX_RELEASE >= 9)
-                    AConnection->OnDisconnected([this](auto && Sender) { DoPointDisconnected(Sender); });
+                AConnection->OnDisconnected([this](auto &&Sender) { DoPointDisconnected(Sender); });
 #else
-                    AConnection->OnDisconnected(std::bind(&CCSService::DoPointDisconnected, this, _1));
+                AConnection->OnDisconnected(std::bind(&CCSService::DoPointDisconnected, this, _1));
 #endif
+            }
+
+            pPoint->Parse(pRequest->Content, pReply->Content);
+
+            AConnection->SendReply(CHTTPReply::ok, "application/soap+xml");
+#endif
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
+        void CCSService::DoWebSocket(CHTTPServerConnection *AConnection) {
+            try {
+                auto pPoint = dynamic_cast<CCSChargingPoint *> (CCSChargingPoint::FindOfConnection(AConnection));
+#ifdef WITH_POSTGRESQL
+                auto pWSRequest = AConnection->WSRequest();
+
+                const CString request(pWSRequest->Payload());
+
+                CJSONMessage message;
+                CJSONProtocol::Request(request, message);
+
+                if (message.MessageTypeId == ChargePoint::mtCall) {
+                    // Let's process the request in the DBMS
+                    ParseJSON(AConnection, pPoint->Identity(), message);
+                } else {
+                    // We will send the response from the charging station to the handler
+                    auto pHandler = pPoint->Messages().FindMessageById(message.UniqueId);
+                    if (Assigned(pHandler)) {
+                        pHandler->Handler(AConnection);
+                        delete pHandler;
+                    }
+                    pWSRequest->Clear();
                 }
+#else
+                auto pWSReply = AConnection->WSReply();
 
-                pPoint->Parse(pRequest->Content, pReply->Content);
+                CString sResponse;
 
-                AConnection->SendReply(CHTTPReply::ok, "application/soap+xml");
+                if (pPoint->Parse(csRequest, sResponse)) {
+                    if (!sResponse.IsEmpty()) {
+                        pWSReply->SetPayload(sResponse);
+                        AConnection->SendWebSocket();
+                    }
+                } else {
+                    Log()->Error(APP_LOG_ERR, 0, "Unknown WebSocket request: %s", csRequest.c_str());
+                }
+#endif
+            } catch (std::exception &e) {
+                AConnection->Clear();
+                Log()->Error(APP_LOG_ERR, 0, e.what());
             }
         }
         //--------------------------------------------------------------------------------------------------------------
@@ -1115,7 +1240,7 @@ namespace Apostol {
 
             if (pPoint == nullptr) {
                 pPoint = m_PointManager.Add(AConnection);
-                pPoint->ProtocolType(OCPP::ptJSON);
+                pPoint->ProtocolType(ChargePoint::ptJSON);
                 pPoint->Identity() = caIdentity;
             } else {
                 pPoint->UpdateConnected(false);
@@ -1130,68 +1255,18 @@ namespace Apostol {
             WSDebugConnection(AConnection);
 #endif
 #if defined(_GLIBCXX_RELEASE) && (_GLIBCXX_RELEASE >= 9)
+            pPoint->OnMessageJSON([this](auto && Sender, auto && Message) { OnChargePointMessageJSON(Sender, Message); });
             AConnection->OnDisconnected([this](auto && Sender) { DoPointDisconnected(Sender); });
 #else
+            pPoint->OnMessageJSON(std::bind(&CCSService::OnChargePointMessageJSON, this, _1, _2));
             AConnection->OnDisconnected(std::bind(&CCSService::DoPointDisconnected, this, _1));
 #endif
-        }
-        //--------------------------------------------------------------------------------------------------------------
 
-        void CCSService::DoWebSocket(CHTTPServerConnection *AConnection) {
-
-            auto pWSRequest = AConnection->WSRequest();
-            auto pWSReply = AConnection->WSReply();
-
-            const CString csRequest(pWSRequest->Payload());
-
-            try {
-                auto pPoint = CChargingPoint::FindOfConnection(AConnection);
-
-                if (m_bParseInDataBase) {
-
-                    CJSONMessage jmRequest;
-                    CJSONProtocol::Request(csRequest, jmRequest);
-
-                    if (jmRequest.MessageTypeId == OCPP::mtCall) {
-#ifdef WITH_POSTGRESQL
-                        // Let's process the request in the DBMS
-                        ParseJSON(AConnection, pPoint->Identity(), jmRequest.Action, jmRequest.Payload);
-#else
-                        AConnection->SendStockReply(CHTTPReply::not_implemented);
-#endif
-                    } else {
-                        // We will send the response from the charging station to the handler
-                        auto pHandler = pPoint->Messages()->FindMessageById(jmRequest.UniqueId);
-                        if (Assigned(pHandler)) {
-                            pHandler->Handler(AConnection);
-                            delete pHandler;
-                        }
-                        pWSRequest->Clear();
-                    }
-
-                } else {
-
-                    CString sResponse;
-
-                    if (pPoint->Parse(csRequest, sResponse)) {
-                        if (!sResponse.IsEmpty()) {
-                            pWSReply->SetPayload(sResponse);
-                            AConnection->SendWebSocket();
-                        }
-                    } else {
-                        Log()->Error(APP_LOG_ERR, 0, "Unknown WebSocket request: %s", csRequest.c_str());
-                    }
-                }
-            } catch (std::exception &e) {
-                AConnection->Clear();
-                Log()->Error(APP_LOG_ERR, 0, e.what());
-            }
         }
         //--------------------------------------------------------------------------------------------------------------
 
         void CCSService::Initialization(CModuleProcess *AProcess) {
             CApostolModule::Initialization(AProcess);
-            m_bParseInDataBase = Config()->PostgresConnect();
         }
         //--------------------------------------------------------------------------------------------------------------
 

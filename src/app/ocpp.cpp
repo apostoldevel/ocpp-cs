@@ -190,6 +190,11 @@ namespace Apostol {
                 m_ProcessType = ptHelper;
             }
 
+            if (Config()->IniFile().ReadBool("process/ChargePoint", "enable", false)) {
+                Application()->SignalProcess(AddProcess<CCPEmulator>());
+                m_ProcessType = ptCustom;
+            }
+
             CApplication::StartProcess();
         }
         //--------------------------------------------------------------------------------------------------------------

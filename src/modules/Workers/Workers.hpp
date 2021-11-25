@@ -25,10 +25,8 @@ Author:
 #define APOSTOL_WORKERS_HPP
 //----------------------------------------------------------------------------------------------------------------------
 
-#include "CentralSystem/OCPP.hpp"
-//----------------------------------------------------------------------------------------------------------------------
-
-#include "CentralSystem/Service.hpp"
+#include "ChargePoint.hpp"
+#include "CentralSystem/CSService.hpp"
 //----------------------------------------------------------------------------------------------------------------------
 
 static inline void CreateWorkers(CModuleProcess *AProcess) {

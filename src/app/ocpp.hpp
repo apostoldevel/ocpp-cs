@@ -21,8 +21,8 @@ Author:
 
 --*/
 
-#ifndef APOSTOL_APOSTOL_HPP
-#define APOSTOL_APOSTOL_HPP
+#ifndef APOSTOL_OCPP_HPP
+#define APOSTOL_OCPP_HPP
 
 #include "../../version.h"
 //----------------------------------------------------------------------------------------------------------------------
@@ -71,4 +71,4 @@ namespace Apostol {
 using namespace Apostol::Ocpp;
 }
 
-#endif //APOSTOL_APOSTOL_HPP
+#endif //APOSTOL_OCPP_HPP

@@ -108,8 +108,8 @@ github()
     display_heading_message "Updating the current project"
     git pull
 
-    download_from_github src/lib ufocomp libdelphi master delphi
-    download_from_github src ufocomp apostol-core master core
+    download_from_github src/lib apostoldevel libdelphi master delphi
+    download_from_github src apostoldevel apostol-core master core
 }
 
 Success()
