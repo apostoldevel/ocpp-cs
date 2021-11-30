@@ -3,16 +3,16 @@
 <head>
     <!-- Required meta tags -->
     <meta charset="utf-8">
-    <meta name="description" content="Plugme: Авторизация">
+    <meta name="description" content="OCPP Central System Service: Авторизация">
 
     <!-- Required meta tags -->
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 
     <!-- SignIn -->
-    <meta name="signin-scope" content="plugme">
-    <meta name="signin-client_id" content="ocpp-plugme.ru">
+    <meta name="signin-scope" content="http://localhost:8080">
+    <meta name="signin-client_id" content="ocpp-apostol-crm.ru">
 
-    <title>Авторизация | Plugme (OCPP)</title>
+    <title>Авторизация | OCPP Central System Service (CSS)</title>
 
     <!-- Bootstrap CSS -->
     <link rel="stylesheet" href="/assets/vendor/bootstrap/4.5.0/css/bootstrap.min.css" integrity="sha384-9aIt2nRpC12Uk9gS9baDl411NQApFmC26EwAOH8WgZl5MYYxFfc+NcPb1dKGj7Sk" crossorigin="anonymous">
@@ -31,21 +31,17 @@
 <div class="form-signin">
     <form id="formSignIn" class="needs-validation" novalidate>
         <div class="text-center mb-4">
-            <h1 class="h3 mb-3 font-weight-normal">Добро пожаловать в OCPP Plugme</h1>
+            <h1 class="h3 mb-3 font-weight-normal">Welcome to<br>OCPP Central System Service</h1>
         </div>
 
-        <button id="btnSignIn" class="btn btn-lg btn-primary btn-block" type="button" onclick="oauthSignIn()">Войти</button>
+        <button id="btnSignIn" class="btn btn-lg btn-primary btn-block" type="button" onclick="oauthSignIn()">Sign In</button>
         <div id="alertMessage" class="text-center invalid-feedback">
         </div>
 
         <div id="g-signin2" class="mt-3" data-width="200" data-height="48" data-longtitle="false"></div>
 
-        <div class="text-center mb-4">
-            <p class="text-center">Продолжая, вы соглашаетесь с <a href="#">Условиями использования</a> и <a href="#">Политикой конфиденциальности</a>.</p>
-        </div>
-
         <hr class="my-1">
-        <p class="mt-3 text-muted text-center">© Plugme 2020</p>
+        <p class="mt-3 text-muted text-center">© Apostol Developer 2021</p>
     </form>
 </div>
 <!-- Optional JavaScript -->
@@ -80,7 +76,7 @@
     }
 
     /*
-     * Create form to request access token from Plugme's OAuth 2.0 server.
+     * Create form to request access token from OCPP Central System Service's OAuth 2.0 server.
      */
     function oauthSignIn() {
         let oauth2Endpoint = 'http://localhost:8080/oauth2/authorize';
@@ -88,7 +84,6 @@
         // Parameters to pass to OAuth 2.0 endpoint.
         let params = {
             client_id: $("meta[name='signin-client_id']").attr("content"),
-            //redirect_uri: 'http://ocpp.plugme.ru/dashboard/',
             redirect_uri: 'http://localhost:9220/dashboard/',
             response_type: 'token',
             scope: $("meta[name='signin-scope']").attr("content"),
