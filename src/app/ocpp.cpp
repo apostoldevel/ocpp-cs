@@ -186,13 +186,15 @@ namespace Apostol {
         //--------------------------------------------------------------------------------------------------------------
 
         void COCPP::StartProcess() {
-            if (Config()->Helper()) {
-                m_ProcessType = ptHelper;
-            }
+            if (m_ProcessType != ptSignaller) {
+                if (Config()->Helper()) {
+                    m_ProcessType = ptHelper;
+                }
 
-            if (Config()->IniFile().ReadBool("process/ChargePoint", "enable", false)) {
-                Application()->SignalProcess(AddProcess<CCPEmulator>());
-                m_ProcessType = ptCustom;
+                if (Config()->IniFile().ReadBool("process/ChargePoint", "enable", false)) {
+                    Application()->SignalProcess(AddProcess<CCPEmulator>());
+                    m_ProcessType = ptCustom;
+                }
             }
 
             CApplication::StartProcess();
