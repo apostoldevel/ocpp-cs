@@ -8,13 +8,13 @@ About OCPP Framework
 -
 The OCPP Framework is a set of C++ libraries for building OCPP applications. The toolkit consists of several libraries, most of which depend on the foundational [libdelphi](https://github.com/ufocomp/libdelphi) library.
 
+On the basis of this platform, you can create your own central server or prepare the firmware for the charging station.
+
 Overview
 -
 Open Charge Point Protocol [OCPP](http://ocppforum.net) is a communication protocol between multiple charging stations ("charge points") and a single management software ("central system").
 
 The OCPP Framework supports two versions of OCPP (1.5 and 1.6) are released. Version 1.5 uses SOAP over HTTP as the RPC/transport protocol. Version 1.6 uses SOAP and JSON over WebSocket protocol.
-
-**On the basis of this platform, you can create your own central server or prepare the firmware for the charging station.**
 
 Attention 
 -
