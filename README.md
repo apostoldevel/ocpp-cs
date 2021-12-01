@@ -1,14 +1,30 @@
-# OCPP Central System Service
+# OCPP Framework
 
 OCPP (Open Charge Point Protocol) implementation in C++. Built on base [Apostol](https://github.com/ufocomp/apostol).
 
 The software stack consists of a compilation of source code, libraries and scripts.
 
+About OCPP Framework
+-
+The OCPP Framework is a set of C++ libraries for building OCPP applications. The toolkit consists of several libraries, most of which depend on the foundational [libdelphi](https://github.com/ufocomp/libdelphi) library.
+
 Overview
 -
 Open Charge Point Protocol [OCPP](http://ocppforum.net) is a communication protocol between multiple charging stations ("charge points") and a single management software ("central system").
 
-Currently, two versions of OCPP (1.5 and 1.6) are released. A draft is being prepared for the new version (2.0). Version 1.5 uses SOAP over HTTP as the RPC/transport protocol. Version 1.6 uses SOAP and JSON over WebSocket protocol.
+The OCPP Framework supports two versions of OCPP (1.5 and 1.6) are released. Version 1.5 uses SOAP over HTTP as the RPC/transport protocol. Version 1.6 uses SOAP and JSON over WebSocket protocol.
+
+**On the basis of this platform, you can create your own central server or prepare the firmware for the charging station.**
+
+Attention 
+-
+The production version is designed to work with a database and all business logic is implemented in PL/pgSQL (the code is not included in this assembly).
+
+To build in emulator mode, change the following settings in the [CMakeLists.txt](https://github.com/apostoldevel/apostol-ocpp/blob/master/CMakeLists.txt) file:
+~~~
+WITH_AUTHORIZATION OFF
+WITH_POSTGRESQL OFF
+~~~
 
 Build and installation
 -
@@ -18,7 +34,7 @@ Build required:
 1. [CMake](https://cmake.org);
 1. Library [libdelphi](https://github.com/ufocomp/libdelphi/) (Delphi classes for C++);
 1. Library [libpq-dev](https://www.postgresql.org/download/) (libraries and headers for C language frontend development);
-1. Library [postgresql-server-dev-10](https://www.postgresql.org/download/) (libraries and headers for C language backend development).
+1. Library [postgresql-server-dev-all](https://www.postgresql.org/download/) (libraries and headers for C language backend development).
 
 ###### **ATTENTION**: You do not need to install [libdelphi](https://github.com/ufocomp/libdelphi/), just download and put it in the `src/lib` directory of the project.
 
@@ -42,7 +58,25 @@ To install (without Git) you need:
 
 To install (with Git) you need:
 ~~~
-git clone https://github.com/ufocomp/apostol-ocpp.git
+git clone https://github.com/apostoldevel/apostol-ocpp.git
+~~~
+
+###### CMake configuration:
+~~~
+/// Install as root. 
+/// Disable for local installation.
+/// Default: ON 
+INSTALL_AS_ROOT = {ON | OFF}
+
+/// Build with authorization OAuth 2.0 for production release. 
+/// Disable for emulator mode. 
+/// Default: ON
+WITH_AUTHORIZATION = {ON | OFF}
+
+/// Build with PostgreSQL for production release. 
+/// Disable for emulator mode. 
+/// Default: ON
+WITH_POSTGRESQL = {ON | OFF}
 ~~~
 
 ###### Build:
