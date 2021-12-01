@@ -121,3 +121,12 @@ To check the status, run:
 ~~~
 sudo service ocpp status
 ~~~
+
+Donate
+-
+  * BTC: 1MvvFNE89NK1zQguy9RhXH3PGmSf7RcahB
+  * ETH: 0x417bed7f4b156d952503fb8f91644194b48dded2
+
+_ETH network: Ethereum (ERC20)_
+
+Any help is priceless, thanks.
