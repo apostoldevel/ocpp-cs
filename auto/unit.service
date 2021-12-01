@@ -1,0 +1,21 @@
+[Unit]
+Description=OCPP Central System Service
+After=network.target remote-fs.target nss-lookup.target
+
+[Service]
+Type=forking
+PIDFile=/run/ocpp.pid
+# ocpp will fail to start if /run/ocpp.pid already exists but has the wrong
+# SELinux context. This might happen when running `ocpp -t` from the cmdline.
+# https://bugzilla.redhat.com/show_bug.cgi?id=1268621
+ExecStartPre=/usr/bin/rm -f /run/ocpp.pid
+ExecStartPre=/usr/sbin/ocpp -t
+ExecStart=/usr/sbin/ocpp
+ExecReload=/bin/kill -s HUP $MAINPID
+KillSignal=SIGQUIT
+TimeoutStopSec=5
+KillMode=mixed
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
