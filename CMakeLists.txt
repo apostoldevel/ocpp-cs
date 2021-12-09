@@ -66,6 +66,11 @@ if (WITH_POSTGRESQL)
     add_compile_options("-DWITH_POSTGRESQL")
 endif()
 
+if (WITH_SSL)
+    set(SSL_LIB_NAME "ssl")
+    add_compile_options("-DWITH_SSL")
+endif()
+
 if (WITH_SQLITE3)
     set(SQLITE3_LIB_NAME "sqlite3")
     add_compile_options("-DWITH_SQLITE3")
