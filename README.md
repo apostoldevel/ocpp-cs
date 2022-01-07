@@ -1,26 +1,37 @@
-# OCPP Framework
+# OCPP Central Server
 
-OCPP (Open Charge Point Protocol) implementation in C++. Built on base [Apostol](https://github.com/ufocomp/apostol).
+**OCPP CS** (Open Charge Point Protocol Central Server) implementation in C++.
 
 The software stack consists of a compilation of source code, libraries and scripts.
 
-About OCPP Framework
--
-The OCPP Framework is a set of C++ libraries for building OCPP applications. The toolkit consists of several libraries, most of which depend on the foundational [libdelphi](https://github.com/ufocomp/libdelphi) library.
+Built on base [Apostol](https://github.com/ufocomp/apostol).
 
-On the basis of this platform, you can create your own central server or prepare the firmware for the charging station.
+About
+-
+**OCPP Central System and Charge Point emulator.**
+
+The **OCPP CS** supports all commands for released versions of the OCPP protocol (1.5 and 1.6). 
+
+Version 1.5 uses SOAP over HTTP as the RPC/transport protocol. Version 1.6 uses SOAP and JSON over WebSocket protocol.
+
+See [Releases](https://github.com/apostoldevel/apostol-cs/releases) for mode details.
+
+Framework
+-
+The OCPP Central Server is a set of C++ libraries for building OCPP applications. The toolkit consists of several libraries, most of which depend on the foundational [libdelphi](https://github.com/ufocomp/libdelphi) library.
+
+**This code can be used as a framework for creating your own central server or preparing firmware for a charging station**.
+
 
 Overview
 -
 Open Charge Point Protocol [OCPP](http://ocppforum.net) is a communication protocol between multiple charging stations ("charge points") and a single management software ("central system").
 
-The OCPP Framework supports two versions of OCPP (1.5 and 1.6) are released. Version 1.5 uses SOAP over HTTP as the RPC/transport protocol. Version 1.6 uses SOAP and JSON over WebSocket protocol.
-
-Attention 
+Attention
 -
 The production version is designed to work with a database and all business logic is implemented in PL/pgSQL (the code is not included in this assembly).
 
-To build in emulator mode, change the following settings in the [CMakeLists.txt](https://github.com/apostoldevel/apostol-ocpp/blob/master/CMakeLists.txt) file:
+To build in emulator mode, change the following settings in the [CMakeLists.txt](https://github.com/apostoldevel/apostol-cs/blob/master/CMakeLists.txt) file:
 ~~~
 WITH_AUTHORIZATION OFF
 WITH_POSTGRESQL OFF
@@ -45,11 +56,11 @@ sudo apt-get install build-essential libssl-dev libcurl4-openssl-dev make cmake 
 
 To install PostgreSQL, use the instructions for [this](https://www.postgresql.org/download/) link.
 
-###### A detailed description of the installation of C ++, CMake, IDE, and other components necessary for building the project is not included in this guide. 
+###### A detailed description of the installation of C ++, CMake, IDE, and other components necessary for building the project is not included in this guide.
 
 To install (without Git) you need:
 
-1. Download [OCPP Central System Service](https://github.com/ufocomp/apostol-ocpp/archive/master.zip);
+1. Download [OCPP Central Service](https://github.com/ufocomp/apostol-cs/archive/master.zip);
 1. Unpack;
 1. Download [libdelphi](https://github.com/ufocomp/libdelphi/archive/master.zip);
 1. Unpack in `src/lib/delphi`;
@@ -58,7 +69,7 @@ To install (without Git) you need:
 
 To install (with Git) you need:
 ~~~
-git clone https://github.com/apostoldevel/apostol-ocpp.git
+git clone https://github.com/apostoldevel/apostol-cs.git
 ~~~
 
 ###### CMake configuration:
@@ -81,7 +92,7 @@ WITH_POSTGRESQL = {ON | OFF}
 
 ###### Build:
 ~~~
-cd apostol-ocpp
+cd apostol-cs
 ./configure
 ~~~
 
@@ -92,34 +103,34 @@ make
 sudo make install
 ~~~
 
-By default, **ocpp** will be set to:
+By default, **cs** will be set to:
 ~~~
 /usr/sbin
 ~~~
 
 The configuration file and the necessary files for operation, depending on the installation option, will be located in:
 ~~~
-/etc/apostol-ocpp
+/etc/cs
 or
-~/apostol-ocpp
+~/cs
 ~~~
 
 Run
 -
 ###### If **`INSTALL_AS_ROOT`** set to `ON`.
 
-**`ocpp`** - it is a Linux system service (daemon). 
+**`cs`** - it is a Linux system service (daemon).
 
-To manage **`ocpp`** use standard service management commands.
+To manage **`cs`** use standard service management commands.
 
 To start, run:
 ~~~
-sudo service ocpp start
+sudo service cs start
 ~~~
 
 To check the status, run:
 ~~~
-sudo service ocpp status
+sudo service cs status
 ~~~
 
 Donate

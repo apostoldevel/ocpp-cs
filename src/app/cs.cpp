@@ -21,7 +21,7 @@ Author:
 
 --*/
 
-#include "ocpp.hpp"
+#include "cs.hpp"
 //----------------------------------------------------------------------------------------------------------------------
 
 #define exit_failure(msg) {                                 \
@@ -37,9 +37,9 @@ extern "C++" {
 
 namespace Apostol {
 
-    namespace Ocpp {
+    namespace OCPP {
 
-        void COCPP::ShowVersionInfo() {
+        void CCentralSystem::ShowVersionInfo() {
 
             std::cerr << APP_NAME " version: " APP_VERSION " (" APP_DESCRIPTION ")" LINEFEED << std::endl;
 
@@ -66,7 +66,7 @@ namespace Apostol {
         }
         //--------------------------------------------------------------------------------------------------------------
 
-        void COCPP::ParseCmdLine() {
+        void CCentralSystem::ParseCmdLine() {
 
             LPCTSTR P;
 
@@ -185,7 +185,7 @@ namespace Apostol {
         }
         //--------------------------------------------------------------------------------------------------------------
 
-        void COCPP::StartProcess() {
+        void CCentralSystem::StartProcess() {
             if (m_ProcessType != ptSignaller) {
                 if (Config()->Helper()) {
                     m_ProcessType = ptHelper;
@@ -201,7 +201,7 @@ namespace Apostol {
         }
         //--------------------------------------------------------------------------------------------------------------
 
-        void COCPP::Run() {
+        void CCentralSystem::Run() {
             CApplication::Run();
         }
         //--------------------------------------------------------------------------------------------------------------
@@ -216,18 +216,18 @@ int main(int argc, char *argv[]) {
 
     DefaultLocale.SetLocale("");
     
-    COCPP ocpp(argc, argv);
+    CCentralSystem cs(argc, argv);
 
     try
     {
-        ocpp.Name() = APP_NAME;
-        ocpp.Description() = APP_DESCRIPTION;
-        ocpp.Version() = APP_VERSION;
-        ocpp.Title() = APP_VER;
+        cs.Name() = APP_NAME;
+        cs.Description() = APP_DESCRIPTION;
+        cs.Version() = APP_VERSION;
+        cs.Title() = APP_VER;
 
-        ocpp.Run();
+        cs.Run();
 
-        exitcode = ocpp.ExitCode();
+        exitcode = cs.ExitCode();
     }
     catch (std::exception& e)
     {

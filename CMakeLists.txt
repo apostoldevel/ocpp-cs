@@ -1,11 +1,11 @@
 cmake_minimum_required(VERSION 3.13)
-project(apostol-ocpp)
+project(apostol-cs)
 
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -static-libgcc -static-libstdc++ -rdynamic")
 
-set(PROJECT_NAME "ocpp")
-set(PROJECT_DESCRIPTION "OCPP Central System Service")
+set(PROJECT_NAME "cs")
+set(PROJECT_DESCRIPTION "OCPP Central System")
 
 message(STATUS "Project name: ${PROJECT_NAME}")
 message(STATUS "Project description: ${PROJECT_DESCRIPTION}")

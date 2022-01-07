@@ -38,9 +38,9 @@ extern "C++" {
 
 namespace Apostol {
 
-    namespace Ocpp {
+    namespace OCPP {
 
-        class COCPP: public CApplication {
+        class CCentralSystem: public CApplication {
         protected:
 
             void ParseCmdLine() override;
@@ -50,14 +50,14 @@ namespace Apostol {
 
         public:
 
-            COCPP(int argc, char *const *argv): CApplication(argc, argv) {
+            CCentralSystem(int argc, char *const *argv): CApplication(argc, argv) {
 
             };
 
-            ~COCPP() override = default;
+            ~CCentralSystem() override = default;
 
-            static class COCPP *Create(int argc, char *const *argv) {
-                return new COCPP(argc, argv);
+            static class CCentralSystem *Create(int argc, char *const *argv) {
+                return new CCentralSystem(argc, argv);
             };
 
             inline void Destroy() override { delete this; };
@@ -68,7 +68,7 @@ namespace Apostol {
     }
 }
 
-using namespace Apostol::Ocpp;
+using namespace Apostol::OCPP;
 }
 
 #endif //APOSTOL_OCPP_HPP
