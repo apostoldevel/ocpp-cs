@@ -14,7 +14,7 @@ The **OCPP CS** supports all commands for released versions of the OCPP protocol
 
 Version 1.5 uses SOAP over HTTP as the RPC/transport protocol. Version 1.6 uses SOAP and JSON over WebSocket protocol.
 
-See [Releases](https://github.com/apostoldevel/apostol-cs/releases) for mode details.
+See [Releases](https://github.com/apostoldevel/apostol-cs/releases) for more details.
 
 Framework
 -
