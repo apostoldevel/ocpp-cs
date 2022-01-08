@@ -1,23 +1,23 @@
 #!/bin/sh
 ### BEGIN INIT INFO
-# Provides:          ocpp
+# Provides:          cs
 # Required-Start:    $local_fs $remote_fs $network $syslog $named
 # Required-Stop:     $local_fs $remote_fs $network $syslog $named
 # Default-Start:     2 3 4 5
 # Default-Stop:      0 1 6
-# Short-Description: starts the ocpp central system service
-# Description:       starts ocpp using start-stop-daemon
+# Short-Description: starts the ocpp central system
+# Description:       starts cs using start-stop-daemon
 ### END INIT INFO
 
 PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
-DAEMON=/usr/sbin/ocpp
+DAEMON=/usr/sbin/cs
 
-NAME=ocpp
-DESC="OCPP Central System Service"
+NAME=cs
+DESC="OCPP Central System"
 
-# Include ocpp defaults if available
-if [ -r /etc/default/ocpp ]; then
-	. /etc/default/ocpp
+# Include cs defaults if available
+if [ -r /etc/default/cs ]; then
+	. /etc/default/cs
 fi
 
 STOP_SCHEDULE="${STOP_SCHEDULE:-QUIT/5/TERM/5/KILL/5}"
@@ -27,14 +27,14 @@ test -x $DAEMON || exit 0
 . /lib/init/vars.sh
 . /lib/lsb/init-functions
 
-# Try to extract ocpp pidfile
-PID=$(cat /etc/ocpp/ocpp.conf | grep -Ev '^\s*#' | awk 'BEGIN { FS="=" } { if ($1 == "pid") print $2 }' | head -n1)
+# Try to extract cs pidfile
+PID=$(cat /etc/cs/cs.conf | grep -Ev '^\s*#' | awk 'BEGIN { FS="=" } { if ($1 == "pid") print $2 }' | head -n1)
 if [ -z "$PID" ]
 then
-	PID=/run/ocpp.pid
+	PID=/run/cs.pid
 fi
 
-# Check if the ULIMIT is set in /etc/default/ocpp
+# Check if the ULIMIT is set in /etc/default/cs
 if [ -n "$ULIMIT" ]; then
 	# Set the ulimits
 	ulimit $ULIMIT
@@ -94,14 +94,14 @@ do_rotate() {
 }
 
 #
-# Online upgrade ocpp executable
+# Online upgrade cs executable
 #
 # "Upgrading Executable on the Fly"
 #
 do_upgrade() {
 	# Return
-	#   0 if ocpp has been successfully upgraded
-	#   1 if ocpp is not running
+	#   0 if cs has been successfully upgraded
+	#   1 if cs is not running
 	#   2 if the pid files were not created on time
 	#   3 if the old master could not be killed
 	if start-stop-daemon --stop --signal USR2 --quiet --pidfile $PID --name $NAME; then
@@ -144,7 +144,7 @@ case "$1" in
 	restart)
 		log_daemon_msg "Restarting $DESC" "$NAME"
 
-		# Check configuration before stopping ocpp
+		# Check configuration before stopping cs
 		if ! test_ocpp_config; then
 			log_end_msg 1 # Configuration error
 			exit 0
@@ -169,9 +169,9 @@ case "$1" in
 	reload|force-reload)
 		log_daemon_msg "Reloading $DESC configuration" "$NAME"
 
-		# Check configuration before reload ocpp
+		# Check configuration before reload cs
 		#
-		# This is not entirely correct since the on-disk ocpp binary
+		# This is not entirely correct since the on-disk cs binary
 		# may differ from the in-memory one, but that`s not common.
 		# We prefer to check the configuration and return an error
 		# to the administrator.
