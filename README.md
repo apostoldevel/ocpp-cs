@@ -20,7 +20,7 @@ Framework
 -
 The OCPP Central System is a set of C++ libraries for building OCPP applications. The toolkit consists of several libraries, most of which depend on the foundational [libdelphi](https://github.com/ufocomp/libdelphi) library.
 
-**This code can be used as a framework for creating your own central server or preparing firmware for a charging station**.
+This code can be used as a framework for creating your own **Central System** or preparing firmware for a **Charging Station**.
 
 Demonstration
 -
