@@ -1,16 +1,16 @@
-# OCPP Central Server
+# OCPP Central System
 
-**OCPP CS** (Open Charge Point Protocol Central Server) implementation in C++.
+**OCPP Central System** and **Charge Point emulator**, implementation in C++.
 
 The software stack consists of a compilation of source code, libraries and scripts.
 
 Built on base [Apostol](https://github.com/ufocomp/apostol).
 
-About
+Overview
 -
-**OCPP Central System and Charge Point emulator.**
+Open Charge Point Protocol [OCPP](http://ocppforum.net) is a communication protocol between multiple charging stations ("charge points") and a single management software ("central system").
 
-The **OCPP CS** supports all commands for released versions of the OCPP protocol (1.5 and 1.6). 
+The **OCPP Central System** supports all commands for released versions of the OCPP protocol (1.5 and 1.6). 
 
 Version 1.5 uses SOAP over HTTP as the RPC/transport protocol. Version 1.6 uses SOAP and JSON over WebSocket protocol.
 
@@ -18,14 +18,33 @@ See [Releases](https://github.com/apostoldevel/apostol-cs/releases) for more det
 
 Framework
 -
-The OCPP Central Server is a set of C++ libraries for building OCPP applications. The toolkit consists of several libraries, most of which depend on the foundational [libdelphi](https://github.com/ufocomp/libdelphi) library.
+The OCPP Central System is a set of C++ libraries for building OCPP applications. The toolkit consists of several libraries, most of which depend on the foundational [libdelphi](https://github.com/ufocomp/libdelphi) library.
 
 **This code can be used as a framework for creating your own central server or preparing firmware for a charging station**.
 
-
-Overview
+Demonstration
 -
-Open Charge Point Protocol [OCPP](http://ocppforum.net) is a communication protocol between multiple charging stations ("charge points") and a single management software ("central system").
+You can connect your station to a demo central system.
+
+---
+Connection addresses:
+- WebSocket: ws://ws.ocpp-css.com/ocpp
+- SOAP: http://soap.ocpp-css.com/Ocpp
+---
+
+To control the charging station, use the web shell at:
+- [http://cs.ocpp-css.com](http://cs.ocpp-css.com)
+
+Authorization:
+~~~
+login: ocpp
+password: ocpp
+~~~
+
+RFID-card:
+~~~
+b1db8d051145b7
+~~~
 
 Attention
 -
