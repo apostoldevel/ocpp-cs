@@ -3,16 +3,16 @@
 <head>
     <!-- Required meta tags -->
     <meta charset="utf-8">
-    <meta name="description" content="OCPP Central System Service: Авторизация">
+    <meta name="description" content="OCPP Central System: Welcome">
 
     <!-- Required meta tags -->
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
 
     <!-- SignIn -->
-    <meta name="signin-scope" content="http://localhost:8080">
-    <meta name="signin-client_id" content="ocpp-apostol-crm.ru">
+    <meta name="signin-scope" content="css">
+    <meta name="signin-client_id" content="web-ocpp-css.com">
 
-    <title>Авторизация | OCPP Central System Service (CSS)</title>
+    <title>Welcome | OCPP Central System (CS)</title>
 
     <!-- Bootstrap CSS -->
     <link rel="stylesheet" href="/assets/vendor/bootstrap/4.5.0/css/bootstrap.min.css" integrity="sha384-9aIt2nRpC12Uk9gS9baDl411NQApFmC26EwAOH8WgZl5MYYxFfc+NcPb1dKGj7Sk" crossorigin="anonymous">
@@ -31,7 +31,7 @@
 <div class="form-signin">
     <form id="formSignIn" class="needs-validation" novalidate>
         <div class="text-center mb-4">
-            <h1 class="h3 mb-3 font-weight-normal">Welcome to<br>OCPP Central System Service</h1>
+            <h1 class="h3 mb-3 font-weight-normal">Welcome to<br>OCPP Central System</h1>
         </div>
 
         <button id="btnSignIn" class="btn btn-lg btn-primary btn-block" type="button" onclick="oauthSignIn()">Sign In</button>
@@ -80,11 +80,13 @@
      */
     function oauthSignIn() {
         let oauth2Endpoint = 'http://localhost:8080/oauth2/authorize';
+//        let oauth2Endpoint = 'https://ocpp-css.ru/oauth2/authorize';
 
         // Parameters to pass to OAuth 2.0 endpoint.
         let params = {
             client_id: $("meta[name='signin-client_id']").attr("content"),
             redirect_uri: 'http://localhost:9220/dashboard/',
+//            redirect_uri: 'http://cs.ocpp-css.ru/dashboard/',
             response_type: 'token',
             scope: $("meta[name='signin-scope']").attr("content"),
             state: 'SignIn'
