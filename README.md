@@ -79,7 +79,7 @@ To install PostgreSQL, use the instructions for [this](https://www.postgresql.or
 
 To install (without Git) you need:
 
-1. Download [OCPP Central Service](https://github.com/ufocomp/apostol-cs/archive/master.zip);
+1. Download [OCPP Central System](https://github.com/ufocomp/apostol-cs/archive/master.zip);
 1. Unpack;
 1. Download [libdelphi](https://github.com/ufocomp/libdelphi/archive/master.zip);
 1. Unpack in `src/lib/delphi`;
