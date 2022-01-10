@@ -43,7 +43,7 @@ password: ocpp
 
 RFID-card:
 ~~~
-b1db8d051145b7
+idTag: b1db8d051145b7
 ~~~
 
 Attention
