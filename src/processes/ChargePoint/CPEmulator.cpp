@@ -287,7 +287,7 @@ namespace Apostol {
             AClient->Actions().AddObject(_T("ChangeConfiguration")   , (CObject *) new CJSONActionHandler(true , [this](auto && Sender, auto && Request, auto && Response) { OnChangeConfiguration(Sender, Request, Response); }));
             AClient->Actions().AddObject(_T("ClearCache")            , (CObject *) new CJSONActionHandler(true , [this](auto && Sender, auto && Request, auto && Response) { OnClearCache(Sender, Request, Response); }));
             AClient->Actions().AddObject(_T("ClearChargingProfile")  , (CObject *) new CJSONActionHandler(false, [this](auto && Sender, auto && Request, auto && Response) { OnClearChargingProfile(Sender, Request, Response); }));
-            AClient->Actions().AddObject(_T("DataTransfer")          , (CObject *) new CJSONActionHandler(false, [this](auto && Sender, auto && Request, auto && Response) { OnDataTransfer(Sender, Request, Response); }));
+            AClient->Actions().AddObject(_T("DataTransfer")          , (CObject *) new CJSONActionHandler(true , [this](auto && Sender, auto && Request, auto && Response) { OnDataTransfer(Sender, Request, Response); }));
             AClient->Actions().AddObject(_T("GetCompositeSchedule")  , (CObject *) new CJSONActionHandler(false, [this](auto && Sender, auto && Request, auto && Response) { OnGetCompositeSchedule(Sender, Request, Response); }));
             AClient->Actions().AddObject(_T("GetConfiguration")      , (CObject *) new CJSONActionHandler(true , [this](auto && Sender, auto && Request, auto && Response) { OnGetConfiguration(Sender, Request, Response); }));
             AClient->Actions().AddObject(_T("GetDiagnostics")        , (CObject *) new CJSONActionHandler(false, [this](auto && Sender, auto && Request, auto && Response) { OnGetDiagnostics(Sender, Request, Response); }));
@@ -307,7 +307,7 @@ namespace Apostol {
             AClient->Actions().AddObject(_T("ChangeConfiguration")   , (CObject *) new CJSONActionHandler(true , std::bind(&CCPEmulator::OnChangeConfiguration, this, _1, _2, _3)));
             AClient->Actions().AddObject(_T("ClearCache")            , (CObject *) new CJSONActionHandler(true , std::bind(&CCPEmulator::OnClearCache, this, _1, _2, _3)));
             AClient->Actions().AddObject(_T("ClearChargingProfile")  , (CObject *) new CJSONActionHandler(false, std::bind(&CCPEmulator::OnClearChargingProfile, this, _1, _2, _3)));
-            AClient->Actions().AddObject(_T("DataTransfer")          , (CObject *) new CJSONActionHandler(false, std::bind(&CCPEmulator::OnDataTransfer, this, _1, _2, _3)));
+            AClient->Actions().AddObject(_T("DataTransfer")          , (CObject *) new CJSONActionHandler(true , std::bind(&CCPEmulator::OnDataTransfer, this, _1, _2, _3)));
             AClient->Actions().AddObject(_T("GetCompositeSchedule")  , (CObject *) new CJSONActionHandler(false, std::bind(&CCPEmulator::OnGetCompositeSchedule, this, _1, _2, _3)));
             AClient->Actions().AddObject(_T("GetConfiguration")      , (CObject *) new CJSONActionHandler(true , std::bind(&CCPEmulator::OnGetConfiguration, this, _1, _2, _3)));
             AClient->Actions().AddObject(_T("GetDiagnostics")        , (CObject *) new CJSONActionHandler(false, std::bind(&CCPEmulator::OnGetDiagnostics, this, _1, _2, _3)));
@@ -520,7 +520,13 @@ namespace Apostol {
         void CCPEmulator::OnDataTransfer(CObject *Sender, const CJSONMessage &Request, CJSONMessage &Response) {
             auto pClient = dynamic_cast<COCPPClient *> (Sender);
             chASSERT(pClient);
-            LoadChargePointRequest(pClient->Prefix(), Request.Action, Response.Payload);
+
+            Response.Payload.Object().AddPair("status", "Accepted");
+
+            if (Request.Payload.HasOwnProperty("data")) {
+                Response.Payload.Object().AddPair("data", Request.Payload["data"]);
+            }
+
             pClient->SendMessage(Response);
         }
         //--------------------------------------------------------------------------------------------------------------
