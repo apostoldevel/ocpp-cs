@@ -22,6 +22,18 @@ The OCPP Central System is a set of C++ libraries for building OCPP applications
 
 This code can be used as a framework for creating your own **Central System** or preparing firmware for a **Charging Station**.
 
+Swagger
+-
+We use OpenAPI to interact with the full node. You can directly open Swagger UI through [https://ocpp-css.ru/docs](https://ocpp-css.ru/docs).
+
+Alternatively, you can use any OpenAPI client to import the [api.yaml](https://ocpp-css.ru/docs/api.yaml) file from our repository (download).
+
+Authorize:
+~~~
+login: demo
+password: demo
+~~~
+
 Demonstration
 -
 You can connect your station to a demo central system.
@@ -35,15 +47,15 @@ Connection addresses:
 To control the charging station, use the web shell at:
 - [http://cs.ocpp-css.com](http://cs.ocpp-css.com)
 
-Authorization:
+Authorize:
 ~~~
-login: ocpp
-password: ocpp
+login: demo
+password: demo
 ~~~
 
 RFID-card:
 ~~~
-idTag: b1db8d051145b7
+idTag: demo
 ~~~
 
 Attention
