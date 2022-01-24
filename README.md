@@ -24,7 +24,7 @@ This code can be used as a framework for creating your own **Central System** or
 
 Swagger
 -
-We use OpenAPI to interact with the CSS. You can directly open Swagger UI through [https://ocpp-css.ru/docs](https://ocpp-css.ru/docs).
+We use OpenAPI to interact with the Central System Service (CSS). You can directly open Swagger UI through [https://ocpp-css.ru/docs](https://ocpp-css.ru/docs).
 
 Alternatively, you can use any OpenAPI client to import the [api.yaml](https://ocpp-css.ru/docs/api.yaml) file from our repository (download).
 
