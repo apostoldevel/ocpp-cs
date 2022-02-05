@@ -196,6 +196,38 @@ namespace Apostol {
             m_Operations.Last().Value().Add({"retryInterval", "integer", false});
         }
         //--------------------------------------------------------------------------------------------------------------
+
+        CJSON CCSService::GetChargePointList() {
+            CJSON json;
+            CJSONValue jsonArray(jvtArray);
+
+            for (int i = 0; i < m_PointManager.Count(); i++) {
+                CJSONValue jsonPoint(jvtObject);
+                CJSONValue jsonConnection(jvtObject);
+
+                auto pPoint = m_PointManager.Points(i);
+
+                jsonPoint.Object().AddPair("Identity", pPoint->Identity());
+                jsonPoint.Object().AddPair("Address", pPoint->Address());
+
+                auto pConnection = pPoint->Connection();
+
+                if (pConnection != nullptr && pConnection->Connected()) {
+                    jsonConnection.Object().AddPair("Socket", pConnection->Socket()->Binding()->Handle());
+                    jsonConnection.Object().AddPair("IP", pConnection->Socket()->Binding()->PeerIP());
+                    jsonConnection.Object().AddPair("Port", pConnection->Socket()->Binding()->PeerPort());
+
+                    jsonPoint.Object().AddPair("Connection", jsonConnection);
+                }
+
+                jsonArray.Array().Add(jsonPoint);
+            }
+
+            json.Object().AddPair("ChargePointList", jsonArray);
+
+            return json;
+        }
+        //--------------------------------------------------------------------------------------------------------------
 #ifdef WITH_POSTGRESQL
         void CCSService::DoPostgresQueryExecuted(CPQPollQuery *APollQuery) {
 
@@ -251,38 +283,6 @@ namespace Apostol {
             } catch (Delphi::Exception::Exception &E) {
                 Log()->Error(APP_LOG_ERR, 0, E.what());
             }
-        }
-        //--------------------------------------------------------------------------------------------------------------
-
-        CJSON CCSService::GetChargePointList() {
-            CJSON json;
-            CJSONValue jsonArray(jvtArray);
-
-            for (int i = 0; i < m_PointManager.Count(); i++) {
-                CJSONValue jsonPoint(jvtObject);
-                CJSONValue jsonConnection(jvtObject);
-
-                auto pPoint = m_PointManager.Points(i);
-
-                jsonPoint.Object().AddPair("Identity", pPoint->Identity());
-                jsonPoint.Object().AddPair("Address", pPoint->Address());
-
-                auto pConnection = pPoint->Connection();
-
-                if (pConnection != nullptr && pConnection->Connected()) {
-                    jsonConnection.Object().AddPair("Socket", pConnection->Socket()->Binding()->Handle());
-                    jsonConnection.Object().AddPair("IP", pConnection->Socket()->Binding()->PeerIP());
-                    jsonConnection.Object().AddPair("Port", pConnection->Socket()->Binding()->PeerPort());
-
-                    jsonPoint.Object().AddPair("Connection", jsonConnection);
-                }
-
-                jsonArray.Array().Add(jsonPoint);
-            }
-
-            json.Object().AddPair("ChargePointList", jsonArray);
-
-            return json;
         }
         //--------------------------------------------------------------------------------------------------------------
 
