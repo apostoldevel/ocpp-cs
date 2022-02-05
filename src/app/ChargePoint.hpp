@@ -140,7 +140,7 @@ namespace Apostol {
         public:
             static void ExceptionToJson(int ErrorCode, const std::exception &e, CJSON& Json);
 
-            static bool Request(const CString &String, CJSONMessage &Message);
+            static size_t Request(const CString &String, CJSONMessage &Message);
             static void Response(const CJSONMessage &Message, CString &String);
 
             static void PrepareResponse(const CJSONMessage &Request, CJSONMessage &Response);

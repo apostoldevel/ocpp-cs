@@ -263,28 +263,25 @@ namespace Apostol {
         }
         //--------------------------------------------------------------------------------------------------------------
 
-        bool CJSONProtocol::Request(const CString &String, CJSONMessage &Message) {
-            bool Result = false;
-
-            if (String.Size() > 0) {
-
+        size_t CJSONProtocol::Request(const CString &String, CJSONMessage &Message) {
+            if (String.Position() < String.Size()) {
                 CString Item;
 
-                bool Quotes = false;
-                int Brackets = 0;
+                bool quotes = false;
+                int brackets = 0;
 
                 CJSONParserState State = psBegin;
 
                 TCHAR ch;
 
-                for (size_t i = 0; i < String.Size(); i++) {
+                for (size_t i = String.Position(); i < String.Size(); i++) {
 
                     ch = String.at(i);
 
                     switch (State) {
                         case psBegin:
 
-                            if (ch == ' ')
+                            if (ch == 13 || ch == 10 || ch == ' ')
                                 break;
 
                             if (ch != '[')
@@ -321,15 +318,15 @@ namespace Apostol {
 
                         case psUniqueId:
 
-                            if (!Quotes && ch == ' ')
+                            if (!quotes && ch == ' ')
                                 break;
 
                             if (ch == '"') {
-                                Quotes = !Quotes;
+                                quotes = !quotes;
                                 break;
                             }
 
-                            if (!Quotes && ch == ',') {
+                            if (!quotes && ch == ',') {
                                 switch (Message.MessageTypeId) {
                                     case mtCall:
                                         State = psAction;
@@ -350,15 +347,15 @@ namespace Apostol {
 
                         case psAction:
 
-                            if (!Quotes && ch == ' ')
+                            if (!quotes && ch == ' ')
                                 break;
 
                             if (ch == '"') {
-                                Quotes = !Quotes;
+                                quotes = !quotes;
                                 break;
                             }
 
-                            if (!Quotes && ch == ',') {
+                            if (!quotes && ch == ',') {
                                 State = psPayloadBegin;
                                 break;
                             }
@@ -368,15 +365,15 @@ namespace Apostol {
 
                         case psErrorCode:
 
-                            if (!Quotes && ch == ' ')
+                            if (!quotes && ch == ' ')
                                 break;
 
                             if (ch == '"') {
-                                Quotes = !Quotes;
+                                quotes = !quotes;
                                 break;
                             }
 
-                            if (!Quotes && ch == ',') {
+                            if (!quotes && ch == ',') {
                                 State = psErrorDescription;
                                 break;
                             }
@@ -386,15 +383,15 @@ namespace Apostol {
 
                         case psErrorDescription:
 
-                            if (!Quotes && ch == ' ')
+                            if (!quotes && ch == ' ')
                                 break;
 
                             if (ch == '"') {
-                                Quotes = !Quotes;
+                                quotes = !quotes;
                                 break;
                             }
 
-                            if (!Quotes && ch == ',') {
+                            if (!quotes && ch == ',') {
                                 State = psPayloadBegin;
                                 break;
                             }
@@ -405,11 +402,11 @@ namespace Apostol {
                         case psPayloadBegin:
 
                             if (ch == '{') {
-                                Brackets++;
+                                brackets++;
                                 Item.Append(ch);
                                 State = psPayloadObject;
                             } else if (ch == '[') {
-                                Brackets++;
+                                brackets++;
                                 Item.Append(ch);
                                 State = psPayloadArray;
                             }
@@ -419,14 +416,14 @@ namespace Apostol {
                         case psPayloadObject:
 
                             if (ch == '{') {
-                                Brackets++;
+                                brackets++;
                             } else if (ch == '}') {
-                                Brackets--;
+                                brackets--;
                             }
 
                             Item.Append(ch);
 
-                            if (Brackets == 0) {
+                            if (brackets == 0) {
                                 try {
                                     Message.Payload << Item;
                                 } catch (std::exception &e) {
@@ -440,14 +437,14 @@ namespace Apostol {
                         case psPayloadArray:
 
                             if (ch == '[') {
-                                Brackets++;
+                                brackets++;
                             } else if (ch == ']') {
-                                Brackets--;
+                                brackets--;
                             }
 
                             Item.Append(ch);
 
-                            if (Brackets == 0) {
+                            if (brackets == 0) {
                                 try {
                                     Message.Payload << Item;
                                 } catch (std::exception &e) {
@@ -461,14 +458,14 @@ namespace Apostol {
                         case psEnd:
 
                             if (ch == ']')
-                                Result = true;
+                                return i + 1;
 
                             break;
                     }
                 }
             }
 
-            return Result;
+            return 0;
         }
         //--------------------------------------------------------------------------------------------------------------
 

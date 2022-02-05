@@ -1167,39 +1167,45 @@ namespace Apostol {
         void CCSService::DoWebSocket(CHTTPServerConnection *AConnection) {
             try {
                 auto pPoint = dynamic_cast<CCSChargingPoint *> (CCSChargingPoint::FindOfConnection(AConnection));
-
                 auto pWSRequest = AConnection->WSRequest();
 
-                const CString request(pWSRequest->Payload());
-
+                CString Request(pWSRequest->Payload());
 #ifdef WITH_POSTGRESQL
-                CJSONMessage message;
-                CJSONProtocol::Request(request, message);
+                while (Request.Position() < Request.Size()) {
+                    CJSONMessage Message;
+                    size_t size = CJSONProtocol::Request(Request, Message);
 
-                if (message.MessageTypeId == ChargePoint::mtCall) {
-                    // Let's process the request in the DBMS
-                    ParseJSON(AConnection, pPoint->Identity(), message);
-                } else {
-                    // We will send the response from the charging station to the handler
-                    auto pHandler = pPoint->Messages().FindMessageById(message.UniqueId);
-                    if (Assigned(pHandler)) {
-                        pHandler->Handler(AConnection);
-                        delete pHandler;
+                    if (size == 0)
+                        throw ExceptionFrm("Invalid request data: %s", Request.c_str());
+
+                    Request.Position(size);
+
+                    if (Message.MessageTypeId == ChargePoint::mtCall) {
+                        // Let's process the request in the DBMS
+                        ParseJSON(AConnection, pPoint->Identity(), Message);
+                    } else {
+                        // We will send the response from the charging station to the handler
+                        auto pHandler = pPoint->Messages().FindMessageById(Message.UniqueId);
+
+                        if (Assigned(pHandler)) {
+                            pHandler->Handler(AConnection);
+                            delete pHandler;
+                        }
+
+                        pWSRequest->Clear();
                     }
-                    pWSRequest->Clear();
                 }
 #else
                 auto pWSReply = AConnection->WSReply();
 
-                CString response;
+                CString Response;
 
-                if (pPoint->Parse(request, response)) {
-                    if (!response.IsEmpty()) {
-                        pWSReply->SetPayload(response);
-                        AConnection->SendWebSocket();
-                    }
-                } else {
-                    Log()->Error(APP_LOG_ERR, 0, "Unknown WebSocket request: %s", request.c_str());
+                if (!pPoint->Parse(Request, Response))
+                    throw ExceptionFrm("Unknown WebSocket request: %s", Request.c_str());
+
+                if (!Response.IsEmpty()) {
+                    pWSReply->SetPayload(Response);
+                    AConnection->SendWebSocket();
                 }
 #endif
             } catch (std::exception &e) {
