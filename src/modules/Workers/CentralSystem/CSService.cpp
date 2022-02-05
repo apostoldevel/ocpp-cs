@@ -218,6 +218,8 @@ namespace Apostol {
                     jsonConnection.Object().AddPair("Port", pConnection->Socket()->Binding()->PeerPort());
 
                     jsonPoint.Object().AddPair("Connection", jsonConnection);
+                } else {
+                    jsonPoint.Object().AddPair("Connection", CJSONValue());
                 }
 
                 jsonArray.Array().Add(jsonPoint);
