@@ -122,12 +122,16 @@ namespace Apostol {
 
             static void LogJSONMessage(const CString &Identity, const CJSONMessage &Message);
 
+            CJSON GetChargePointList();
+
             void OnChargePointMessageSOAP(CObject *Sender, const CSOAPMessage &Message);
             void OnChargePointMessageJSON(CObject *Sender, const CJSONMessage &Message);
 
         protected:
 
             void DoChargePoint(CHTTPServerConnection *AConnection, const CString &Identity, const CString &Operation);
+
+            void DoAuthChargePointList(const CAuthorization &Authorization, CHTTPServerConnection *AConnection);
             void DoChargePointList(CHTTPServerConnection *AConnection);
 
             void DoWebSocket(CHTTPServerConnection *AConnection);

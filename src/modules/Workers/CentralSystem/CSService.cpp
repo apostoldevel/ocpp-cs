@@ -254,6 +254,38 @@ namespace Apostol {
         }
         //--------------------------------------------------------------------------------------------------------------
 
+        CJSON CCSService::GetChargePointList() {
+            CJSON json;
+            CJSONValue jsonArray(jvtArray);
+
+            for (int i = 0; i < m_PointManager.Count(); i++) {
+                CJSONValue jsonPoint(jvtObject);
+                CJSONValue jsonConnection(jvtObject);
+
+                auto pPoint = m_PointManager.Points(i);
+
+                jsonPoint.Object().AddPair("Identity", pPoint->Identity());
+                jsonPoint.Object().AddPair("Address", pPoint->Address());
+
+                auto pConnection = pPoint->Connection();
+
+                if (pConnection != nullptr && pConnection->Connected()) {
+                    jsonConnection.Object().AddPair("Socket", pConnection->Socket()->Binding()->Handle());
+                    jsonConnection.Object().AddPair("IP", pConnection->Socket()->Binding()->PeerIP());
+                    jsonConnection.Object().AddPair("Port", pConnection->Socket()->Binding()->PeerPort());
+
+                    jsonPoint.Object().AddPair("Connection", jsonConnection);
+                }
+
+                jsonArray.Array().Add(jsonPoint);
+            }
+
+            json.Object().AddPair("ChargePointList", jsonArray);
+
+            return json;
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
         void CCSService::ParseSOAP(CHTTPServerConnection *AConnection, const CString &Payload) {
 
             auto OnExecuted = [this](CPQPollQuery *APollQuery) {
@@ -415,7 +447,7 @@ namespace Apostol {
         void CCSService::JSONToSOAP(CHTTPServerConnection *AConnection, CCSChargingPoint *APoint, const CString &Operation,
             const CJSON &Payload) {
 
-            auto OnExecuted = [this, APoint, &Operation](CPQPollQuery *APollQuery) {
+            auto OnExecuted = [this, APoint](CPQPollQuery *APollQuery) {
 
                 CPQResult *pResult;
 
@@ -423,6 +455,8 @@ namespace Apostol {
 
                 if (pConnection != nullptr && !pConnection->ClosedGracefully()) {
                     try {
+                        const auto &csOperation = pConnection->Data()["operation"];
+
                         for (int i = 0; i < APollQuery->Count(); i++) {
                             pResult = APollQuery->Results(i);
 
@@ -432,7 +466,7 @@ namespace Apostol {
                             CString caPayload(R"(<?xml version="1.0" encoding="UTF-8"?>)" LINEFEED);
                             caPayload << pResult->GetValue(0, 0);
 
-                            SendSOAP(pConnection, APoint, Operation, caPayload);
+                            SendSOAP(pConnection, APoint, csOperation, caPayload);
                         }
                     } catch (Delphi::Exception::Exception &E) {
                         ReplyError(pConnection, CHTTPReply::bad_request, E.what());
@@ -458,12 +492,14 @@ namespace Apostol {
             Data.Object().AddPair("header", Header);
             Data.Object().AddPair("payload", Payload.Object());
 
-            const auto &data = Data.ToString();
+            const auto &caData = Data.ToString();
 
             SQL.Add(CString()
-                .MaxFormatSize(256 + data.Size())
-                .Format("SELECT * FROM ocpp.JSONToSOAP(%s::jsonb);", PQQuoteLiteral(data).c_str())
+                .MaxFormatSize(256 + caData.Size())
+                .Format("SELECT * FROM ocpp.JSONToSOAP(%s::jsonb);", PQQuoteLiteral(caData).c_str())
             );
+
+            AConnection->Data().Values("operation", Operation);
 
             try {
                 ExecSQL(SQL, AConnection, OnExecuted, OnException);
@@ -1041,39 +1077,67 @@ namespace Apostol {
         }
         //--------------------------------------------------------------------------------------------------------------
 
-        void CCSService::DoChargePointList(CHTTPServerConnection *AConnection) {
+        void CCSService::DoAuthChargePointList(const CAuthorization &Authorization, CHTTPServerConnection *AConnection) {
+#ifdef WITH_POSTGRESQL
+            auto OnExecuted = [this](CPQPollQuery *APollQuery) {
 
-            auto pReply = AConnection->Reply();
+                CPQResult *pResult;
 
-            CJSONObject jsonObject;
-            CJSONValue jsonArray(jvtArray);
+                auto pConnection = dynamic_cast<CHTTPServerConnection *>(APollQuery->Binding());
 
-            for (int i = 0; i < m_PointManager.Count(); i++) {
-                CJSONValue jsonPoint(jvtObject);
-                CJSONValue jsonConnection(jvtObject);
+                if (pConnection != nullptr && !pConnection->ClosedGracefully()) {
+                    try {
+                        auto pReply = pConnection->Reply();
 
-                auto pPoint = m_PointManager.Points(i);
+                        for (int i = 0; i < APollQuery->Count(); i++) {
+                            pResult = APollQuery->Results(i);
 
-                jsonPoint.Object().AddPair("Identity", pPoint->Identity());
-                jsonPoint.Object().AddPair("Address", pPoint->Address());
+                            if (pResult->ExecStatus() != PGRES_TUPLES_OK)
+                                throw Delphi::Exception::EDBError(pResult->GetErrorMessage());
 
-                auto pConnection = pPoint->Connection();
-
-                if (pConnection != nullptr && pConnection->Connected()) {
-                    jsonConnection.Object().AddPair("Socket", pConnection->Socket()->Binding()->Handle());
-                    jsonConnection.Object().AddPair("IP", pConnection->Socket()->Binding()->PeerIP());
-                    jsonConnection.Object().AddPair("Port", pConnection->Socket()->Binding()->PeerPort());
-
-                    jsonPoint.Object().AddPair("Connection", jsonConnection);
+                            pReply->Content = pResult->GetValue(0, 0);
+                            pConnection->SendReply(CHTTPReply::ok, nullptr, true);
+                        }
+                    } catch (Delphi::Exception::Exception &E) {
+                        ReplyError(pConnection, CHTTPReply::bad_request, E.what());
+                        Log()->Error(APP_LOG_ERR, 0, E.what());
+                    }
                 }
+            };
 
-                jsonArray.Array().Add(jsonPoint);
+            auto OnException = [](CPQPollQuery *APollQuery, const Delphi::Exception::Exception &E) {
+                auto pConnection = dynamic_cast<CHTTPServerConnection *>(APollQuery->Binding());
+                ReplyError(pConnection, CHTTPReply::internal_server_error, E.what());
+            };
+
+            CStringList SQL;
+
+            const auto &caPayload = GetChargePointList().ToString();
+
+            SQL.Add(CString()
+                            .MaxFormatSize(256 + Authorization.Token.Size() + caPayload.Size())
+                            .Format("SELECT * FROM ocpp.ChargePointList(%s, %s::jsonb);",
+                                    PQQuoteLiteral(Authorization.Token).c_str(),
+                                    PQQuoteLiteral(caPayload).c_str()
+                            )
+            );
+
+            try {
+                ExecSQL(SQL, AConnection, OnExecuted, OnException);
+            } catch (Delphi::Exception::Exception &E) {
+                ReplyError(AConnection, CHTTPReply::internal_server_error, E.what());
             }
+#else
+            auto pReply = AConnection->Reply();
+            pReply->Content = GetChargePointList().ToString();
+            AConnection->SendReply(CHTTPReply::ok);
+#endif
+        }
+        //--------------------------------------------------------------------------------------------------------------
 
-            jsonObject.AddPair("ChargePointList", jsonArray);
-
-            pReply->Content = jsonObject.ToString();
-
+        void CCSService::DoChargePointList(CHTTPServerConnection *AConnection) {
+            auto pReply = AConnection->Reply();
+            pReply->Content = GetChargePointList().ToString();
             AConnection->SendReply(CHTTPReply::ok);
         }
         //--------------------------------------------------------------------------------------------------------------
@@ -1102,9 +1166,7 @@ namespace Apostol {
             const auto &caCommand = slPath[2];
 
             try {
-
                 if (caVersion == "v1") {
-
                     pReply->ContentType = CHTTPReply::json;
 
                     if (caCommand == "ping") {
@@ -1114,18 +1176,25 @@ namespace Apostol {
                         pReply->Content << "{\"serverTime\": " << LongToString(MsEpoch()) << "}";
                         AConnection->SendReply(CHTTPReply::ok);
                         return;
-                    } else if (caCommand == "ChargePointList") {
-                        DoChargePointList(AConnection);
-                        return;
-                    } else if (caCommand == "ChargePoint" && slPath.Count() >= 5) {
+                    } else {
 #ifdef WITH_AUTHORIZATION
                         CAuthorization Authorization;
                         if (!CheckAuthorization(AConnection, Authorization)) {
                             return;
                         }
+
+                        if (caCommand == "ChargePointList") {
+                            DoAuthChargePointList(Authorization, AConnection);
+                            return;
+#else
+                        if (caCommand == "ChargePointList") {
+                            DoChargePointList(AConnection);
+                            return;
 #endif
-                        DoChargePoint(AConnection, slPath[3], slPath[4]);
-                        return;
+                        } else if (caCommand == "ChargePoint" && slPath.Count() >= 5) {
+                            DoChargePoint(AConnection, slPath[3], slPath[4]);
+                            return;
+                        }
                     }
                 }
 
