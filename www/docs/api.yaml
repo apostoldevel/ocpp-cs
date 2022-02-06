@@ -13,7 +13,7 @@ externalDocs:
   description: GitHub
   url: https://github.com/apostoldevel/apostol-cs
 servers:
-  - url: 'http://cs.ocpp-css.ru/api/v1'
+  - url: 'http://cs.ocpp-css.com/api/v1'
     description: OCPP CS
   - url: 'http://{host}:{port}/api/v1'
     description: Custom
