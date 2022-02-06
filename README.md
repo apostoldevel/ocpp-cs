@@ -24,7 +24,7 @@ Alternatively, you can use any OpenAPI client to import the [api.yaml](http://cs
 
 Authorize:
 ~~~
-login: demo
+username: demo
 password: demo
 ~~~
 
@@ -54,7 +54,7 @@ To control the charging station, use the web shell at:
 
 Authorize:
 ~~~
-login: demo
+username: demo
 password: demo
 ~~~
 
