@@ -16,23 +16,28 @@ Version 1.5 uses SOAP over HTTP as the RPC/transport protocol. Version 1.6 uses 
 
 See [Releases](https://github.com/apostoldevel/apostol-cs/releases) for more details.
 
-Framework
+API
 -
-The OCPP Central System is a set of C++ libraries for building OCPP applications. The toolkit consists of several libraries, most of which depend on the foundational [libdelphi](https://github.com/ufocomp/libdelphi) library.
+We use OpenAPI to interact with the Central System (CS). You can directly open Swagger UI through [http://cs.ocpp-css.com/docs](http://cs.ocpp-css.com/docs).
 
-This code can be used as a framework for creating your own **Central System** or preparing firmware for a **Charging Station**.
-
-Swagger
--
-We use OpenAPI to interact with the Central System Service (CSS). You can directly open Swagger UI through [https://ocpp-css.ru/docs](https://ocpp-css.ru/docs).
-
-Alternatively, you can use any OpenAPI client to import the [api.yaml](https://ocpp-css.ru/docs/api.yaml) file from our repository (download).
+Alternatively, you can use any OpenAPI client to import the [api.yaml](http://cs.ocpp-css.com/docs/api.yaml) file from our repository (download).
 
 Authorize:
 ~~~
 login: demo
 password: demo
 ~~~
+
+RFID-card:
+~~~
+idTag: demo
+~~~
+
+Framework
+-
+The OCPP Central System is a set of C++ libraries for building OCPP applications. The toolkit consists of several libraries, most of which depend on the foundational [libdelphi](https://github.com/ufocomp/libdelphi) library.
+
+This code can be used as a framework for creating your own **Central System** or preparing firmware for a **Charging Station**.
 
 Demonstration
 -
