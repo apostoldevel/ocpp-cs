@@ -20,7 +20,7 @@ API
 -
 We use OpenAPI to interact with the Central System (CS). You can directly open Swagger UI through [http://cs.ocpp-css.com/docs](http://cs.ocpp-css.com/docs).
 
-Alternatively, you can use any OpenAPI client to import the [api.yaml](http://cs.ocpp-css.com/docs/api.yaml) file from our repository (download).
+Alternatively, you can use any OpenAPI client to import the [api.yaml](https://github.com/apostoldevel/apostol-cs/blob/master/www/docs/api.yaml) file from our repository (download).
 
 Authorize:
 ~~~
