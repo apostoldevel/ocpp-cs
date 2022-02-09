@@ -1170,7 +1170,7 @@ namespace Apostol {
 
             CStringList SQL;
 
-            const auto &caPayload = GetChargePointList().ToString();
+            const auto &caPayload = Endpoint == "ChargePointList" ? GetChargePointList().ToString() : Payload.ToString();
 
             SQL.Add(CString()
                             .MaxFormatSize(256 + Token.Size() + caPayload.Size())

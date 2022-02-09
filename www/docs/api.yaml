@@ -72,29 +72,6 @@ paths:
           $ref: '#/components/responses/NotFound'
         '5XX':
           $ref: '#/components/responses/InternalError'
-  /ChargePointList:
-    get:
-      tags:
-        - CentralSystem
-      summary: Get a list of connected charging stations.
-      operationId: ChargePointList
-      responses:
-        '200':
-          description: Successfully.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ChargePointListResponce'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
-        '5XX':
-          $ref: '#/components/responses/InternalError'
   /CentralSystem/ChargePointList:
     get:
       tags:
