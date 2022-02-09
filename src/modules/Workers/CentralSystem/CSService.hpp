@@ -92,12 +92,14 @@ namespace Apostol {
         class CCSService: public CApostolModule {
         private:
 
+            COperations m_Endpoints;
             COperations m_Operations;
 
             CCSChargingPointManager m_PointManager;
 
             void InitMethods() override;
             void InitOperations();
+            void InitEndpoints();
 
 #ifdef WITH_AUTHORIZATION
             void VerifyToken(const CString &Token);
@@ -124,14 +126,17 @@ namespace Apostol {
 
             CJSON GetChargePointList();
 
+            static int CheckError(const CJSON &Json, CString &ErrorMessage, bool RaiseIfError = false);
+            static CHTTPReply::CStatusType ErrorCodeToStatus(int ErrorCode);
+
             void OnChargePointMessageSOAP(CObject *Sender, const CSOAPMessage &Message);
             void OnChargePointMessageJSON(CObject *Sender, const CJSONMessage &Message);
 
         protected:
 
+            void DoCentralSystem(CHTTPServerConnection *AConnection, const CString &Token, const CString &Endpoint);
             void DoChargePoint(CHTTPServerConnection *AConnection, const CString &Identity, const CString &Operation);
 
-            void DoAuthChargePointList(const CAuthorization &Authorization, CHTTPServerConnection *AConnection);
             void DoChargePointList(CHTTPServerConnection *AConnection);
 
             void DoWebSocket(CHTTPServerConnection *AConnection);

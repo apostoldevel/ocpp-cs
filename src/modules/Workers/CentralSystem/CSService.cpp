@@ -48,6 +48,7 @@ namespace Apostol {
             CCSService::InitMethods();
 
             InitOperations();
+            InitEndpoints();
         }
         //--------------------------------------------------------------------------------------------------------------
         
@@ -194,6 +195,84 @@ namespace Apostol {
             m_Operations.Last().Value().Add({"retries", "integer", false});
             m_Operations.Last().Value().Add({"retrieveDate", "dateTime", true});
             m_Operations.Last().Value().Add({"retryInterval", "integer", false});
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
+        void CCSService::InitEndpoints() {
+            m_Endpoints.AddPair("ChargePointList", {});
+
+            m_Endpoints.AddPair("TransactionList", {});
+            m_Endpoints.Last().Value().Add({"identity", "text", true});
+            m_Endpoints.Last().Value().Add({"dateFrom", "timestamp", false});
+            m_Endpoints.Last().Value().Add({"dateTo", "timestamp", false});
+
+            m_Endpoints.AddPair("ReservationList", {});
+            m_Endpoints.Last().Value().Add({"identity", "text", true});
+            m_Endpoints.Last().Value().Add({"dateFrom", "timestamp", false});
+            m_Endpoints.Last().Value().Add({"dateTo", "timestamp", false});
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
+        CHTTPReply::CStatusType CCSService::ErrorCodeToStatus(int ErrorCode) {
+            CHTTPReply::CStatusType status = CHTTPReply::ok;
+
+            if (ErrorCode != 0) {
+                switch (ErrorCode) {
+                    case 401:
+                        status = CHTTPReply::unauthorized;
+                        break;
+
+                    case 403:
+                        status = CHTTPReply::forbidden;
+                        break;
+
+                    case 404:
+                        status = CHTTPReply::not_found;
+                        break;
+
+                    case 500:
+                        status = CHTTPReply::internal_server_error;
+                        break;
+
+                    default:
+                        status = CHTTPReply::bad_request;
+                        break;
+                }
+            }
+
+            return status;
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
+        int CCSService::CheckError(const CJSON &Json, CString &ErrorMessage, bool RaiseIfError) {
+            int errorCode = 0;
+
+            if (Json.HasOwnProperty(_T("error"))) {
+                const auto& error = Json[_T("error")];
+
+                if (error.HasOwnProperty(_T("code"))) {
+                    errorCode = error[_T("code")].AsInteger();
+                } else {
+                    return 0;
+                }
+
+                if (error.HasOwnProperty(_T("message"))) {
+                    ErrorMessage = error[_T("message")].AsString();
+                } else {
+                    return 0;
+                }
+
+                if (RaiseIfError)
+                    throw EDBError(ErrorMessage.c_str());
+
+                if (errorCode >= 10000)
+                    errorCode = errorCode / 100;
+
+                if (errorCode < 0)
+                    errorCode = 400;
+            }
+
+            return errorCode;
         }
         //--------------------------------------------------------------------------------------------------------------
 
@@ -995,6 +1074,124 @@ namespace Apostol {
         }
         //--------------------------------------------------------------------------------------------------------------
 
+        void CCSService::DoCentralSystem(CHTTPServerConnection *AConnection, const CString &Token, const CString &Endpoint) {
+
+            auto pRequest = AConnection->Request();
+
+            const auto index = m_Endpoints.IndexOfName(Endpoint);
+            if (index == -1) {
+                ReplyError(AConnection, CHTTPReply::bad_request, CString().Format("Invalid endpoint: %s", Endpoint.c_str()));
+                return;
+            }
+            auto IndexOfName = [](const CFields &Fields, const CString &Name) {
+                for (int i = 0; i < Fields.Count(); ++i) {
+                    const auto &field = Fields[i];
+                    if (field.name == Name)
+                        return i;
+                }
+                return -1;
+            };
+
+            CJSON Payload;
+            ContentToJson(pRequest, Payload);
+
+            const auto &caFields = m_Endpoints[index].Value();
+            auto &Object = Payload.Object();
+
+            for (int i = 0; i < Object.Count(); i++) {
+                const auto& caMember = Object.Members(i);
+                const auto& caKey = caMember.String();
+
+                if (IndexOfName(caFields, caKey) == -1) {
+                    ReplyError(AConnection, CHTTPReply::bad_request, CString().Format("Invalid key: %s", caKey.c_str()));
+                    return;
+                }
+
+                const auto& caValue = caMember.Value();
+                if (caValue.IsNull() || caValue.IsEmpty()) {
+                    Object.Delete(i);
+                }
+            }
+
+            for (int i = 0; i < caFields.Count(); i++) {
+                const auto &field = caFields[i];
+                if (field.required && Payload[field.name].IsNull()) {
+                    ReplyError(AConnection, CHTTPReply::bad_request, CString().Format("Not found required key: %s (%s)", field.name.c_str(), field.type.c_str()));
+                    return;
+                }
+            }
+#ifdef WITH_POSTGRESQL
+            auto OnExecuted = [](CPQPollQuery *APollQuery) {
+
+                CPQResult *pResult;
+                CString errorMessage;
+
+                auto pConnection = dynamic_cast<CHTTPServerConnection *>(APollQuery->Binding());
+
+                if (pConnection != nullptr && !pConnection->ClosedGracefully()) {
+                    const auto &endpoint = pConnection->Data()["endpoint"];
+
+                    try {
+                        auto pReply = pConnection->Reply();
+                        CHTTPReply::CStatusType status = CHTTPReply::ok;
+
+                        for (int i = 0; i < APollQuery->Count(); i++) {
+                            pResult = APollQuery->Results(i);
+
+                            if (pResult->ExecStatus() != PGRES_TUPLES_OK)
+                                throw Delphi::Exception::EDBError(pResult->GetErrorMessage());
+
+                            if (pResult->nTuples() == 1) {
+                                const CJSON Payload(pResult->GetValue(0, 0));
+                                status = ErrorCodeToStatus(CheckError(Payload, errorMessage));
+                            }
+
+                            PQResultToJson(pResult, pReply->Content, "object", endpoint);
+
+                            if (status == CHTTPReply::ok) {
+                                pConnection->SendReply(status, nullptr, true);
+                            } else {
+                                ReplyError(pConnection, status, errorMessage);
+                            }
+                        }
+                    } catch (Delphi::Exception::Exception &E) {
+                        ReplyError(pConnection, CHTTPReply::bad_request, E.what());
+                        Log()->Error(APP_LOG_ERR, 0, E.what());
+                    }
+                }
+            };
+
+            auto OnException = [](CPQPollQuery *APollQuery, const Delphi::Exception::Exception &E) {
+                auto pConnection = dynamic_cast<CHTTPServerConnection *>(APollQuery->Binding());
+                ReplyError(pConnection, CHTTPReply::internal_server_error, E.what());
+            };
+
+            AConnection->Data().Values("endpoint", Endpoint);
+
+            CStringList SQL;
+
+            const auto &caPayload = GetChargePointList().ToString();
+
+            SQL.Add(CString()
+                            .MaxFormatSize(256 + Token.Size() + caPayload.Size())
+                            .Format("SELECT * FROM ocpp.%s(%s, %s::jsonb);",
+                                    Endpoint.c_str(),
+                                    PQQuoteLiteral(Token).c_str(),
+                                    PQQuoteLiteral(caPayload).c_str()
+                            )
+            );
+
+            try {
+                ExecSQL(SQL, AConnection, OnExecuted, OnException);
+            } catch (Delphi::Exception::Exception &E) {
+                ReplyError(AConnection, CHTTPReply::internal_server_error, E.what());
+            }
+#else
+            AConnection->SendStockReply(CHTTPReply::not_implemented);
+#endif
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
         void CCSService::DoChargePoint(CHTTPServerConnection *AConnection, const CString &Identity, const CString &Operation) {
 
             auto pRequest = AConnection->Request();
@@ -1079,64 +1276,6 @@ namespace Apostol {
         }
         //--------------------------------------------------------------------------------------------------------------
 
-        void CCSService::DoAuthChargePointList(const CAuthorization &Authorization, CHTTPServerConnection *AConnection) {
-#ifdef WITH_POSTGRESQL
-            auto OnExecuted = [this](CPQPollQuery *APollQuery) {
-
-                CPQResult *pResult;
-
-                auto pConnection = dynamic_cast<CHTTPServerConnection *>(APollQuery->Binding());
-
-                if (pConnection != nullptr && !pConnection->ClosedGracefully()) {
-                    try {
-                        auto pReply = pConnection->Reply();
-
-                        for (int i = 0; i < APollQuery->Count(); i++) {
-                            pResult = APollQuery->Results(i);
-
-                            if (pResult->ExecStatus() != PGRES_TUPLES_OK)
-                                throw Delphi::Exception::EDBError(pResult->GetErrorMessage());
-
-                            pReply->Content = pResult->GetValue(0, 0);
-                            pConnection->SendReply(CHTTPReply::ok, nullptr, true);
-                        }
-                    } catch (Delphi::Exception::Exception &E) {
-                        ReplyError(pConnection, CHTTPReply::bad_request, E.what());
-                        Log()->Error(APP_LOG_ERR, 0, E.what());
-                    }
-                }
-            };
-
-            auto OnException = [](CPQPollQuery *APollQuery, const Delphi::Exception::Exception &E) {
-                auto pConnection = dynamic_cast<CHTTPServerConnection *>(APollQuery->Binding());
-                ReplyError(pConnection, CHTTPReply::internal_server_error, E.what());
-            };
-
-            CStringList SQL;
-
-            const auto &caPayload = GetChargePointList().ToString();
-
-            SQL.Add(CString()
-                            .MaxFormatSize(256 + Authorization.Token.Size() + caPayload.Size())
-                            .Format("SELECT * FROM ocpp.ChargePointList(%s, %s::jsonb);",
-                                    PQQuoteLiteral(Authorization.Token).c_str(),
-                                    PQQuoteLiteral(caPayload).c_str()
-                            )
-            );
-
-            try {
-                ExecSQL(SQL, AConnection, OnExecuted, OnException);
-            } catch (Delphi::Exception::Exception &E) {
-                ReplyError(AConnection, CHTTPReply::internal_server_error, E.what());
-            }
-#else
-            auto pReply = AConnection->Reply();
-            pReply->Content = GetChargePointList().ToString();
-            AConnection->SendReply(CHTTPReply::ok);
-#endif
-        }
-        //--------------------------------------------------------------------------------------------------------------
-
         void CCSService::DoChargePointList(CHTTPServerConnection *AConnection) {
             auto pReply = AConnection->Reply();
             pReply->Content = GetChargePointList().ToString();
@@ -1186,14 +1325,17 @@ namespace Apostol {
                         }
 
                         if (caCommand == "ChargePointList") {
-                            DoAuthChargePointList(Authorization, AConnection);
+                            DoCentralSystem(AConnection, Authorization.Token, caCommand);
+                            return;
+                        } else if (caCommand == "CentralSystem" && slPath.Count() == 4) {
+                            DoCentralSystem(AConnection, Authorization.Token, slPath[3]);
                             return;
 #else
                         if (caCommand == "ChargePointList") {
                             DoChargePointList(AConnection);
                             return;
 #endif
-                        } else if (caCommand == "ChargePoint" && slPath.Count() >= 5) {
+                        } else if (caCommand == "ChargePoint" && slPath.Count() == 5) {
                             DoChargePoint(AConnection, slPath[3], slPath[4]);
                             return;
                         }

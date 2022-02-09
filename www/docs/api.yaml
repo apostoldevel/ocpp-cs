@@ -13,7 +13,7 @@ externalDocs:
   description: GitHub
   url: https://github.com/apostoldevel/apostol-cs
 servers:
-  - url: 'http://cs.ocpp-css.com/api/v1'
+  - url: 'http://cs.ocpp-css.ru/api/v1'
     description: OCPP CS
   - url: 'http://{host}:{port}/api/v1'
     description: Custom
@@ -77,14 +77,101 @@ paths:
       tags:
         - CentralSystem
       summary: Get a list of connected charging stations.
-      operationId: getChargePointList
+      operationId: ChargePointList
       responses:
         '200':
           description: Successfully.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/chargePointList'
+                $ref: '#/components/schemas/ChargePointListResponce'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '5XX':
+          $ref: '#/components/responses/InternalError'
+  /CentralSystem/ChargePointList:
+    get:
+      tags:
+        - CentralSystem
+      summary: Get a list of connected charging stations.
+      operationId: ChargePointList
+      responses:
+        '200':
+          description: Successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChargePointListResponce'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '5XX':
+          $ref: '#/components/responses/InternalError'
+  /CentralSystem/TransactionList:
+    post:
+      tags:
+        - CentralSystem
+      summary: Transaction list.
+      operationId: TransactionList
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/TransactionList'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TransactionList'
+      responses:
+        '200':
+          description: Successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TransactionListResponce'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '5XX':
+          $ref: '#/components/responses/InternalError'
+  /CentralSystem/ReservationList:
+    post:
+      tags:
+        - CentralSystem
+      summary: Reservation list.
+      operationId: ReservationList
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/ReservationList'
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReservationList'
+      responses:
+        '200':
+          description: Successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReservationListResponce'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -1413,6 +1500,139 @@ components:
           type: string
           enum: [Accepted, Blocked, Expired, Invalid, ConcurrentTx]
           description: This contains whether the idTag has been accepted or not by the Central System.
+    ChargePointListResponce:
+      type: object
+      required:
+        - ChargePointList
+      properties:
+        ChargePointList:
+          type: array
+          items:
+            type: object
+            properties:
+              Identity:
+                type: string
+                description: Charge point identity.
+              Address:
+                type: string
+              Connection:
+                type: object
+                properties:
+                  Socket:
+                    type: integer
+                    format: int32
+                  IP:
+                    type: string
+                  Port:
+                    type: integer
+                    format: int32
+    TransactionList:
+      type: object
+      required:
+        - identity
+      properties:
+        identity:
+          type: string
+          description: Charge point identity.
+        dateFrom:
+          type: string
+          format: date-time
+        dateTo:
+          type: string
+          format: date-time
+    TransactionListResponce:
+      type: object
+      required:
+        - TransactionList
+      properties:
+        TransactionList:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+                format: int32
+                description: Transaction ID.
+              idTag:
+                type: string
+                description: The identifier to which this authorization applies.
+              identity:
+                type: string
+              serialNumber:
+                type: string
+              connectorId:
+                type: integer
+                format: int32
+              meterStart:
+                type: number
+                format: double
+              meterStop:
+                type: number
+                format: double
+              value:
+                type: number
+                format: double
+              reservationId:
+                type: integer
+                format: int32
+              reason:
+                type: string
+              data:
+                type: object
+              dateStart:
+                type: string
+                format: date-time
+              dateStop:
+                type: string
+                format: date-time
+    ReservationList:
+      type: object
+      required:
+        - identity
+      properties:
+        identity:
+          type: string
+          description: Charge point identity.
+        dateFrom:
+          type: string
+          format: date-time
+        dateTo:
+          type: string
+          format: date-time
+    ReservationListResponce:
+      type: object
+      required:
+        - ReservationList
+      properties:
+        ReservationList:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+                format: int32
+                description: Reservation ID.
+              idTag:
+                type: string
+                description: The identifier to which this authorization applies.
+              identity:
+                type: string
+              serialNumber:
+                type: string
+              connectorId:
+                type: integer
+                format: int32
+              expiryDate:
+                type: string
+                format: date-time
+              dateStart:
+                type: string
+                format: date-time
+              dateStop:
+                type: string
+                format: date-time
     status:
       type: object
       required:
@@ -1449,31 +1669,6 @@ components:
               format: int32
             message:
               type: string
-    chargePointList:
-      type: object
-      required:
-        - ChargePointList
-      properties:
-        ChargePointList:
-          type: array
-          items:
-            type: object
-            properties:
-              Identity:
-                type: string
-              Address:
-                type: string
-              Connection:
-                type: object
-                properties:
-                  Socket:
-                    type: integer
-                    format: int32
-                  IP:
-                    type: string
-                  Port:
-                    type: integer
-                    format: int32
   securitySchemes:
     oauth2:
       type: oauth2
