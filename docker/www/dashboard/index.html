@@ -1,0 +1,1856 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <!-- Required meta tags -->
+    <meta charset="utf-8">
+    <meta name="description" content="OCPP Central System Service: Home">
+
+    <!-- Required meta tags -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+
+    <title>Home | OCPP Central System Service</title>
+
+    <!-- Token -->
+    <meta name="web-scope" content="http://localhost:8080">
+    <meta name="web-client_id" content="ocpp-apostol-crm.ru">
+
+    <!-- Bootstrap CSS -->
+    <link rel="stylesheet" href="/assets/vendor/bootstrap/4.5.0/css/bootstrap.min.css" integrity="sha384-9aIt2nRpC12Uk9gS9baDl411NQApFmC26EwAOH8WgZl5MYYxFfc+NcPb1dKGj7Sk" crossorigin="anonymous">
+
+    <!-- Favicons -->
+    <link href="/assets/img/favicon.png" rel="icon">
+    <link href="/assets/img/apple-touch-icon.png" rel="apple-touch-icon">
+
+    <!-- Template Main CSS File -->
+    <!-- Custom styles for this template -->
+    <link href="/assets/css/main.css" rel="stylesheet" type="text/css">
+    <link href="/assets/css/fonts.css" rel="stylesheet" type="text/css">
+</head>
+
+<body>
+<header class="navbar navbar-expand-md navbar-dark bg-dark fixed-top">
+    <a class="navbar-brand" href="/dashboard/" title="В начало"><svg class="bi bi-house" width="1em" height="1em" viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+        <path fill-rule="evenodd" d="M2 13.5V7h1v6.5a.5.5 0 00.5.5h9a.5.5 0 00.5-.5V7h1v6.5a1.5 1.5 0 01-1.5 1.5h-9A1.5 1.5 0 012 13.5zm11-11V6l-2-2V2.5a.5.5 0 01.5-.5h1a.5.5 0 01.5.5z" clip-rule="evenodd"/>
+        <path fill-rule="evenodd" d="M7.293 1.5a1 1 0 011.414 0l6.647 6.646a.5.5 0 01-.708.708L8 2.207 1.354 8.854a.5.5 0 11-.708-.708L7.293 1.5z" clip-rule="evenodd"/>
+    </svg></a>
+    <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarsDefault" aria-controls="navbarsDefault" aria-expanded="false" aria-label="Toggle navigation">
+        <span class="navbar-toggler-icon"></span>
+    </button>
+
+    <div class="collapse navbar-collapse" id="navbarsDefault">
+        <ul class="navbar-nav mr-auto">
+            <li class="nav-item active">
+                <a class="nav-link" href="/dashboard/">Home<span class="sr-only">(current)</span></a>
+            </li>
+        </ul>
+        <ul class="navbar-nav flex-row ml-md-auto d-none d-md-flex">
+            <li class="nav-item dropdown">
+                <a class="nav-item nav-link dropdown-toggle mr-md-2" href="#" id="bd-versions" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                    <svg class="bi bi-people-circle" width="1em" height="1em" viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M13.468 12.37C12.758 11.226 11.195 10 8 10s-4.757 1.225-5.468 2.37A6.987 6.987 0 008 15a6.987 6.987 0 005.468-2.63z"/>
+                        <path fill-rule="evenodd" d="M8 9a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd"/>
+                        <path fill-rule="evenodd" d="M8 1a7 7 0 100 14A7 7 0 008 1zM0 8a8 8 0 1116 0A8 8 0 010 8z" clip-rule="evenodd"/>
+                    </svg>
+                </a>
+                <div class="dropdown-menu dropdown-menu-right">
+                    <a id="username" class="dropdown-item" href="#" title="Profile">ocpp-apostol-crm.ru</a>
+                    <div class="dropdown-divider"></div>
+                    <a class="dropdown-item " href="#" title="Sign out" onclick="SignOut()">Sign Out</a>
+                </div>
+            </li>
+        </ul>
+    </div>
+</header>
+
+<div class="container">
+    <div class="row flex-xl-nowrap">
+        <main class="col py-md-3 pl-md-5 bd-content" role="main">
+            <div class="shadow-sm p-3 mt-5 mb-3 bg-white rounded">
+                <div class="text-center">
+                    <h3>OCPP Central System Service</h3>
+                </div>
+                <br>
+                <div class="tab-content">
+                    <div id="tab-account" class="tab-pane active">
+                        <nav class="navbar navbar-expand-lg navbar-light bg-light">
+                            <a class="navbar-brand" href="#">API</a>
+                            <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                                <span class="navbar-toggler-icon"></span>
+                            </button>
+                            <div class="collapse navbar-collapse" id="navbarNav">
+                                <ul class="nav nav-tabs mr-auto">
+                                    <li class="nav-item">
+                                        <a class="nav-link active" href="#tab-charge-point-list">Connected Charge Points</a>
+                                    </li>
+                                    <li class="nav-item dropdown">
+                                        <a class="nav-link dropdown-toggle" href="#" id="navbarOperation" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                                            5. Operations Initiated by Central System
+                                        </a>
+                                        <div class="dropdown-menu" aria-labelledby="navbarDropdown">
+                                            <a class="nav-link" href="#tab-cancel-reservation">5.1. Cancel Reservation</a>
+                                            <a class="nav-link" href="#tab-change-availability">5.2. Change Availability</a>
+                                            <a class="nav-link" href="#tab-change-configuration">5.3. Change Configuration</a>
+                                            <a class="nav-link" href="#tab-clear-cache">5.4. Clear Cache</a>
+                                            <a class="nav-link" href="#tab-clear-charging-profile">5.5. Clear Charging Profile</a>
+                                            <a class="nav-link" href="#tab-data-transfer">5.6. Data Transfer</a>
+                                            <a class="nav-link" href="#tab-get-composite-schedule">5.7. Get Composite Schedule</a>
+                                            <a class="nav-link" href="#tab-get-configuration">5.8. Get Configuration</a>
+                                            <a class="nav-link" href="#tab-get-diagnostics">5.9. Get Diagnostics</a>
+                                            <a class="nav-link" href="#tab-get-local-list-version">5.10. Get Local List Version</a>
+                                            <a class="nav-link" href="#tab-remote-start-transaction">5.11. Remote Start Transaction</a>
+                                            <a class="nav-link" href="#tab-remote-stop-transaction">5.12. Remote Stop Transaction</a>
+                                            <a class="nav-link" href="#tab-reserve-now">5.13. Reserve Now</a>
+                                            <a class="nav-link" href="#tab-reset">5.14. Reset</a>
+                                            <a class="nav-link" href="#tab-send-local-list">5.15. Send Local List</a>
+                                            <a class="nav-link" href="#tab-set-charging-profile">5.16. Set Charging Profile</a>
+                                            <a class="nav-link" href="#tab-trigger-message">5.17. Trigger Message</a>
+                                            <a class="nav-link" href="#tab-unlock-connector">5.18. Unlock Connector</a>
+                                            <a class="nav-link" href="#tab-update-firmware">5.19. Update Firmware</a>
+                                        </div>
+                                    </li>
+                                </ul>
+                                <span class="navbar-text">
+                                <div class="input-group">
+                                    <div class="input-group-prepend">
+                                        <label class="input-group-text" for="ChargePoints">Identity</label>
+                                    </div>
+                                    <select id="ChargePoints" class="custom-select"></select>
+                                </div>
+                            </span>
+                            </div>
+                        </nav>
+                        <!-- Tab panes -->
+                        <div class="tab-content">
+                            <div id="tab-charge-point-list" class="container tab-pane active">
+                                <div id="ChargePointList-request" class="mt-3">
+                                    <small class="form-text text-muted">Wait response...</small>
+                                </div>
+                            </div>
+                            <div id="tab-cancel-reservation" class="container tab-pane fade">
+                                <div class="mt-3">
+                                    <small class="form-text text-muted">5.1. Cancel Reservation:</small>
+                                    <hr>
+                                    <form onsubmit="CancelReservation()">
+                                        <div class="form-group row">
+                                            <label for="CancelReservation-reservationId" class="col-sm-2 col-form-label">reservationId</label>
+                                            <div class="col-sm-10">
+                                                <input type="text" class="form-control" id="CancelReservation-reservationId" aria-describedby="CancelReservation-reservationId-help" placeholder="Integer" required>
+                                                <small id="CancelReservation-reservationId-help" class="form-text text-muted"><b>Required</b>. Id of the reservation to cancel.</small>
+                                            </div>
+                                        </div>
+                                        <button id="CancelReservation-execute" type="submit" class="btn btn-primary">Execute</button>
+                                    </form>
+                                    <hr>
+                                    <div id="CancelReservation-request">
+                                        <small class="form-text text-muted">Press "Execute" button...</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div id="tab-change-availability" class="container tab-pane fade">
+                                <div class="mt-3">
+                                    <small class="form-text text-muted">5.2. Change Availability:</small>
+                                    <hr>
+                                    <form onsubmit="ChangeAvailability()">
+                                        <div class="form-group row">
+                                            <label for="ChangeAvailability-connectorId" class="col-sm-2 col-form-label">connectorId</label>
+                                            <div class="col-sm-10">
+                                                <input type="text" class="form-control" id="ChangeAvailability-connectorId" aria-describedby="ChangeAvailability-connectorId-help" placeholder="Integer" required>
+                                                <small id="ChangeAvailability-connectorId-help" class="form-text text-muted"><b>Required</b>. The id of the connector for which availability needs to change. Id '0' (zero) is used if the availability of the Charge Point and all its connectors needs to change.</small>
+                                            </div>
+                                        </div>
+                                        <div class="form-group row">
+                                            <label for="ChangeAvailability-type" class="col-sm-2 col-form-label">type</label>
+                                            <div class="col-sm-10">
+                                                <select id="ChangeAvailability-type" class="custom-select" aria-describedby="ChangeAvailability-type-help">
+                                                    <option value="Inoperative">Charge point is not available for charging</option>
+                                                    <option value="Operative">Charge point is available for charging</option>
+                                                </select>
+                                                <small id="ChangeAvailability-type-help" class="form-text text-muted"><b>Required</b>. This contains the type of availability change that the Charge Point should perform.</small>
+                                            </div>
+                                        </div>
+                                        <button id="ChangeAvailability-execute" type="submit" class="btn btn-primary">Execute</button>
+                                    </form>
+                                    <hr>
+                                    <div id="ChangeAvailability-request">
+                                        <small class="form-text text-muted">Press "Execute" button...</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div id="tab-change-configuration" class="container tab-pane fade">
+                                <div class="mt-3">
+                                    <small class="form-text text-muted">5.3. Change Configuration:</small>
+                                    <hr>
+                                    <form onsubmit="ChangeConfiguration()">
+                                        <div class="form-group row">
+                                            <label for="ChangeConfiguration-key" class="col-sm-2 col-form-label">key</label>
+                                            <div class="col-sm-10">
+                                                <input type="text" class="form-control" id="ChangeConfiguration-key" aria-describedby="ChangeConfiguration-key-help" placeholder="String50" required>
+                                                <small id="ChangeConfiguration-key-help" class="form-text text-muted"><b>Required</b>. The name of the configuration setting to change.
+                                                    See for standard configuration key names and associated values.</small>
+                                            </div>
+                                        </div>
+                                        <div class="form-group row">
+                                            <label for="ChangeConfiguration-value" class="col-sm-2 col-form-label">value</label>
+                                            <div class="col-sm-10">
+                                                <input type="text" class="form-control" id="ChangeConfiguration-value" aria-describedby="ChangeConfiguration-value-help" placeholder="String500" required>
+                                                <small id="ChangeConfiguration-value-help" class="form-text text-muted"><b>Required</b>. The new value as string for the setting.
+                                                    See for standard configuration key names and associated values.</small>
+                                            </div>
+                                        </div>
+                                        <button id="ChangeConfiguration-execute" type="submit" class="btn btn-primary">Execute</button>
+                                    </form>
+                                    <hr>
+                                    <div id="ChangeConfiguration-request">
+                                        <small class="form-text text-muted">Press "Execute" button...</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div id="tab-clear-cache" class="container tab-pane fade">
+                                <div class="mt-3">
+                                    <small class="form-text text-muted">5.4. Clear Cache:</small>
+                                    <hr>
+                                    <form onsubmit="ClearCache()">
+                                        <div class="form-group row">
+                                            <div class="col-sm-10">
+                                                No fields are defined.
+                                            </div>
+                                        </div>
+                                        <button id="ClearCache-execute" type="submit" class="btn btn-primary">Execute</button>
+                                    </form>
+                                    <hr>
+                                    <div id="ClearCache-request">
+                                        <small class="form-text text-muted">Press "Execute" button...</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div id="tab-clear-charging-profile" class="container tab-pane fade">
+                                <div class="mt-3">
+                                    <small class="form-text text-muted">5.5. Clear Charging Profile:</small>
+                                    <hr>
+                                    <form onsubmit="ClearChargingProfile()">
+                                        <div class="form-group row">
+                                            <label for="ClearChargingProfile-id" class="col-sm-2 col-form-label">id</label>
+                                            <div class="col-sm-10">
+                                                <input type="text" class="form-control" id="ClearChargingProfile-id" aria-describedby="ClearChargingProfile-id-help" placeholder="Integer">
+                                                <small id="ClearChargingProfile-id-help" class="form-text text-muted"><b>Optional</b>. The ID of the charging profile to clear.</small>
+                                            </div>
+                                        </div>
+                                        <div class="form-group row">
+                                            <label for="ClearChargingProfile-connectorId" class="col-sm-2 col-form-label">connectorId</label>
+                                            <div class="col-sm-10">
+                                                <input type="text" class="form-control" id="ClearChargingProfile-connectorId" aria-describedby="ClearChargingProfile-connectorId-help" placeholder="Integer">
+                                                <small id="ClearChargingProfile-connectorId-help" class="form-text text-muted"><b>Optional</b>. Specifies the ID of the connector for which to clear
+                                                    charging profiles. A connectorId of zero (0) specifies the charging
+                                                    profile for the overall Charge Point. Absence of this parameter
+                                                    means the clearing applies to all charging profiles that match the
+                                                    other criteria in the request.</small>
+                                            </div>
+                                        </div>
+                                        <div class="form-group row">
+                                            <label for="ClearChargingProfile-chargingProfilePurpose" class="col-sm-2 col-form-label">chargingProfilePurpose</label>
+                                            <div class="col-sm-10">
+                                                <input type="text" class="form-control" id="ClearChargingProfile-chargingProfilePurpose" aria-describedby="ClearChargingProfile-chargingProfilePurpose-help" placeholder="ChargingProfilePurposeType (JSON)">
+                                                <small id="ClearChargingProfile-chargingProfilePurpose-help" class="form-text text-muted"><b>Optional</b>. Specifies to purpose of the charging profiles that will be
+                                                    cleared, if they meet the other criteria in the request.</small>
+                                            </div>
+                                        </div>
+                                        <div class="form-group row">
+                                            <label for="ClearChargingProfile-stackLevel" class="col-sm-2 col-form-label">stackLevel</label>
+                                            <div class="col-sm-10">
+                                                <input type="text" class="form-control" id="ClearChargingProfile-stackLevel" aria-describedby="ClearChargingProfile-stackLevel-help" placeholder="Integer">
+                                                <small id="ClearChargingProfile-stackLevel-help" class="form-text text-muted"><b>Optional</b>. Specifies the stackLevel for which charging profiles will
+                                                    be cleared, if they meet the other criteria in the request.</small>
+                                            </div>
+                                        </div>
+                                        <button id="ClearChargingProfile-execute" type="submit" class="btn btn-primary">Execute</button>
+                                    </form>
+                                    <hr>
+                                    <div id="ClearChargingProfile-request">
+                                        <small class="form-text text-muted">Press "Execute" button...</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div id="tab-data-transfer" class="container tab-pane fade">
+                                <div class="mt-3">
+                                    <small class="form-text text-muted">5.6. Data Transfer:</small>
+                                    <hr>
+                                    <form onsubmit="DataTransfer()">
+                                        <div class="form-group row">
+                                            <label for="DataTransfer-vendorId" class="col-sm-2 col-form-label">vendorId</label>
+                                            <div class="col-sm-10">
+                                                <input type="text" class="form-control" id="DataTransfer-vendorId" aria-describedby="DataTransfer-vendorId-help" placeholder="String255" required>
+                                                <small id="DataTransfer-vendorId-help" class="form-text text-muted"><b>Required</b>. This identifies the Vendor specific implementation.</small>
+                                            </div>
+                                        </div>
+                                        <div class="form-group row">
+                                            <label for="DataTransfer-messageId" class="col-sm-2 col-form-label">messageId</label>
+                                            <div class="col-sm-10">
+                                                <input type="text" class="form-control" id="DataTransfer-messageId" aria-describedby="DataTransfer-messageId-help" placeholder="String50">
+                                                <small id="DataTransfer-messageId-help" class="form-text text-muted"><b>Optional</b>. Additional identification field.</small>
+                                            </div>
+                                        </div>
+                                        <div class="form-group row">
+                                            <label for="DataTransfer-data" class="col-sm-2 col-form-label">data</label>
+                                            <div class="col-sm-10">
+                                                <input type="text" class="form-control" id="DataTransfer-data" aria-describedby="DataTransfer-data-help" placeholder="String">
+                                                <small id="DataTransfer-data-help" class="form-text text-muted"><b>Optional</b>. Data without specified length or format.</small>
+                                            </div>
+                                        </div>
+                                        <button id="DataTransfer-execute" type="submit" class="btn btn-primary">Execute</button>
+                                    </form>
+                                    <hr>
+                                    <div id="DataTransfer-request">
+                                        <small class="form-text text-muted">Press "Execute" button...</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div id="tab-get-composite-schedule" class="container tab-pane fade">
+                                <div class="mt-3">
+                                    <small class="form-text text-muted">5.6. Data Transfer:</small>
+                                    <hr>
+                                    <form onsubmit="GetCompositeSchedule()">
+                                        <div class="form-group row">
+                                            <label for="GetCompositeSchedule-connectorId" class="col-sm-2 col-form-label">connectorId</label>
+                                            <div class="col-sm-10">
+                                                <input type="text" class="form-control" id="GetCompositeSchedule-connectorId" aria-describedby="GetCompositeSchedule-connectorId-help" placeholder="Integer" required>
+                                                <small id="GetCompositeSchedule-connectorId-help" class="form-text text-muted"><b>Required</b>. The ID of the Connector for which the schedule is
+                                                    requested. When ConnectorId=0, the Charge Point will calculate
+                                                    the expected consumption for the grid connection.</small>
+                                            </div>
+                                        </div>
+                                        <div class="form-group row">
+                                            <label for="GetCompositeSchedule-duration" class="col-sm-2 col-form-label">duration</label>
+                                            <div class="col-sm-10">
+                                                <input type="text" class="form-control" id="GetCompositeSchedule-duration" aria-describedby="GetCompositeSchedule-duration-help" placeholder="Integer" required>
+                                                <small id="GetCompositeSchedule-duration-help" class="form-text text-muted"><b>Required</b>. Time in seconds. length of requested schedule.</small>
+                                            </div>
+                                        </div>
+                                        <div class="form-group row">
+                                            <label for="GetCompositeSchedule-chargingRateUnit" class="col-sm-2 col-form-label">chargingRateUnit</label>
+                                            <div class="col-sm-10">
+                                                <input type="text" class="form-control" id="GetCompositeSchedule-chargingRateUnit" aria-describedby="GetCompositeSchedule-chargingRateUnit-help" placeholder="ChargingRateUnitType">
+                                                <small id="GetCompositeSchedule-chargingRateUnit-help" class="form-text text-muted"><b>Optional</b>. Can be used to force a power or current profile.</small>
+                                            </div>
+                                        </div>
+                                        <button id="GetCompositeSchedule-execute" type="submit" class="btn btn-primary">Execute</button>
+                                    </form>
+                                    <hr>
+                                    <div id="GetCompositeSchedule-request">
+                                        <small class="form-text text-muted">Press "Execute" button...</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div id="tab-get-configuration" class="container tab-pane fade">
+                                <div class="mt-3">
+                                    <small class="form-text text-muted">5.8. Get Configuration:</small>
+                                    <hr>
+                                    <form onsubmit="GetConfiguration()">
+                                        <div class="form-group row">
+                                            <label for="GetConfiguration-key" class="col-sm-2 col-form-label">key</label>
+                                            <div class="col-sm-10">
+                                                <input type="text" class="form-control" id="GetConfiguration-key" aria-describedby="GetConfiguration-key-help" placeholder="String50">
+                                                <small id="GetConfiguration-key-help" class="form-text text-muted"><b>Optional</b>. List of keys for which the configuration value is requested.</small>
+                                            </div>
+                                        </div>
+                                        <button id="GetConfiguration-execute" type="submit" class="btn btn-primary">Execute</button>
+                                    </form>
+                                    <hr>
+                                    <div id="GetConfiguration-request">
+                                        <small class="form-text text-muted">Press "Execute" button...</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div id="tab-get-diagnostics" class="container tab-pane fade">
+                                <div class="mt-3">
+                                    <small class="form-text text-muted">5.9. Get Diagnostics:</small>
+                                    <hr>
+                                    <form onsubmit="GetDiagnostics()">
+                                        <div class="form-group row">
+                                            <label for="GetDiagnostics-location" class="col-sm-2 col-form-label">location</label>
+                                            <div class="col-sm-10">
+                                                <input type="text" class="form-control" id="GetDiagnostics-location" aria-describedby="GetDiagnostics-location-help" placeholder="anyURI" required>
+                                                <small id="GetDiagnostics-location-help" class="form-text text-muted"><b>Required</b>. This contains the location (directory) where the diagnostics file shall
+                                                    be uploaded to.</small>
+                                            </div>
+                                        </div>
+                                        <div class="form-group row">
+                                            <label for="GetDiagnostics-retries" class="col-sm-2 col-form-label">retries</label>
+                                            <div class="col-sm-10">
+                                                <input type="text" class="form-control" id="GetDiagnostics-retries" aria-describedby="GetDiagnostics-retries-help" placeholder="Integer">
+                                                <small id="GetDiagnostics-retries-help" class="form-text text-muted"><b>Optional</b>. This specifies how many times Charge Point must try to upload the
+                                                    diagnostics before giving up. If this field is not present, it is left to Charge Point
+                                                    to decide how many times it wants to retry.</small>
+                                            </div>
+                                        </div>
+                                        <div class="form-group row">
+                                            <label for="GetDiagnostics-retryInterval" class="col-sm-2 col-form-label">retryInterval</label>
+                                            <div class="col-sm-10">
+                                                <input type="text" class="form-control" id="GetDiagnostics-retryInterval" aria-describedby="GetDiagnostics-retryInterval-help" placeholder="Integer">
+                                                <small id="GetDiagnostics-retryInterval-help" class="form-text text-muted"><b>Optional</b>. The interval in seconds after which a retry may be attempted. If this
+                                                    field is not present, it is left to Charge Point to decide how long to wait between
+                                                    attempts.</small>
+                                            </div>
+                                        </div>
+                                        <div class="form-group row">
+                                            <label for="GetDiagnostics-startTime" class="col-sm-2 col-form-label">startTime</label>
+                                            <div class="col-sm-10">
+                                                <div class="input-group mb-3">
+                                                    <input type="text" class="form-control" id="GetDiagnostics-startTime" aria-describedby="GetDiagnostics-startTime-help" placeholder="DateTime">
+                                                    <div class="input-group-append">
+                                                        <button class="btn btn-outline-secondary" type="button" id="GetDiagnostics-startTime-now" onclick="GetDiagnosticsStartTime()">Now</button>
+                                                    </div>
+                                                </div>
+                                                <small id="GetDiagnostics-startTime-help" class="form-text text-muted"><b>Optional</b>. This contains the date and time of the oldest logging information to
+                                                    include in the diagnostics.</small>
+                                            </div>
+                                        </div>
+                                        <div class="form-group row">
+                                            <label for="GetDiagnostics-stopTime" class="col-sm-2 col-form-label">stopTime</label>
+                                            <div class="col-sm-10">
+                                                <div class="input-group mb-3">
+                                                    <input type="text" class="form-control" id="GetDiagnostics-stopTime" aria-describedby="GetDiagnostics-stopTime-help" placeholder="DateTime">
+                                                    <div class="input-group-append">
+                                                        <button class="btn btn-outline-secondary" type="button" id="GetDiagnostics-stopTime-now" onclick="GetDiagnosticsStopTime()">Now</button>
+                                                    </div>
+                                                </div>
+                                                <small id="GetDiagnostics-stopTime-help" class="form-text text-muted"><b>Optional</b>. This contains the date and time of the latest logging information to
+                                                    include in the diagnostics.</small>
+                                            </div>
+                                        </div>
+                                        <button id="GetDiagnostics-execute" type="submit" class="btn btn-primary">Execute</button>
+                                    </form>
+                                    <hr>
+                                    <div id="GetDiagnostics-request">
+                                        <small class="form-text text-muted">Press "Execute" button...</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div id="tab-get-local-list-version" class="container tab-pane fade">
+                                <div class="mt-3">
+                                    <small class="form-text text-muted">5.10. Get Local List Version:</small>
+                                    <hr>
+                                    <form onsubmit="GetLocalListVersion()">
+                                        <div class="form-group row">
+                                            <div class="col-sm-10">
+                                                No fields are defined.
+                                            </div>
+                                        </div>
+                                        <button id="GetLocalListVersion-execute" type="submit" class="btn btn-primary">Execute</button>
+                                    </form>
+                                    <hr>
+                                    <div id="GetLocalListVersion-request">
+                                        <small class="form-text text-muted">Press "Execute" button...</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div id="tab-remote-start-transaction" class="container tab-pane fade">
+                                <div class="mt-3">
+                                    <small class="form-text text-muted">5.11. Remote Start Transaction:</small>
+                                    <hr>
+                                    <form onsubmit="RemoteStartTransaction()">
+                                        <div class="form-group row">
+                                            <label for="RemoteStartTransaction-connectorId" class="col-sm-2 col-form-label">connectorId</label>
+                                            <div class="col-sm-10">
+                                                <input type="text" class="form-control" id="RemoteStartTransaction-connectorId" aria-describedby="RemoteStartTransaction-connectorId-help" placeholder="Integer">
+                                                <small id="RemoteStartTransaction-connectorId-help" class="form-text text-muted"><b>Optional</b>. Number of the connector on which to start the transaction. connectorId SHALL be > 0.</small>
+                                            </div>
+                                        </div>
+                                        <div class="form-group row">
+                                            <label for="RemoteStartTransaction-idTag" class="col-sm-2 col-form-label">idTag</label>
+                                            <div class="col-sm-10">
+                                                <input type="text" class="form-control" id="RemoteStartTransaction-idTag" aria-describedby="RemoteStartTransaction-idTag-help" placeholder="IdToken (String20)" required>
+                                                <small id="RemoteStartTransaction-idTag-help" class="form-text text-muted"><b>Required</b>. The identifier that Charge Point must use to start a transaction.</small>
+                                            </div>
+                                        </div>
+                                        <button id="RemoteStartTransaction-execute" type="submit" class="btn btn-primary">Execute</button>
+                                    </form>
+                                    <hr>
+                                    <div id="RemoteStartTransaction-request">
+                                        <small class="form-text text-muted">Press "Execute" button...</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div id="tab-remote-stop-transaction" class="container tab-pane fade">
+                                <div class="mt-3">
+                                    <small class="form-text text-muted">5.12. Remote Stop Transaction:</small>
+                                    <hr>
+                                    <form onsubmit="RemoteStopTransaction()">
+                                        <div class="form-group row">
+                                            <label for="RemoteStopTransaction-transactionId" class="col-sm-2 col-form-label">transactionId</label>
+                                            <div class="col-sm-10">
+                                                <input type="text" class="form-control" id="RemoteStopTransaction-transactionId" aria-describedby="RemoteStopTransaction-transactionId-help" placeholder="Integer" required>
+                                                <small id="RemoteStopTransaction-transactionId-help" class="form-text text-muted"><b>Required</b>. The identifier of the transaction which Charge Point is requested to stop.</small>
+                                            </div>
+                                        </div>
+                                        <button id="RemoteStopTransaction-execute" type="submit" class="btn btn-primary">Execute</button>
+                                    </form>
+                                    <hr>
+                                    <div id="RemoteStopTransaction-request">
+                                        <small class="form-text text-muted">Press "Execute" button...</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div id="tab-reserve-now" class="container tab-pane fade">
+                                <div class="mt-3">
+                                    <small class="form-text text-muted">5.13. Reserve Now:</small>
+                                    <hr>
+                                    <form onsubmit="ReserveNow()">
+                                        <div class="form-group row">
+                                            <label for="ReserveNow-connectorId" class="col-sm-2 col-form-label">connectorId</label>
+                                            <div class="col-sm-10">
+                                                <input type="text" class="form-control" id="ReserveNow-connectorId" aria-describedby="ReserveNow-connectorId-help" placeholder="Integer" required>
+                                                <small id="ReserveNow-connectorId-help" class="form-text text-muted"><b>Required</b>. This contains the id of the connector to be reserved. A value of 0
+                                                    means that the reservation is not for a specific connector.</small>
+                                            </div>
+                                        </div>
+                                        <div class="form-group row">
+                                            <label for="ReserveNow-expiryDate" class="col-sm-2 col-form-label">expiryDate</label>
+                                            <div class="col-sm-10">
+                                                <input type="text" class="form-control" id="ReserveNow-expiryDate" aria-describedby="ReserveNow-expiryDate-help" placeholder="DateTime" required>
+                                                <small id="ReserveNow-expiryDate-help" class="form-text text-muted"><b>Required</b>. This contains the date and time when the reservation ends. Default: UTC date time + 15 minutes.</small>
+                                            </div>
+                                        </div>
+                                        <div class="form-group row">
+                                            <label for="ReserveNow-idTag" class="col-sm-2 col-form-label">idTag</label>
+                                            <div class="col-sm-10">
+                                                <input type="text" class="form-control" id="ReserveNow-idTag" aria-describedby="ReserveNow-idTag-help" placeholder="IdToken (String20)" required>
+                                                <small id="ReserveNow-idTag-help" class="form-text text-muted"><b>Required</b>. The identifier for which the Charge Point has to reserve a connector.</small>
+                                            </div>
+                                        </div>
+                                        <div class="form-group row">
+                                            <label for="ReserveNow-parentIdTag" class="col-sm-2 col-form-label">parentIdTag</label>
+                                            <div class="col-sm-10">
+                                                <input type="text" class="form-control" id="ReserveNow-parentIdTag" aria-describedby="ReserveNow-parentIdTag-help" placeholder="IdToken (String20)">
+                                                <small id="ReserveNow-parentIdTag-help" class="form-text text-muted"><b>Optional</b>. The parent idTag.</small>
+                                            </div>
+                                        </div>
+                                        <div class="form-group row">
+                                            <label for="ReserveNow-reservationId" class="col-sm-2 col-form-label">reservationId</label>
+                                            <div class="col-sm-10">
+                                                <input type="text" class="form-control" id="ReserveNow-reservationId" aria-describedby="ReserveNow-reservationId-help" placeholder="Integer" required>
+                                                <small id="ReserveNow-reservationId-help" class="form-text text-muted"><b>Required</b>. Unique id for this reservation.</small>
+                                            </div>
+                                        </div>
+                                        <button id="ReserveNow-execute" type="submit" class="btn btn-primary">Execute</button>
+                                    </form>
+                                    <hr>
+                                    <div id="ReserveNow-request">
+                                        <small class="form-text text-muted">Press "Execute" button...</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div id="tab-reset" class="container tab-pane fade">
+                                <div class="mt-3">
+                                    <small class="form-text text-muted">5.14. Reset:</small>
+                                    <hr>
+                                    <form onsubmit="Reset()">
+                                        <div class="form-group row">
+                                            <label for="Reset-type" class="col-sm-2 col-form-label">Type</label>
+                                            <div class="col-sm-10">
+                                                <select id="Reset-type" class="custom-select" aria-describedby="Reset-type-help" required>
+                                                    <option value="Soft" selected>Soft</option>
+                                                    <option value="Hard">Hard</option>
+                                                </select>
+                                                <small id="Reset-type-help" class="form-text text-muted"><b>Required</b>. This contains the type of reset that the Charge Point should perform.</small>
+                                            </div>
+                                        </div>
+                                        <button id="Reset-execute" type="submit" class="btn btn-primary">Execute</button>
+                                    </form>
+                                    <hr>
+                                    <div id="Reset-request">
+                                        <small class="form-text text-muted">Press "Execute" button...</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div id="tab-send-local-list" class="container tab-pane fade">
+                                <div class="mt-3">
+                                    <small class="form-text text-muted">5.15. Send Local List:</small>
+                                    <hr>
+                                    <form onsubmit="SendLocalList()">
+                                        <div class="form-group row">
+                                            <label for="SendLocalList-listVersion" class="col-sm-2 col-form-label">listVersion</label>
+                                            <div class="col-sm-10">
+                                                <input type="text" class="form-control" id="SendLocalList-listVersion" aria-describedby="SendLocalList-listVersion-help" placeholder="Integer" required>
+                                                <small id="SendLocalList-listVersion-help" class="form-text text-muted"><b>Required</b>. In case of a full update this is the version number of the
+                                                    full list. In case of a differential update it is the version number of
+                                                    the list after the update has been applied.</small>
+                                            </div>
+                                        </div>
+                                        <div class="form-group row">
+                                            <label for="SendLocalList-localAuthorizationList" class="col-sm-2 col-form-label">localAuthorizationList</label>
+                                            <div class="col-sm-10">
+                                                <input type="text" class="form-control" id="SendLocalList-localAuthorizationList" aria-describedby="SendLocalList-localAuthorizationList-help" placeholder="AuthorizationData (JSON)">
+                                                <small id="SendLocalList-localAuthorizationList-help" class="form-text text-muted"><b>Optional</b>. In case of a full update this contains the list of values
+                                                    that form the new local authorization list. In case of a differential
+                                                    update it contains the changes to be applied to the local
+                                                    authorization list in the Charge Point. Maximum number of
+                                                    AuthorizationData elements is available in the configuration key:
+                                                    SendLocalListMaxLength.</small>
+                                            </div>
+                                        </div>
+                                        <div class="form-group row">
+                                            <label for="SendLocalList-updateType" class="col-sm-2 col-form-label">updateType</label>
+                                            <div class="col-sm-10">
+                                                <select id="SendLocalList-updateType" class="custom-select" aria-describedby="SendLocalList-updateType-help" required>
+                                                    <option value="Differential" selected>Differential: Indicates that the current Local Authorization List must be updated with the values in this message.</option>
+                                                    <option value="Full">Full: Indicates that the current Local Authorization List must be replaced by the values in this message.</option>
+                                                </select>
+                                                <small id="SendLocalList-updateType-help" class="form-text text-muted"><b>Required</b>. This contains the type of update (full or differential) of
+                                                    this request.</small>
+                                            </div>
+                                        </div>
+                                        <button id="SendLocalList-execute" type="submit" class="btn btn-primary">Execute</button>
+                                    </form>
+                                    <hr>
+                                    <div id="SendLocalList-request">
+                                        <small class="form-text text-muted">Press "Execute" button...</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div id="tab-set-charging-profile" class="container tab-pane fade">
+                                <div class="mt-3">
+                                    <small class="form-text text-muted">5.16. Set Charging Profile:</small>
+                                    <hr>
+                                    <form onsubmit="SetChargingProfile()">
+                                        <div class="form-group row">
+                                            <label for="SetChargingProfile-connectorId" class="col-sm-2 col-form-label">connectorId</label>
+                                            <div class="col-sm-10">
+                                                <input type="text" class="form-control" id="SetChargingProfile-connectorId" aria-describedby="SetChargingProfile-connectorId-help" placeholder="Integer" required>
+                                                <small id="SetChargingProfile-connectorId-help" class="form-text text-muted"><b>Required</b>. The connector to which the charging profile applies. If connectorId = 0,
+                                                    the message contains an overall limit for the Charge Point.</small>
+                                            </div>
+                                        </div>
+                                        <div class="form-group row">
+                                            <label for="SetChargingProfile-csChargingProfiles" class="col-sm-2 col-form-label">csChargingProfiles</label>
+                                            <div class="col-sm-10">
+                                                <input type="text" class="form-control" id="SetChargingProfile-csChargingProfiles" aria-describedby="SetChargingProfile-csChargingProfiles-help" placeholder="ChargingProfile (JSON)" required>
+                                                <small id="SetChargingProfile-csChargingProfiles-help" class="form-text text-muted"><b>Required</b>. The charging profile to be set at the Charge Point.</small>
+                                            </div>
+                                        </div>
+                                        <button id="SetChargingProfile-execute" type="submit" class="btn btn-primary">Execute</button>
+                                    </form>
+                                    <hr>
+                                    <div id="SetChargingProfile-request">
+                                        <small class="form-text text-muted">Press "Execute" button...</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div id="tab-trigger-message" class="container tab-pane fade">
+                                <div class="mt-3">
+                                    <small class="form-text text-muted">5.17. Trigger Message:</small>
+                                    <hr>
+                                    <form onsubmit="TriggerMessage()">
+                                        <div class="form-group row">
+                                            <label for="TriggerMessage-requestedMessage" class="col-sm-2 col-form-label">requestedMessage</label>
+                                            <div class="col-sm-10">
+                                                <select id="TriggerMessage-requestedMessage" class="custom-select">
+                                                    <option value="BootNotification">BootNotification</option>
+                                                    <option value="DiagnosticsStatusNotification">DiagnosticsStatusNotification</option>
+                                                    <option value="FirmwareStatusNotification">FirmwareStatusNotification</option>
+                                                    <option value="Heartbeat">Heartbeat</option>
+                                                    <option value="MeterValues">MeterValues</option>
+                                                    <option value="StatusNotification" selected>StatusNotification</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div class="form-group row">
+                                            <label for="TriggerMessage-connectorId" class="col-sm-2 col-form-label">connectorId</label>
+                                            <div class="col-sm-10">
+                                                <input type="text" class="form-control" id="TriggerMessage-connectorId" aria-describedby="TriggerMessage-connectorId-help" placeholder="Integer">
+                                                <small id="TriggerMessage-connectorId-help" class="form-text text-muted"><b>Optional</b>. Only filled in when request applies to a specific connector.</small>
+                                            </div>
+                                        </div>
+                                        <button id="TriggerMessage-execute" type="submit" class="btn btn-primary">Execute</button>
+                                    </form>
+                                    <hr>
+                                    <div id="TriggerMessage-request">
+                                        <small class="form-text text-muted">Press "Execute" button...</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div id="tab-unlock-connector" class="container tab-pane fade">
+                                <div class="mt-3">
+                                    <small class="form-text text-muted">5.18. Unlock Connector:</small>
+                                    <hr>
+                                    <form onsubmit="UnlockConnector()">
+                                        <div class="form-group row">
+                                            <label for="UnlockConnector-connectorId" class="col-sm-2 col-form-label">connectorId</label>
+                                            <div class="col-sm-10">
+                                                <input type="text" class="form-control" id="UnlockConnector-connectorId" aria-describedby="UnlockConnector-connectorId-help" placeholder="Integer" required>
+                                                <small id="UnlockConnector-connectorId-help" class="form-text text-muted"><b>Required</b>. This contains the identifier of the connector to be unlocked.</small>
+                                            </div>
+                                        </div>
+                                        <button id="UnlockConnector-execute" type="submit" class="btn btn-primary">Execute</button>
+                                    </form>
+                                    <hr>
+                                    <div id="UnlockConnector-request">
+                                        <small class="form-text text-muted">Press "Execute" button...</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div id="tab-update-firmware" class="container tab-pane fade">
+                                <div class="mt-3">
+                                    <small class="form-text text-muted">5.19. Update Firmware:</small>
+                                    <hr>
+                                    <form onsubmit="UpdateFirmware()">
+                                        <div class="form-group row">
+                                            <label for="UpdateFirmware-location" class="col-sm-2 col-form-label">location</label>
+                                            <div class="col-sm-10">
+                                                <input type="text" class="form-control" id="UpdateFirmware-location" aria-describedby="UpdateFirmware-location-help" placeholder="anyURI" required>
+                                                <small id="UpdateFirmware-location-help" class="form-text text-muted"><b>Required</b>. This contains a string containing a URI pointing to a location from
+                                                    which to retrieve the firmware.</small>
+                                            </div>
+                                        </div>
+                                        <div class="form-group row">
+                                            <label for="UpdateFirmware-retries" class="col-sm-2 col-form-label">retries</label>
+                                            <div class="col-sm-10">
+                                                <input type="text" class="form-control" id="UpdateFirmware-retries" aria-describedby="UpdateFirmware-retries-help" placeholder="Integer">
+                                                <small id="UpdateFirmware-retries-help" class="form-text text-muted"><b>Optional</b>. This specifies how many times Charge Point must try to download the
+                                                    firmware before giving up. If this field is not present, it is left to Charge Point to
+                                                    decide how many times it wants to retry.</small>
+                                            </div>
+                                        </div>
+                                        <div class="form-group row">
+                                            <label for="UpdateFirmware-retrieveDate" class="col-sm-2 col-form-label">retrieveDate</label>
+                                            <div class="col-sm-10">
+                                                <div class="input-group mb-3">
+                                                    <input type="text" class="form-control" id="UpdateFirmware-retrieveDate" aria-describedby="UpdateFirmware-retrieveDate-help" placeholder="DateTime">
+                                                    <div class="input-group-append">
+                                                        <button class="btn btn-outline-secondary" type="button" id="UpdateFirmware-retrieveDate-now" onclick="UpdateFirmwareRetrieveDate()">Now</button>
+                                                    </div>
+                                                </div>
+                                                <small id="UpdateFirmware-retrieveDate-help" class="form-text text-muted"><b>Optional</b>. This contains the date and time of the oldest logging information to
+                                                    include in the diagnostics.</small>
+                                            </div>
+                                        </div>
+                                        <div class="form-group row">
+                                            <label for="UpdateFirmware-retryInterval" class="col-sm-2 col-form-label">retryInterval</label>
+                                            <div class="col-sm-10">
+                                                <input type="text" class="form-control" id="UpdateFirmware-retryInterval" aria-describedby="UpdateFirmware-retryInterval-help" placeholder="Integer">
+                                                <small id="UpdateFirmware-retryInterval-help" class="form-text text-muted"><b>Optional</b>. The interval in seconds after which a retry may be attempted. If this
+                                                    field is not present, it is left to Charge Point to decide how long to wait between
+                                                    attempts.</small>
+                                            </div>
+                                        </div>
+                                        <button id="UpdateFirmware-execute" type="submit" class="btn btn-primary">Execute</button>
+                                    </form>
+                                    <hr>
+                                    <div id="UpdateFirmware-request">
+                                        <small class="form-text text-muted">Press "Execute" button...</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<!-- ======= Footer ======= -->
+<footer id="footer">
+    <div class="container">
+        <div class="copyright text-center">
+            &copy; Copyright <strong><span> 2020 Apostol</span></strong>. All rights reserved.
+        </div>
+    </div>
+</footer><!-- End #footer -->
+
+<a href="#" class="back-to-top"><i class="icofont-simple-up"></i></a>
+
+<!-- Optional JavaScript -->
+<!-- jQuery first, then Popper.js, then Bootstrap JS -->
+<script src="https://code.jquery.com/jquery-3.5.1.slim.min.js" integrity="sha384-DfXdz2htPH0lsSSs5nCTpuj/zy4C+OGpamoFVy38MVBnE+IbbVYUew+OrCXaRkfj" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/popper.js@1.16.0/dist/umd/popper.min.js" integrity="sha384-Q6E9RHvbIyZFJoft+2mJbHaEWldlvI9IOYy5n3zV9zzTtmI3UksdQRVvoxMfooAo" crossorigin="anonymous"></script>
+<script src="/assets/vendor/bootstrap/4.5.0/js/bootstrap.min.js" integrity="sha384-OgVRvuATP1z7JjHLkuOU7Xw704+h835Lr+6QL9UvYjZE3Ipu6Tp75j7Bh/kR0JKI" crossorigin="anonymous"></script>
+<script src="/assets/vendor/crypto-js/hmac-sha256.js" type="text/javascript"></script>
+<script>
+    const spinner = `<div id="spinner" class="text-center">
+                        <div class="spinner-border" role="status">
+                            <span class="sr-only">Loading...</span>
+                        </div>
+                     </div>
+    `;
+
+    let token;
+
+    $('.nav-tabs a[href="#tab-charge-point-list"]').click(function() {
+        $(this).tab('show');
+    });
+
+    $('.nav-tabs a[href="#tab-cancel-reservation"]').click(function() {
+        $(this).tab('show');
+    });
+
+    $('.nav-tabs a[href="#tab-change-availability"]').click(function() {
+        $(this).tab('show');
+    });
+
+    $('.nav-tabs a[href="#tab-change-configuration"]').click(function() {
+        $(this).tab('show');
+    });
+
+    $('.nav-tabs a[href="#tab-clear-cache"]').click(function() {
+        $(this).tab('show');
+    });
+
+    $('.nav-tabs a[href="#tab-clear-charging-profile"]').click(function() {
+        $(this).tab('show');
+    });
+
+    $('.nav-tabs a[href="#tab-data-transfer"]').click(function() {
+        $(this).tab('show');
+    });
+
+    $('.nav-tabs a[href="#tab-get-composite-schedule"]').click(function() {
+        $(this).tab('show');
+    });
+
+    $('.nav-tabs a[href="#tab-get-configuration"]').click(function() {
+        $(this).tab('show');
+    });
+
+    $('.nav-tabs a[href="#tab-get-diagnostics"]').click(function() {
+        $(this).tab('show');
+    });
+
+    $('.nav-tabs a[href="#tab-get-local-list-version"]').click(function() {
+        $(this).tab('show');
+    });
+
+    $('.nav-tabs a[href="#tab-remote-start-transaction"]').click(function() {
+        $(this).tab('show');
+    });
+
+    $('.nav-tabs a[href="#tab-remote-stop-transaction"]').click(function() {
+        $(this).tab('show');
+    });
+
+    $('.nav-tabs a[href="#tab-reserve-now"]').click(function() {
+        $("input[id='ReserveNow-expiryDate']").val(getFormattedDateTime(new Date(Date.now() + 15 * 60 * 1000)));
+        $(this).tab('show');
+    });
+
+    $('.nav-tabs a[href="#tab-reset"]').click(function() {
+        $(this).tab('show');
+    });
+
+    $('.nav-tabs a[href="#tab-send-local-list"]').click(function() {
+        $(this).tab('show');
+    });
+
+    $('.nav-tabs a[href="#tab-set-charging-profile"]').click(function() {
+        $(this).tab('show');
+    });
+
+    $('.nav-tabs a[href="#tab-trigger-message"]').click(function() {
+        $(this).tab('show');
+    });
+
+    $('.nav-tabs a[href="#tab-unlock-connector"]').click(function() {
+        $(this).tab('show');
+    });
+
+    $('.nav-tabs a[href="#tab-update-firmware"]').click(function() {
+        $(this).tab('show');
+    });
+
+    function GetDiagnosticsStartTime() {
+        let startTime = $("input[id='GetDiagnostics-startTime']");
+        startTime.val(getFormattedDateTime(new Date()));
+    }
+
+    function GetDiagnosticsStopTime() {
+        let stopTime = $("input[id='GetDiagnostics-stopTime']");
+        stopTime.val(getFormattedDateTime(new Date()));
+    }
+
+    function UpdateFirmwareRetrieveDate() {
+        let retrieveDate = $("input[id='UpdateFirmware-retrieveDate']");
+        retrieveDate.val(getFormattedDateTime(new Date()));
+    }
+
+    function empty(e) {
+        switch (e) {
+            case "":
+            case null:
+            case undefined:
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    function NullIfEmpty(value) {
+        return empty(value) ? null : value;
+    }
+
+    function parseJWT(token) {
+        try {
+            // Get Token Header
+            const base64HeaderUrl = token.split('.')[0];
+            const base64Header = base64HeaderUrl.replace('-', '+').replace('_', '/');
+            const headerData = JSON.parse(window.atob(base64Header));
+
+            // Get Token payload and date's
+            const base64Url = token.split('.')[1];
+            const base64 = base64Url.replace('-', '+').replace('_', '/');
+            const dataJWT = JSON.parse(window.atob(base64));
+
+            dataJWT.header = headerData;
+
+            // TODO: add expiration at check ...
+
+            return dataJWT;
+        } catch (err) {
+            return false;
+        }
+    }
+
+    class Token {
+
+        constructor(clientId, accessName, refreshName) {
+            this.clientId = clientId;
+            this.accessName = accessName;
+            this.refreshName = refreshName;
+        }
+
+        save(accessToken, refreshToken) {
+            let success = false;
+
+            if (!empty(accessToken)) {
+                localStorage.setItem(this.accessName, accessToken);
+                success = true;
+            }
+
+            if (!empty(refreshToken)) {
+                localStorage.setItem(this.refreshName, refreshToken);
+                success = true;
+            }
+
+            return success;
+        }
+
+        getAccess() {
+            return localStorage.getItem(this.accessName);
+        }
+
+        getRefresh() {
+            return localStorage.getItem(this.refreshName);
+        }
+
+        clear() {
+            localStorage.removeItem(this.accessName);
+            localStorage.removeItem(this.refreshName);
+        }
+
+        parse(hash) {
+            if (empty(hash))
+                return false;
+
+            const search = hash.substr(1);
+
+            let params = new URLSearchParams(search);
+
+            let access_token = params.get("access_token");
+            let refresh_token = decodeURIComponent(params.get("refresh_token"));
+
+            return this.save(access_token, refresh_token);
+        }
+
+        async new() {
+            const body = {
+                client_id: this.clientId,
+                grant_type: 'client_credentials',
+            }
+
+            return await this.fetchToken(body);
+        }
+
+        async refresh() {
+            const refreshToken = this.getRefresh();
+
+            if (empty(refreshToken))
+                return false;
+
+            const body = {
+                client_id: this.clientId,
+                grant_type: 'refresh_token',
+                refresh_token: refreshToken
+            }
+
+            return await this.fetchToken(body);
+        }
+
+        async fetchToken(body) {
+            const response = await fetch('/oauth2/token', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(body),
+                mode: "cors",
+                cache: "no-store",
+                credentials: 'omit'
+            });
+
+            if (!response.ok) {
+                this.clear();
+                throw new Error(`Fetch token failed: ${response.statusText}`);
+            }
+
+            const json = await response.json();
+            return this.save(json['access_token'], json['refresh_token']);
+        }
+
+        expired(accessToken) {
+            if (!empty(accessToken)) {
+                const jwtDecoded = parseJWT(accessToken);
+                if (jwtDecoded) {
+                    let now = new Date();
+                    let exp = new Date(jwtDecoded.exp * 1000);
+                    return now >= exp;
+                }
+            }
+            return false;
+        }
+
+        async update() {
+            const accessToken = this.getAccess();
+            if (empty(accessToken))
+                return await this.new();
+            if (this.expired(accessToken)) {
+                return await this.refresh();
+            }
+            return true;
+        }
+
+        async validate() {
+            const accessToken = this.getAccess();
+            if (empty(accessToken))
+                return false;
+            if (this.expired(accessToken)) {
+                return await this.refresh();
+            }
+            return true;
+        }
+    }
+
+    async function CheckResponse(json, status) {
+        let error;
+        let message;
+        let location;
+
+        if (json.hasOwnProperty('error')) {
+            error = json['error'];
+            if (typeof error === 'object') {
+                message = error["message"];
+            } else {
+                message = json["error_description"];
+            }
+        }
+
+        if (status === 400) {
+            if (typeof error === 'string') {
+                token.clear();
+            }
+            return undefined;
+        } else if (status === 401) {
+            location = '/welcome/';
+        } else if (status === 403) {
+            // Refresh token
+        } else if (status === 404) {
+            location = `/error/404/?error=not_found&error_description=${encodeURIComponent(message)}`;
+        } else if (status === 500) {
+            location = `/error/500/?error=server_error&error_description=${encodeURIComponent(message)}`;
+        } else if (status === 504) {
+            return undefined;
+        } else {
+            location = `/error/?code=${status}&error=invalid_request&error_description=${encodeURIComponent(message)}`;
+        }
+
+        return location;
+    }
+
+    /**
+     * @return {json}
+     */
+    async function AsyncFetch (path, method = "GET", body = null, headers = {}) {
+
+        const apiPath = `/api/v1${path}`;
+
+        // await response of fetch call
+        let response = await fetch(apiPath, {
+            method: method,
+            headers: headers,
+            body: body,
+            mode: 'cors',
+            cache: 'no-store'
+        });
+
+        const json = await response.json();
+
+        if (response.ok)
+            return json;
+
+        console.log(method + ' ' + apiPath);
+        console.log(json);
+
+        const location = await CheckResponse(json, response.status);
+
+        if (empty(location))
+            return json;
+
+        document.location.replace(location);
+    }
+
+    /**
+     * @return {json}
+     */
+    async function TokenFetch(path, method = "GET", body = null, initHeaders = {}) {
+        return AsyncFetch(path, method, body, initHeaders);
+
+        // if (await token.validate()) {
+        //     let headers = new Headers(initHeaders);
+        //     headers.append('Authorization', `Bearer ${token.getAccess()}`)
+        //     return AsyncFetch(path, method, body, headers);
+        // }
+    }
+
+    function Welcome() {
+        localStorage.removeItem('Session');
+        localStorage.removeItem('Secret');
+
+        token.clear();
+
+        window.location.replace("/welcome/");
+    }
+
+    function SignOut() {
+        Welcome();
+    }
+
+    /**
+     * @return {string}
+     */
+    function JsonToHTML(json) {
+        return '<pre><code>' + JSON.stringify(json, undefined, 2) + '</code></pre>';
+    }
+
+    function JsonToTableOne(json, small = false) {
+        const base = 'table table-hover table-striped text-monospace';
+        const classes = small ? base + ' table-bordered table-sm' : base;
+
+        let i, txt;
+
+        txt = `<table class="${classes}">`;
+        txt += '<thead>';
+        txt += '<tr>';
+        txt += '</tr>';
+        txt += '</thead>';
+
+        txt += '<tbody>';
+        for (i in json) {
+            const value = json[i];
+            txt += '<tr>';
+            txt += `<th scope="row">${i}</th>`;
+            if (value && typeof value === 'object') {
+                txt += `<td scope="row" nowrap>${JsonToTableOne(value, true)}</td>`;
+            } else {
+                txt += `<td scope="row" nowrap>${value}</td>`;
+            }
+            txt += '</tr>';
+        }
+
+        txt += '</tbody>';
+        txt += '</table>';
+
+        return txt;
+    }
+
+    function JsonToTable(json, small = false) {
+        const base = 'table table-hover table-striped text-monospace';
+        const classes = small ? base + ' table-bordered table-sm' : base;
+
+        let obj, x, i, txt, index;
+
+        txt = `<table class="${classes}">`;
+        txt += '<thead>';
+        txt += '<tr>';
+
+        txt += '<th scope="col">#</th>';
+
+        obj = json[0];
+        for (i in obj)
+            txt += `<th scope="col">${i}</th>`;
+
+        txt += '</tr>';
+        txt += '</thead>';
+
+        txt += '<tbody>';
+
+        index = 0;
+        for (x in json) {
+            txt += '<tr>';
+
+            txt += `<th scope="row">${++index}</th>`;
+
+            obj = json[x];
+
+            for (i in obj) {
+                const value = obj[i];
+                if (value && typeof value === 'object') {
+                    txt += `<td scope="row">${JsonToTableOne(value, true)}</td>`;
+                } else {
+                    txt += `<td scope="row" onclick="onSelectChargePoint('${obj['Identity']}')">${value}</td>`;
+                }
+            }
+
+            txt += '</tr>';
+        }
+
+        txt += '</tbody>';
+        txt += '</table>';
+
+        return txt;
+    }
+
+    function onSelectChargePoint(Identity) {
+        const points = $("#ChargePoints");
+        points.val(Identity);
+    }
+
+    function getFormattedDateTime(date) {
+        const year = date.getFullYear();
+
+        let month = (1 + date.getMonth()).toString();
+        month = month.length > 1 ? month : '0' + month;
+
+        let day = date.getDate().toString();
+        day = day.length > 1 ? day : '0' + day;
+
+        let hours = date.getUTCHours().toString();
+        hours = hours.length > 1 ? hours : '0' + hours;
+
+        let minutes = date.getMinutes().toString();
+        minutes = minutes.length > 1 ? minutes : '0' + minutes;
+
+        let seconds = date.getSeconds().toString();
+        seconds = seconds.length > 1 ? seconds : '0' + seconds;
+
+        return year + '-' + month + '-' + day + ' ' + hours + ':' + minutes + ':' + seconds;
+    }
+
+    function ChargePointList() {
+        AsyncFetch('/ChargePointList')
+            .then((json) => {
+                let points = $("#ChargePoints");
+                let selected = 'selected';
+                const list = json['ChargePointList'];
+                for (let i in list) {
+                    const point = list[i];
+                    points.append(`<option value="${point['Identity']}" ${selected}>${point['Identity']}</option>`);
+                    selected = '';
+                }
+                $("#ChargePointList-request").html(JsonToTable(json['ChargePointList']));
+            }).catch(reason => console.log(reason.message));
+    }
+
+    function CancelReservation() {
+        const point = $("select[id='ChargePoints']").val();
+        const request = $("#CancelReservation-request");
+
+        const reservationId = $("input[id='CancelReservation-reservationId']").val();
+
+        let route = `/ChargePoint/${point}/CancelReservation`;
+
+        let body = {
+            reservationId: NullIfEmpty(reservationId)
+        };
+
+        request.html(spinner);
+
+        let execute = $("button[id='CancelReservation-execute']");
+        execute.prop('disabled', true);
+
+        TokenFetch(route, 'POST', JSON.stringify(body), {'Content-Type': 'application/json'})
+            .then((json) => {
+                request.html(JsonToHTML(json));
+                execute.prop('disabled', false);
+            })
+            .catch((e) => {
+                request.html(e.message);
+                execute.prop('disabled', false);
+            });
+    }
+
+    function ChangeAvailability() {
+        const point = $("select[id='ChargePoints']").val();
+        const request = $("#ChangeAvailability-request");
+
+        const connectorId = $("input[id='ChangeAvailability-connectorId']").val();
+        const type = $("select[id='ChangeAvailability-type']").val();
+
+        let route = `/ChargePoint/${point}/ChangeAvailability`;
+
+        let body = {
+            connectorId: NullIfEmpty(parseInt(connectorId)),
+            type: NullIfEmpty(type)
+        };
+
+        request.html(spinner);
+
+        let execute = $("button[id='ChangeAvailability-execute']");
+        execute.prop('disabled', true);
+
+        TokenFetch(route, 'POST', JSON.stringify(body), {'Content-Type': 'application/json'})
+            .then((json) => {
+                request.html(JsonToHTML(json));
+                execute.prop('disabled', false);
+            })
+            .catch((e) => {
+                request.html(e.message);
+                execute.prop('disabled', false);
+            });
+    }
+
+    function ChangeConfiguration() {
+        const point = $("select[id='ChargePoints']").val();
+        const request = $("#ChangeConfiguration-request");
+
+        const key = $("input[id='ChangeConfiguration-key']").val();
+        const value = $("input[id='ChangeConfiguration-value']").val();
+
+        let route = `/ChargePoint/${point}/ChangeConfiguration`;
+
+        let body = {
+            key: NullIfEmpty(key),
+            value: NullIfEmpty(value)
+        };
+
+        request.html(spinner);
+
+        let execute = $("button[id='ChangeConfiguration-execute']");
+        execute.prop('disabled', true);
+
+        TokenFetch(route, 'POST', JSON.stringify(body), {'Content-Type': 'application/json'})
+            .then((json) => {
+                request.html(JsonToHTML(json));
+                execute.prop('disabled', false);
+            })
+            .catch((e) => {
+                request.html(e.message);
+                execute.prop('disabled', false);
+            });
+    }
+
+    function ClearCache() {
+        const point = $("select[id='ChargePoints']").val();
+        const request = $("#ClearCache-request");
+
+        let route = `/ChargePoint/${point}/ClearCache`;
+
+        let execute = $("button[id='ClearCache-execute']");
+        execute.prop('disabled', true);
+
+        request.html(spinner);
+
+        TokenFetch(route, 'POST')
+            .then((json) => {
+                request.html(JsonToHTML(json));
+                execute.prop('disabled', false);
+            })
+            .catch((e) => {
+                request.html(e.message);
+                execute.prop('disabled', false);
+            });
+    }
+
+    function ClearChargingProfile() {
+        const point = $("select[id='ChargePoints']").val();
+        const request = $("#ClearChargingProfile-request");
+
+        const id = $("input[id='ClearChargingProfile-id']").val();
+        const connectorId = $("input[id='ClearChargingProfile-connectorId']").val();
+        const chargingProfilePurpose = $("input[id='ClearChargingProfile-chargingProfilePurpose']").val();
+        const stackLevel = $("input[id='ClearChargingProfile-stackLevel']").val();
+
+        let route = `/ChargePoint/${point}/ClearChargingProfile`;
+
+        let body = {
+            id: NullIfEmpty(parseInt(id)),
+            connectorId: NullIfEmpty(parseInt(connectorId)),
+            chargingProfilePurpose: JSON.parse(empty(chargingProfilePurpose) ? null : chargingProfilePurpose),
+            stackLevel: NullIfEmpty(parseInt(stackLevel))
+        };
+
+        request.html(spinner);
+
+        let execute = $("button[id='ClearChargingProfile-execute']");
+        execute.prop('disabled', true);
+
+        TokenFetch(route, 'POST', JSON.stringify(body), {'Content-Type': 'application/json'})
+            .then((json) => {
+                request.html(JsonToHTML(json));
+                execute.prop('disabled', false);
+            })
+            .catch((e) => {
+                request.html(e.message);
+                execute.prop('disabled', false);
+            });
+    }
+
+    function DataTransfer() {
+        const point = $("select[id='ChargePoints']").val();
+        const request = $("#DataTransfer-request");
+
+        const vendorId = $("input[id='DataTransfer-vendorId']").val();
+        const messageId = $("input[id='DataTransfer-messageId']").val();
+        const data = $("input[id='DataTransfer-data']").val();
+
+        let route = `/ChargePoint/${point}/DataTransfer`;
+
+        let body = {
+            vendorId: NullIfEmpty(vendorId),
+            messageId: NullIfEmpty(messageId),
+            data: NullIfEmpty(data)
+        };
+
+        request.html(spinner);
+
+        let execute = $("button[id='DataTransfer-execute']");
+        execute.prop('disabled', true);
+
+        TokenFetch(route, 'POST', JSON.stringify(body), {'Content-Type': 'application/json'})
+            .then((json) => {
+                request.html(JsonToHTML(json));
+                execute.prop('disabled', false);
+            })
+            .catch((e) => {
+                request.html(e.message);
+                execute.prop('disabled', false);
+            });
+    }
+
+    function GetCompositeSchedule() {
+        const point = $("select[id='ChargePoints']").val();
+        const request = $("#GetCompositeSchedule-request");
+
+        const connectorId = $("input[id='GetCompositeSchedule-connectorId']").val();
+        const duration = $("input[id='GetCompositeSchedule-duration']").val();
+        const chargingRateUnit = $("input[id='GetCompositeSchedule-chargingRateUnit']").val();
+
+        let route = `/ChargePoint/${point}/GetCompositeSchedule`;
+
+        let body = {
+            connectorId: NullIfEmpty(parseInt(connectorId)),
+            duration: NullIfEmpty(duration),
+            chargingRateUnit: NullIfEmpty(chargingRateUnit)
+        };
+
+        request.html(spinner);
+
+        let execute = $("button[id='GetCompositeSchedule-execute']");
+        execute.prop('disabled', true);
+
+        TokenFetch(route, 'POST', JSON.stringify(body), {'Content-Type': 'application/json'})
+            .then((json) => {
+                request.html(JsonToHTML(json));
+                execute.prop('disabled', false);
+            })
+            .catch((e) => {
+                request.html(e.message);
+                execute.prop('disabled', false);
+            });
+    }
+
+    function GetConfiguration() {
+        const point = $("select[id='ChargePoints']").val();
+        const request = $("#GetConfiguration-request");
+
+        const key = $("input[id='GetConfiguration-key']").val();
+
+        let route = `/ChargePoint/${point}/GetConfiguration`;
+
+        let body = {
+            key: NullIfEmpty(key)
+        };
+
+        request.html(spinner);
+
+        let execute = $("button[id='GetConfiguration-execute']");
+        execute.prop('disabled', true);
+
+        TokenFetch(route, 'POST', JSON.stringify(body), {'Content-Type': 'application/json'})
+            .then((json) => {
+                request.html(JsonToHTML(json));
+                execute.prop('disabled', false);
+            })
+            .catch((e) => {
+                request.html(e.message);
+                execute.prop('disabled', false);
+            });
+    }
+
+    function GetDiagnostics() {
+        const point = $("select[id='ChargePoints']").val();
+        const request = $("#GetDiagnostics-request");
+
+        const location = $("input[id='GetDiagnostics-location']").val();
+        const retries = $("input[id='GetDiagnostics-retries']").val();
+        const retryInterval = $("input[id='GetDiagnostics-retryInterval']").val();
+        const startTime = $("input[id='GetDiagnostics-startTime']").val();
+        const stopTime = $("input[id='GetDiagnostics-stopTime']").val();
+
+        let route = `/ChargePoint/${point}/GetDiagnostics`;
+
+        let body = {
+            location: NullIfEmpty(location),
+            retries: NullIfEmpty(retries),
+            retryInterval: NullIfEmpty(retryInterval),
+            startTime: NullIfEmpty(startTime),
+            stopTime: NullIfEmpty(stopTime)
+        };
+
+        request.html(spinner);
+
+        let execute = $("button[id='GetDiagnostics-execute']");
+        execute.prop('disabled', true);
+
+        TokenFetch(route, 'POST', JSON.stringify(body), {'Content-Type': 'application/json'})
+            .then((json) => {
+                request.html(JsonToHTML(json));
+                execute.prop('disabled', false);
+            })
+            .catch((e) => {
+                request.html(e.message);
+                execute.prop('disabled', false);
+            });
+    }
+
+    function GetLocalListVersion() {
+        const point = $("select[id='ChargePoints']").val();
+        const request = $("#GetLocalListVersion-request");
+
+        let route = `/ChargePoint/${point}/GetLocalListVersion`;
+
+        let execute = $("button[id='GetLocalListVersion-execute']");
+        execute.prop('disabled', true);
+
+        TokenFetch(route, 'POST')
+            .then((json) => {
+                request.html(JsonToHTML(json));
+                execute.prop('disabled', false);
+            })
+            .catch((e) => {
+                request.html(e.message);
+                execute.prop('disabled', false);
+            });
+    }
+
+    function RemoteStartTransaction() {
+        const point = $("select[id='ChargePoints']").val();
+        const request = $("#RemoteStartTransaction-request");
+
+        const connectorId = $("input[id='RemoteStartTransaction-connectorId']").val();
+        const idTag = $("input[id='RemoteStartTransaction-idTag']").val();
+
+        let route = `/ChargePoint/${point}/RemoteStartTransaction`;
+
+        let body = {
+            connectorId: NullIfEmpty(parseInt(connectorId)),
+            idTag: NullIfEmpty(idTag)
+        };
+
+        request.html(spinner);
+
+        let execute = $("button[id='RemoteStartTransaction-execute']");
+        execute.prop('disabled', true);
+
+        TokenFetch(route, 'POST', JSON.stringify(body), {'Content-Type': 'application/json'})
+            .then((json) => {
+                request.html(JsonToHTML(json));
+                execute.prop('disabled', false);
+            })
+            .catch((e) => {
+                request.html(e.message);
+                execute.prop('disabled', false);
+            });
+    }
+
+    function RemoteStopTransaction() {
+        const point = $("select[id='ChargePoints']").val();
+        const request = $("#RemoteStopTransaction-request");
+
+        const transactionId = $("input[id='RemoteStopTransaction-transactionId']").val();
+
+        let route = `/ChargePoint/${point}/RemoteStopTransaction`;
+
+        let body = {
+            transactionId: NullIfEmpty(parseInt(transactionId))
+        };
+
+        request.html(spinner);
+
+        let execute = $("button[id='RemoteStopTransaction-execute']");
+        execute.prop('disabled', true);
+
+        TokenFetch(route, 'POST', JSON.stringify(body), {'Content-Type': 'application/json'})
+            .then((json) => {
+                request.html(JsonToHTML(json));
+                execute.prop('disabled', false);
+            })
+            .catch((e) => {
+                request.html(e.message);
+                execute.prop('disabled', false);
+            });
+    }
+
+    function ReserveNow() {
+        const point = $("select[id='ChargePoints']").val();
+        const request = $("#ReserveNow-request");
+
+        const connectorId = $("input[id='ReserveNow-connectorId']").val();
+        const expiryDate = $("input[id='ReserveNow-expiryDate']").val();
+        const idTag = $("input[id='ReserveNow-idTag']").val();
+        const parentIdTag = $("input[id='ReserveNow-parentIdTag']").val();
+        const reservationId = $("input[id='ReserveNow-reservationId']").val();
+
+        let route = `/ChargePoint/${point}/ReserveNow`;
+
+        let body = {
+            connectorId: NullIfEmpty(parseInt(connectorId)),
+            expiryDate: NullIfEmpty(expiryDate),
+            idTag: NullIfEmpty(idTag),
+            parentIdTag: NullIfEmpty(parentIdTag),
+            reservationId: NullIfEmpty(reservationId)
+        };
+
+        request.html(spinner);
+
+        let execute = $("button[id='ReserveNow-execute']");
+        execute.prop('disabled', true);
+
+        TokenFetch(route, 'POST', JSON.stringify(body), {'Content-Type': 'application/json'})
+            .then((json) => {
+                request.html(JsonToHTML(json));
+                execute.prop('disabled', false);
+            })
+            .catch((e) => {
+                request.html(e.message);
+                execute.prop('disabled', false);
+            });
+    }
+
+    function Reset() {
+        const point = $("select[id='ChargePoints']").val();
+        const request = $("#Reset-request");
+
+        const type = $("select[id='Reset-type']").val();
+
+        let route = `/ChargePoint/${point}/Reset`;
+
+        let body = {
+            type: NullIfEmpty(type)
+        };
+
+        request.html(spinner);
+
+        let execute = $("button[id='Reset-execute']");
+        execute.prop('disabled', true);
+
+        TokenFetch(route, 'POST', JSON.stringify(body), {'Content-Type': 'application/json'})
+            .then((json) => {
+                request.html(JsonToHTML(json));
+                execute.prop('disabled', false);
+            })
+            .catch((e) => {
+                request.html(e.message);
+                execute.prop('disabled', false);
+            });
+    }
+
+    function SendLocalList() {
+        const point = $("select[id='ChargePoints']").val();
+        const request = $("#SendLocalList-request");
+
+        const listVersion = $("input[id='SendLocalList-listVersion']").val();
+        const localAuthorizationList = $("input[id='SendLocalList-localAuthorizationList']").val();
+        const updateType = $("select[id='SendLocalList-updateType']").val();
+
+        let route = `/ChargePoint/${point}/SendLocalList`;
+
+        let body = {
+            listVersion: NullIfEmpty(listVersion),
+            localAuthorizationList: JSON.parse(empty(localAuthorizationList) ? null : localAuthorizationList),
+            updateType: NullIfEmpty(updateType)
+        };
+
+        request.html(spinner);
+
+        let execute = $("button[id='SendLocalList-execute']");
+        execute.prop('disabled', true);
+
+        TokenFetch(route, 'POST', JSON.stringify(body), {'Content-Type': 'application/json'})
+            .then((json) => {
+                request.html(JsonToHTML(json));
+                execute.prop('disabled', false);
+            })
+            .catch((e) => {
+                request.html(e.message);
+                execute.prop('disabled', false);
+            });
+    }
+
+    function SetChargingProfile() {
+        const point = $("select[id='ChargePoints']").val();
+        const request = $("#SetChargingProfile-request");
+
+        const connectorId = $("input[id='SetChargingProfile-connectorId']").val();
+        const csChargingProfiles = $("input[id='SetChargingProfile-csChargingProfiles']").val();
+
+        let route = `/ChargePoint/${point}/SetChargingProfile`;
+
+        let body = {
+            connectorId: NullIfEmpty(parseInt(connectorId)),
+            csChargingProfiles: JSON.parse(empty(csChargingProfiles) ? null : csChargingProfiles)
+        };
+
+        request.html(spinner);
+
+        let execute = $("button[id='SetChargingProfile-execute']");
+        execute.prop('disabled', true);
+
+        TokenFetch(route, 'POST', JSON.stringify(body), {'Content-Type': 'application/json'})
+            .then((json) => {
+                request.html(JsonToHTML(json));
+                execute.prop('disabled', false);
+            })
+            .catch((e) => {
+                request.html(e.message);
+                execute.prop('disabled', false);
+            });
+    }
+
+    function TriggerMessage() {
+        const point = $("select[id='ChargePoints']").val();
+        const request = $("#TriggerMessage-request");
+
+        const requestedMessage = $("select[id='TriggerMessage-requestedMessage']").val();
+        const connectorId = $("input[id='TriggerMessage-connectorId']").val();
+
+        let route = `/ChargePoint/${point}/TriggerMessage`;
+
+        let body = {
+            requestedMessage: NullIfEmpty(requestedMessage),
+            connectorId: NullIfEmpty(parseInt(connectorId))
+        };
+
+        request.html(spinner);
+
+        let execute = $("button[id='TriggerMessage-execute']");
+        execute.prop('disabled', true);
+
+        TokenFetch(route, 'POST', JSON.stringify(body), {'Content-Type': 'application/json'})
+            .then((json) => {
+                request.html(JsonToHTML(json));
+                execute.prop('disabled', false);
+            })
+            .catch((e) => {
+                request.html(e.message);
+                execute.prop('disabled', false);
+            });
+    }
+
+    function UnlockConnector() {
+        const point = $("select[id='ChargePoints']").val();
+        const request = $("#UnlockConnector-request");
+
+        const connectorId = $("input[id='UnlockConnector-connectorId']").val();
+
+        let route = `/ChargePoint/${point}/UnlockConnector`;
+
+        let body = {
+            connectorId: NullIfEmpty(parseInt(connectorId))
+        };
+
+        request.html(spinner);
+
+        let execute = $("button[id='UnlockConnector-execute']");
+        execute.prop('disabled', true);
+
+        TokenFetch(route, 'POST', JSON.stringify(body), {'Content-Type': 'application/json'})
+            .then((json) => {
+                request.html(JsonToHTML(json));
+                execute.prop('disabled', false);
+            })
+            .catch((e) => {
+                request.html(e.message);
+                execute.prop('disabled', false);
+            });
+    }
+
+    function UpdateFirmware() {
+        const point = $("select[id='ChargePoints']").val();
+        const request = $("#UpdateFirmware-request");
+
+        const location = $("input[id='UpdateFirmware-location']").val();
+        const retries = $("input[id='UpdateFirmware-retries']").val();
+        const retrieveDate = $("input[id='UpdateFirmware-retrieveDate']").val();
+        const retryInterval = $("input[id='UpdateFirmware-retryInterval']").val();
+
+        let route = `/ChargePoint/${point}/UpdateFirmware`;
+
+        let body = {
+            location: NullIfEmpty(location),
+            retries: NullIfEmpty(retries),
+            retrieveDate: NullIfEmpty(retrieveDate),
+            retryInterval: NullIfEmpty(retryInterval)
+        };
+
+        request.html(spinner);
+
+        let execute = $("button[id='UpdateFirmware-execute']");
+        execute.prop('disabled', true);
+
+        TokenFetch(route, 'POST', JSON.stringify(body), {'Content-Type': 'application/json'})
+            .then((json) => {
+                request.html(JsonToHTML(json));
+                execute.prop('disabled', false);
+            })
+            .catch((e) => {
+                request.html(e.message);
+                execute.prop('disabled', false);
+            });
+    }
+
+    // Example starter JavaScript for disabling form submissions if there are invalid fields
+    (function() {
+        'use strict';
+        window.addEventListener('load', function() {
+            // Fetch all the forms we want to apply custom Bootstrap validation styles to
+            let forms = document.getElementsByTagName('form');
+            // Loop over them and prevent submission
+            let validation = Array.prototype.filter.call(forms, function(form) {
+                form.addEventListener('submit', function(event) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    if (form.checkValidity() === false) {
+                        form.classList.add('was-validated');
+                    }
+                }, false);
+            });
+        }, false);
+    })();
+
+    $(document).ready(function() {
+        token = new Token($("meta[name='web-client_id']").attr("content"), 'accessToken', 'refreshToken');
+
+        if (token.parse(document.location.hash)) {
+            window.location.hash = '#';
+        }
+
+        ChargePointList();
+    });
+</script>
+</body>
+</html>

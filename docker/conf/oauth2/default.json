@@ -1,0 +1,16 @@
+{
+  "service": {
+    "issuers": ["accounts.ocpp-css.com"],
+    "scopes": ["css"],
+    "client_id": "service-ocpp-css.com",
+    "client_secret": "",
+    "algorithm": "HS256",
+    "auth_uri": "/oauth2/authorize",
+    "token_uri": "/oauth2/token",
+    "redirect_uris": [
+      "http://localhost:9220/dashboard/",
+      "https://ocpp-css.com/dashboard/",
+      "https://oauthdebugger.com/debug"
+    ]
+  }
+}

@@ -39,6 +39,26 @@ The OCPP Central System is a set of C++ libraries for building OCPP applications
 
 This code can be used as a framework for creating your own **Central System** or preparing firmware for a **Charging Station**.
 
+Docker
+-
+
+You can get image of the central system from the docker hub:
+
+~~~
+docker pull apostoldevel/cs
+~~~
+
+How to use this image:
+~~~
+docker run -d -p 9220:9220 --rm --name cs apostoldevel/cs
+~~~
+
+Then you can hit http://localhost:9220 or http://host-ip:9220 in your browser.
+
+Swagger will also be available at http://localhost:9220/docs/ or http://host-ip:9220/docs/ in your browser.
+
+Building for a container does not require authorization.
+
 Demonstration
 -
 You can connect your station to a demo central system.
