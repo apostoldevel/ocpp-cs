@@ -56,7 +56,7 @@ namespace Apostol {
 
             InitializeServer(Application()->Title(), Config()->Listen(), CHARGE_POINT_API_PORT);
 #ifdef WITH_POSTGRESQL
-            InitializePQServer(Application()->Title(), 5, 10);
+            InitializePQClient(Application()->Title(), 5, 10);
 #endif
             m_pCPModule = CCPModule::CreateModule(this);
         }
@@ -82,7 +82,7 @@ namespace Apostol {
 
             ServerStart();
 #ifdef WITH_POSTGRESQL
-            PQServerStart("helper");
+            PQClientStart("helper");
 #endif
             SigProcMask(SIG_UNBLOCK, SigAddSet(&set));
 
@@ -93,7 +93,7 @@ namespace Apostol {
         void CCPEmulator::AfterRun() {
             CApplicationProcess::AfterRun();
 #ifdef WITH_POSTGRESQL
-            PQServerStop();
+            PQClientStop();
 #endif
             ServerStop();
         }
