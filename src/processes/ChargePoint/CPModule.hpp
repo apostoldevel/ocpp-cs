@@ -36,43 +36,6 @@ namespace Apostol {
 
         //--------------------------------------------------------------------------------------------------------------
 
-        //-- CModuleConnection -----------------------------------------------------------------------------------------
-
-        //--------------------------------------------------------------------------------------------------------------
-
-        class CModuleConnection: public CPollConnection {
-        private:
-
-            CString m_Action {};
-            CString m_URL {};
-
-            CHTTPServerConnection *m_pConnection;
-
-        public:
-
-            explicit CModuleConnection(const CString& Address, CHTTPServerConnection *AConnection, CPollManager *AManager = nullptr):
-                    CPollConnection(AManager) {
-                m_pConnection = AConnection;
-            }
-
-            CHTTPServerConnection *Connection() { return m_pConnection; }
-
-            CString& Action() { return m_Action; };
-            const CString& Action() const { return m_Action; }
-
-            CString& URL() { return m_URL; };
-            const CString& URL() const { return m_URL; }
-
-            void HostToURL(const CString& Host);
-
-            void Close() override {
-                Connection()->Disconnect();
-            }
-
-        };
-
-        //--------------------------------------------------------------------------------------------------------------
-
         //-- CCPModule -------------------------------------------------------------------------------------------------
 
         //--------------------------------------------------------------------------------------------------------------

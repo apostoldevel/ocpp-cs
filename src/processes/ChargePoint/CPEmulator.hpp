@@ -49,7 +49,7 @@ namespace Apostol {
             CDateTime m_InitDate;
             CDateTime m_CheckDate;
 
-            CCPModule* m_pCPModule;
+            CCPModule m_CPModule {this};
 
             COCPPClientManager m_ClientManager;
 
@@ -110,7 +110,7 @@ namespace Apostol {
 
             explicit CCPEmulator(CCustomProcess* AParent, CApplication *AApplication);
 
-            ~CCPEmulator() override;
+            ~CCPEmulator() override = default;
 
             static class CCPEmulator *CreateProcess(CCustomProcess *AParent, CApplication *AApplication) {
                 return new CCPEmulator(AParent, AApplication);

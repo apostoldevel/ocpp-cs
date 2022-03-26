@@ -58,12 +58,6 @@ namespace Apostol {
 #ifdef WITH_POSTGRESQL
             InitializePQClient(Application()->Title(), 5, 10);
 #endif
-            m_pCPModule = CCPModule::CreateModule(this);
-        }
-        //--------------------------------------------------------------------------------------------------------------
-
-        CCPEmulator::~CCPEmulator() {
-            FreeAndNil(m_pCPModule);
         }
         //--------------------------------------------------------------------------------------------------------------
 
