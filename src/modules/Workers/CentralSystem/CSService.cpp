@@ -974,7 +974,7 @@ namespace Apostol {
                     pReply->Content = Json.ToString();
                     AConnection->SendReply(pReply->Content.IsEmpty() ? CHTTPReply::no_content : CHTTPReply::ok, "application/json", true);
                 } else {
-                    ReplyError(AConnection, pReply->Status, pReply->StatusText);
+                    ReplyError(AConnection, CHTTPReply::ok, pReply->StatusText);
                 }
 
                 DebugReply(pReply);
@@ -995,10 +995,10 @@ namespace Apostol {
                 if (pReply->Status == CHTTPReply::ok) {
                     SOAPToJSON(AConnection, pReply->Content);
                 } else {
-                    ReplyError(AConnection, pReply->Status, pReply->StatusText);
+                    ReplyError(AConnection, CHTTPReply::ok, pReply->StatusText);
                 }
 #else
-                ReplyError(AConnection, CHTTPReply::not_implemented, "Not Implemented");
+                ReplyError(AConnection, CHTTPReply::ok, "Not Implemented");
 #endif
                 pConnection->CloseConnection(true);
 
