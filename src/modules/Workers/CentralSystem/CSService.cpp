@@ -276,6 +276,20 @@ namespace Apostol {
         }
         //--------------------------------------------------------------------------------------------------------------
 
+        void CCSService::SendError(CHTTPServerConnection *AConnection, CHTTPReply::CStatusType ErrorCode, const CString &Message) {
+            auto pReply = AConnection->Reply();
+
+            pReply->ContentType = CHTTPReply::json;
+
+            pReply->Content.Clear();
+            pReply->Content.Format(R"({"error": {"code": %u, "message": "%s"}})", ErrorCode, Delphi::Json::EncodeJsonString(Message).c_str());
+
+            AConnection->SendReply(CHTTPReply::ok, nullptr, true);
+
+            Log()->Error(ErrorCode == CHTTPReply::internal_server_error ? APP_LOG_EMERG : APP_LOG_ERR, 0, _T("Error: %s"), Message.c_str());
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
         CJSON CCSService::GetChargePointList() {
             CJSON json;
             CJSONValue jsonArray(jvtArray);
@@ -974,7 +988,7 @@ namespace Apostol {
                     pReply->Content = Json.ToString();
                     AConnection->SendReply(pReply->Content.IsEmpty() ? CHTTPReply::no_content : CHTTPReply::ok, "application/json", true);
                 } else {
-                    ReplyError(AConnection, CHTTPReply::ok, pReply->StatusText);
+                    SendError(AConnection, pReply->Status, pReply->StatusText);
                 }
 
                 DebugReply(pReply);
@@ -989,16 +1003,18 @@ namespace Apostol {
                 auto pConnection = dynamic_cast<CHTTPClientConnection *> (AClientConnection);
                 auto pReply = pConnection->Reply();
 
+                DebugReply(pReply);
+
                 pReply->ContentType = CHTTPReply::json;
 
 #ifdef WITH_POSTGRESQL
                 if (pReply->Status == CHTTPReply::ok) {
                     SOAPToJSON(AConnection, pReply->Content);
                 } else {
-                    ReplyError(AConnection, CHTTPReply::ok, pReply->StatusText);
+                    SendError(AConnection, pReply->Status, pReply->StatusText);
                 }
 #else
-                ReplyError(AConnection, CHTTPReply::ok, "Not Implemented");
+                SendError(AConnection, CHTTPReply::not_implemented, "Not Implemented");
 #endif
                 pConnection->CloseConnection(true);
 

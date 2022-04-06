@@ -171,6 +171,8 @@ namespace Apostol {
 
             bool Enabled() override;
 
+            static void SendError(CHTTPServerConnection *AConnection, CHTTPReply::CStatusType ErrorCode, const CString &Message);
+
         };
     }
 }
