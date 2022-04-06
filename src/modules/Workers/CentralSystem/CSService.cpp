@@ -967,15 +967,20 @@ namespace Apostol {
 
                 pReply->ContentType = CHTTPReply::json;
 
-                CJSON Json;
-                CSOAPProtocol::SOAPToJSON(pClientReply->Content, Json);
+                if (pReply->Status == CHTTPReply::ok) {
+                    CJSON Json;
+                    CSOAPProtocol::SOAPToJSON(pClientReply->Content, Json);
 
-                pReply->Content = Json.ToString();
-                AConnection->SendReply(pReply->Content.IsEmpty() ? CHTTPReply::no_content : CHTTPReply::ok, "application/json", true);
+                    pReply->Content = Json.ToString();
+                    AConnection->SendReply(pReply->Content.IsEmpty() ? CHTTPReply::no_content : CHTTPReply::ok, "application/json", true);
+                } else {
+                    ReplyError(AConnection, pReply->Status, pReply->StatusText);
+                }
 
                 DebugReply(pReply);
 
                 pConnection->CloseConnection(true);
+
                 return true;
             };
 
@@ -984,14 +989,19 @@ namespace Apostol {
                 auto pConnection = dynamic_cast<CHTTPClientConnection *> (AClientConnection);
                 auto pReply = pConnection->Reply();
 
-                DebugReply(pReply);
+                pReply->ContentType = CHTTPReply::json;
 
 #ifdef WITH_POSTGRESQL
-                SOAPToJSON(AConnection, pReply->Content);
+                if (pReply->Status == CHTTPReply::ok) {
+                    SOAPToJSON(AConnection, pReply->Content);
+                } else {
+                    ReplyError(AConnection, pReply->Status, pReply->StatusText);
+                }
 #else
-                AConnection->SendStockReply(CHTTPReply::not_implemented);
+                ReplyError(AConnection, CHTTPReply::not_implemented, "Not Implemented");
 #endif
                 pConnection->CloseConnection(true);
+
                 return true;
             };
 
