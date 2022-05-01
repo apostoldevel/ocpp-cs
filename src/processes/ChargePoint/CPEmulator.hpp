@@ -69,6 +69,8 @@ namespace Apostol {
 
             static void LoadChargePointRequest(const CString &Prefix, const CString &Action, CJSON &Json);
 
+            void Heartbeat(CDateTime Now);
+
             void OnChargePointMessageSOAP(CObject *Sender, const CSOAPMessage &Message);
             void OnChargePointMessageJSON(CObject *Sender, const CJSONMessage &Message);
 
@@ -98,8 +100,6 @@ namespace Apostol {
 
             void DoConnected(CObject *Sender);
             void DoDisconnected(CObject *Sender);
-
-            void DoHeartbeat();
 
             void DoError(const Delphi::Exception::Exception &E);
 

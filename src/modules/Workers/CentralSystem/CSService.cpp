@@ -1516,11 +1516,6 @@ namespace Apostol {
         }
         //--------------------------------------------------------------------------------------------------------------
 
-        void CCSService::Heartbeat() {
-            CApostolModule::Heartbeat();
-        }
-        //--------------------------------------------------------------------------------------------------------------
-
         bool CCSService::Execute(CHTTPServerConnection *AConnection) {
             if (AConnection->Protocol() == pWebSocket) {
                 DoWebSocket(AConnection);

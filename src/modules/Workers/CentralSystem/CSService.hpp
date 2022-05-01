@@ -166,7 +166,6 @@ namespace Apostol {
 
             void Initialization(CModuleProcess *AProcess) override;
 
-            void Heartbeat() override;
             bool Execute(CHTTPServerConnection *AConnection) override;
 
             bool Enabled() override;

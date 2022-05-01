@@ -173,7 +173,7 @@ namespace Apostol {
 
             pClient->ClientName() = GApplication->Title();
             pClient->AutoConnect(false);
-            pClient->PollStack(Server().PollStack());
+            pClient->AllocateEventHandlers(Server());
 
 #if defined(_GLIBCXX_RELEASE) && (_GLIBCXX_RELEASE >= 9)
             pClient->OnVerbose([this](auto && Sender, auto && AConnection, auto && AFormat, auto && args) { DoVerbose(Sender, AConnection, AFormat, args); });
@@ -335,8 +335,8 @@ namespace Apostol {
             pTimer->Read(&exp, sizeof(uint64_t));
 
             try {
-                DoHeartbeat();
-                CModuleProcess::HeartbeatModules();
+                Heartbeat(AHandler->TimeStamp());
+                CModuleProcess::HeartbeatModules(AHandler->TimeStamp());
             } catch (Delphi::Exception::Exception &E) {
                 DoServerEventHandlerException(AHandler, E);
             }
@@ -388,18 +388,16 @@ namespace Apostol {
         }
         //--------------------------------------------------------------------------------------------------------------
 
-        void CCPEmulator::DoHeartbeat() {
-            const auto now = Now();
-
-            if ((now >= m_InitDate)) {
-                m_InitDate = now + (CDateTime) 30 / SecsPerDay; // 30 sec
+        void CCPEmulator::Heartbeat(CDateTime Now) {
+            if ((Now >= m_InitDate)) {
+                m_InitDate = Now + (CDateTime) 30 / SecsPerDay; // 30 sec
                 if (m_ClientManager.Count() == 0)
                     InitServer();
             }
 
             if (m_Status == psRunning) {
-                if ((now >= m_CheckDate)) {
-                    m_CheckDate = now + (CDateTime) 30 / SecsPerDay; // 30 sec
+                if ((Now >= m_CheckDate)) {
+                    m_CheckDate = Now + (CDateTime) 30 / SecsPerDay; // 30 sec
                     for (int i = 0; i < m_ClientManager.Count(); ++i) {
                         auto pClient = m_ClientManager.Items(i);
                         if (!pClient->Connected()) {

@@ -51,6 +51,7 @@ namespace Apostol {
         public:
 
             explicit COCPPConnection(CPollSocketClient *AClient) : CHTTPClientConnection(AClient) {
+                TimeOut(INFINITE);
                 CloseConnection(false);
             }
 
