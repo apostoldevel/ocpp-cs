@@ -90,6 +90,7 @@ namespace Apostol {
             PQClientStop();
 #endif
             ServerStop();
+            ServerShutDown();
         }
         //--------------------------------------------------------------------------------------------------------------
 
@@ -193,13 +194,6 @@ namespace Apostol {
             pClient->OnNoCommandHandler(std::bind(&CCPEmulator::DoNoCommandHandler, this, _1, _2, _3));
 #endif
             return pClient;
-        }
-        //--------------------------------------------------------------------------------------------------------------
-
-        CString CCPEmulator::CheckOfNull(const CString &String) {
-            if (!String.IsEmpty())
-                return String;
-            return {"<null>"};
         }
         //--------------------------------------------------------------------------------------------------------------
 

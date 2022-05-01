@@ -49,8 +49,6 @@ namespace Apostol {
             CDateTime m_InitDate;
             CDateTime m_CheckDate;
 
-            CCPModule m_CPModule {this};
-
             COCPPClientManager m_ClientManager;
 
             void BeforeRun() override;
@@ -64,8 +62,6 @@ namespace Apostol {
 
             void InitializeActions(COCPPClient *AClient);
             void InitializeEvents(COCPPClient *AClient);
-
-            static CString CheckOfNull(const CString &String);
 
             static void LoadChargePointRequest(const CString &Prefix, const CString &Action, CJSON &Json);
 

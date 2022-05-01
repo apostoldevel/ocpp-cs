@@ -1671,7 +1671,7 @@ namespace Apostol {
         //--------------------------------------------------------------------------------------------------------------
 
         bool CChargingPoint::MeterValues(int connectorId) {
-            bool result;
+            bool result = false;
 
             if (connectorId == -1) {
                 for (int i = 0; i < Connectors().Count(); ++i) {
