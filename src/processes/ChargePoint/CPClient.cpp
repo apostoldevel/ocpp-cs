@@ -164,7 +164,7 @@ namespace Apostol {
                     pConnection->OnRequest(std::bind(&COCPPClient::DoDebugRequest, this, _1));
                     pConnection->OnReply(std::bind(&COCPPClient::DoDebugReply, this, _1));
 #endif
-                    AHandler->Start(etServerIO);
+                    AHandler->Start(etIO);
 
                     pConnection->Identity() = Identity();
 
