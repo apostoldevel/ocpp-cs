@@ -111,7 +111,7 @@ namespace Apostol {
             static void SOAPError(CHTTPServerConnection *AConnection, const CString &Code, const CString &SubCode,
                                     const CString &Reason, const CString &Message);
 #ifdef WITH_POSTGRESQL
-            void ParseJSON(CHTTPServerConnection *AConnection, const CString &Identity, const CJSONMessage &Message);
+            void ParseJSON(CHTTPServerConnection *AConnection, const CString &Identity, const CJSONMessage &Message, const CString &Account = {});
             void ParseSOAP(CHTTPServerConnection *AConnection, const CString &Payload);
 
             void JSONToSOAP(CHTTPServerConnection *AConnection, CCSChargingPoint *APoint, const CString &Operation, const CJSON &Payload);

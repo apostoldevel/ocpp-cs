@@ -731,6 +731,7 @@ namespace Apostol {
 
             CString m_Address;
             CString m_Identity;
+            CString m_Account;
 
             int m_UpdateCount;
 
@@ -785,6 +786,9 @@ namespace Apostol {
 
             CString &Identity() { return m_Identity; };
             const CString &Identity() const { return m_Identity; };
+
+            CString &Account() { return m_Account; };
+            const CString &Account() const { return m_Account; };
 
             void UpdateConnected(bool Value) { SetUpdateConnected(Value); };
             bool UpdateConnected() const { return m_bUpdateConnected; };

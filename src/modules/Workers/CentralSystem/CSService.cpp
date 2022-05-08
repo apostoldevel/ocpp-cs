@@ -454,7 +454,7 @@ namespace Apostol {
         }
         //--------------------------------------------------------------------------------------------------------------
 
-        void CCSService::ParseJSON(CHTTPServerConnection *AConnection, const CString &Identity, const CJSONMessage &Message) {
+        void CCSService::ParseJSON(CHTTPServerConnection *AConnection, const CString &Identity, const CJSONMessage &Message, const CString &Account) {
 
             auto OnExecuted = [](CPQPollQuery *APollQuery) {
 
@@ -523,12 +523,13 @@ namespace Apostol {
             CStringList SQL;
 
             SQL.Add(CString()
-                .MaxFormatSize(256 + Identity.Size() + Message.Size() + payload.Size())
-                .Format("SELECT * FROM ocpp.Parse(%s, %s, %s, %s::jsonb);",
+                .MaxFormatSize(256 + Identity.Size() + Message.Size() + payload.Size() + Account.Size())
+                .Format("SELECT * FROM ocpp.Parse(%s, %s, %s, %s::jsonb, %s);",
                         PQQuoteLiteral(Identity).c_str(),
                         PQQuoteLiteral(Message.UniqueId).c_str(),
                         PQQuoteLiteral(Message.Action).c_str(),
-                        PQQuoteLiteral(payload).c_str())
+                        PQQuoteLiteral(payload).c_str(),
+                        PQQuoteLiteral(Account).c_str())
             );
 
             try {
@@ -1421,7 +1422,7 @@ namespace Apostol {
 
                     if (Message.MessageTypeId == ChargePoint::mtCall) {
                         // Let's process the request in the DBMS
-                        ParseJSON(AConnection, pPoint->Identity(), Message);
+                        ParseJSON(AConnection, pPoint->Identity(), Message, pPoint->Account());
                     } else {
                         // We will send the response from the charging station to the handler
                         auto pHandler = pPoint->Messages().FindMessageById(Message.UniqueId);
@@ -1475,7 +1476,12 @@ namespace Apostol {
                 return;
             }
 
-            const auto& caIdentity = slPath[1];
+            const auto& caIdentity = slPath.Last();
+            if (caIdentity.IsEmpty()) {
+                AConnection->SendStockReply(CHTTPReply::bad_request);
+                return;
+            }
+
             const CString csAccept(SHA1(caSecWebSocketKey + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"));
             const auto& caSecWebSocketProtocol = pRequest->Headers.Values("sec-websocket-protocol");
             const CString csProtocol(caSecWebSocketProtocol.IsEmpty() ? "" : caSecWebSocketProtocol.SubString(0, caSecWebSocketProtocol.Find(',')));
@@ -1488,6 +1494,13 @@ namespace Apostol {
                 pPoint = m_PointManager.Add(AConnection);
                 pPoint->ProtocolType(ChargePoint::ptJSON);
                 pPoint->Identity() = caIdentity;
+
+                if (slPath.Count() == 3) {
+                    const auto& caAccount = slPath[1];
+                    if (caAccount.Length() == 40) {
+                        pPoint->Account() = caAccount;
+                    }
+                }
             } else {
                 pPoint->UpdateConnected(false);
                 pPoint->SwitchConnection(AConnection);
