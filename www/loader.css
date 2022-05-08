@@ -1,0 +1,46 @@
+/*@import url("https://fonts.googleapis.com/css?family=Roboto:100,100i,300,300i,400,400i,500,500i,700,700i,900,900i");*/
+
+body {
+  padding: 0;
+  margin: 0;
+  height: 100%;
+  width: 100%;
+}
+html {
+  height: 100%;
+  width: 100%;
+}
+
+#app-site {
+  display: flex;
+  width: 100%;
+  height: 100vh;
+}
+
+.loader {
+  position: relative;
+  margin: 0 auto;
+  width: 60px;
+  height: 100vh;
+
+  display: -webkit-flex;
+  display: -ms-flexbox;
+  display: -ms-flex;
+  display: flex;
+
+  -webkit-flex-direction: column;
+  -ms-flex-direction: column;
+  flex-direction: column;
+  -webkit-flex-wrap: nowrap;
+  -ms-flex-wrap: nowrap;
+  flex-wrap: nowrap;
+  -webkit-justify-content: center;
+  -ms-justify-content: center;
+  justify-content: center;
+}
+
+.loading {
+  width: 120px;
+}
+
+/*# sourceMappingURL=loader.css.map */

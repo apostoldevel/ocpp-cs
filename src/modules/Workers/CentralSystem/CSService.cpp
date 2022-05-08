@@ -1071,7 +1071,11 @@ namespace Apostol {
                 return;
             }
 
-            SendResource(AConnection, sPath);
+            CStringList TryFiles;
+
+            TryFiles.Add("/index.html");
+
+            SendResource(AConnection, sPath, nullptr, false, TryFiles);
         }
         //--------------------------------------------------------------------------------------------------------------
 
