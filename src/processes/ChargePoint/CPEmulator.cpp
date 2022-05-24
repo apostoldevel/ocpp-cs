@@ -56,7 +56,7 @@ namespace Apostol {
 
             InitializeServer(Application()->Title(), Config()->Listen(), CHARGE_POINT_API_PORT);
 #ifdef WITH_POSTGRESQL
-            InitializePQClient(Application()->Title(), 5, 10);
+            InitializePQClients(Application()->Title(), 5, 10);
 #endif
         }
         //--------------------------------------------------------------------------------------------------------------
@@ -87,7 +87,7 @@ namespace Apostol {
         void CCPEmulator::AfterRun() {
             CApplicationProcess::AfterRun();
 #ifdef WITH_POSTGRESQL
-            PQClientStop();
+            PQClientsStop();
 #endif
             ServerStop();
             ServerShutDown();
