@@ -1062,8 +1062,8 @@ namespace Apostol {
             }
 
             if (sPath.SubString(0, 6) == "/ocpp/") {
-                DoOCPP(AConnection);
-                return;
+                if (DoOCPP(AConnection) >= 0)
+                    return;
             }
 
             if (sPath.SubString(0, 5) == "/api/") {
@@ -1459,7 +1459,7 @@ namespace Apostol {
         }
         //--------------------------------------------------------------------------------------------------------------
 
-        void CCSService::DoOCPP(CHTTPServerConnection *AConnection) {
+        int CCSService::DoOCPP(CHTTPServerConnection *AConnection) {
 
             auto pRequest = AConnection->Request();
             auto pReply = AConnection->Reply();
@@ -1470,20 +1470,19 @@ namespace Apostol {
             SplitColumns(pRequest->Location.pathname, slPath, '/');
 
             if (slPath.Count() < 2) {
-                AConnection->SendStockReply(CHTTPReply::not_found);
-                return;
+                return -1;
             }
 
             const auto& caSecWebSocketKey = pRequest->Headers.Values("sec-websocket-key");
             if (caSecWebSocketKey.IsEmpty()) {
                 AConnection->SendStockReply(CHTTPReply::bad_request);
-                return;
+                return 0;
             }
 
             const auto& caIdentity = slPath.Last();
             if (caIdentity.IsEmpty()) {
                 AConnection->SendStockReply(CHTTPReply::bad_request);
-                return;
+                return 0;
             }
 
             const CString csAccept(SHA1(caSecWebSocketKey + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"));
@@ -1524,7 +1523,7 @@ namespace Apostol {
             pPoint->OnMessageJSON(std::bind(&CCSService::OnChargePointMessageJSON, this, _1, _2));
             AConnection->OnDisconnected(std::bind(&CCSService::DoPointDisconnected, this, _1));
 #endif
-
+            return 1;
         }
         //--------------------------------------------------------------------------------------------------------------
 

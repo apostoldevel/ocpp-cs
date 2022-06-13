@@ -7,6 +7,7 @@ RUN set -eux; \
     apt-get install apt-utils bash build-essential cmake cmake-data g++ gcc libcurl4-openssl-dev libssl-dev make pkg-config sudo wget git lsb-release -y;
 
 RUN set -eux; \
+    rm -rf /opt/cs; \
     git clone https://github.com/apostoldevel/apostol-cs.git /opt/cs;
 
 WORKDIR /opt/cs

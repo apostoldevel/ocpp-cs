@@ -146,7 +146,7 @@ namespace Apostol {
             void DoPost(CHTTPServerConnection *AConnection);
 
             void DoSOAP(CHTTPServerConnection *AConnection);
-            void DoOCPP(CHTTPServerConnection *AConnection);
+            int DoOCPP(CHTTPServerConnection *AConnection);
 
             void DoPointConnected(CCSChargingPoint *APoint);
             void DoPointDisconnected(CObject *Sender);
