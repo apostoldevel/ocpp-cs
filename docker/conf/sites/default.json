@@ -1,4 +1,4 @@
 {
   "hosts": ["localhost:9220"],
-  "root": "/opt/cs/www"
+  "root": "/opt/cs/www/web"
 }
