@@ -1326,10 +1326,10 @@ namespace Apostol {
         }
         //--------------------------------------------------------------------------------------------------------------
 
-        void CChargingPointConnector::SetStatus(CChargePointStatus Value) {
+        void CChargingPointConnector::SetStatus(CChargePointStatus Value, COnMessageHandlerEvent &&OnStatusNotification) {
             if (m_Status != Value) {
                 m_Status = Value;
-                UpdateStatusNotification();
+                UpdateStatusNotification(std::move(OnStatusNotification));
             }
         }
         //--------------------------------------------------------------------------------------------------------------
@@ -1339,9 +1339,9 @@ namespace Apostol {
         }
         //--------------------------------------------------------------------------------------------------------------
 
-        void CChargingPointConnector::UpdateStatusNotification() {
+        void CChargingPointConnector::UpdateStatusNotification(COnMessageHandlerEvent &&OnStatusNotification) {
             if (m_pChargingPoint != nullptr && m_pChargingPoint->Connected()) {
-                m_pChargingPoint->SendStatusNotification(m_ConnectorId, m_Status, m_ErrorCode);
+                m_pChargingPoint->SendStatusNotification(m_ConnectorId, m_Status, m_ErrorCode, std::move(OnStatusNotification));
             }
         }
         //--------------------------------------------------------------------------------------------------------------
@@ -1349,26 +1349,31 @@ namespace Apostol {
         void CChargingPointConnector::ContinueRemoteStartTransaction() {
             if (m_pChargingPoint != nullptr && m_pChargingPoint->Connected()) {
 
-                auto OnRequest = [this](COCPPMessageHandler *AHandler, CWebSocketConnection *AWSConnection) {
-                    const auto &message = CChargingPoint::RequestToMessage(AWSConnection);
+                auto OnStatus = [this](COCPPMessageHandler *AHandler, CWebSocketConnection *AWSConnection) {
 
-                    if (message.Payload.HasOwnProperty("idTagInfo")) {
-                        m_IdTag.Value() << message.Payload["idTagInfo"];
-                        m_pChargingPoint->UpdateAuthorizationCache(m_IdTag);
-                    }
+                    auto OnRequest = [this](COCPPMessageHandler *AHandler, CWebSocketConnection *AWSConnection) {
+                        const auto &message = CChargingPoint::RequestToMessage(AWSConnection);
 
-                    if (m_IdTag.Value().status == asAccepted) {
-                        if (!message.Payload.HasOwnProperty("transactionId")) {
-                            throw Delphi::Exception::ExceptionFrm("Not found required key: %s", "transactionId");
+                        if (message.Payload.HasOwnProperty("idTagInfo")) {
+                            m_IdTag.Value() << message.Payload["idTagInfo"];
+                            m_pChargingPoint->UpdateAuthorizationCache(m_IdTag);
                         }
-                        m_TransactionId = message.Payload["transactionId"].AsInteger();
-                        SetStatus(cpsPreparing);
-                    } else {
-                        SetStatus(cpsFaulted);
-                    }
+
+                        if (m_IdTag.Value().status == asAccepted) {
+                            if (!message.Payload.HasOwnProperty("transactionId")) {
+                                throw Delphi::Exception::ExceptionFrm("Not found required key: %s", "transactionId");
+                            }
+                            m_TransactionId = message.Payload["transactionId"].AsInteger();
+                            SetStatus(cpsCharging);
+                        } else {
+                            SetStatus(cpsFaulted);
+                        }
+                    };
+
+                    m_pChargingPoint->SendStartTransaction(m_ConnectorId, m_IdTag.Name(), m_MeterValue, m_ReservationId, OnRequest);
                 };
 
-                m_pChargingPoint->SendStartTransaction(m_ConnectorId, m_IdTag.Name(), m_MeterValue, m_ReservationId, OnRequest);
+                SetStatus(cpsPreparing, OnStatus);
             }
         }
         //--------------------------------------------------------------------------------------------------------------
@@ -1376,8 +1381,6 @@ namespace Apostol {
         CRemoteStartStopStatus CChargingPointConnector::RemoteStartTransaction(const CString &idTag) {
             if (m_Status != cpsAvailable || m_pChargingPoint == nullptr)
                 return rssRejected;
-
-            SetStatus(cpsPreparing);
 
             m_IdTag = m_pChargingPoint->AuthorizeLocal(idTag);
 
@@ -1425,7 +1428,6 @@ namespace Apostol {
             m_TransactionId = -1;
 
             SetStatus(cpsFinishing);
-            //SetStatus(cpsAvailable);
 
             return rssAccepted;
         }
@@ -1983,31 +1985,8 @@ namespace Apostol {
         }
         //--------------------------------------------------------------------------------------------------------------
 
-        void CChargingPoint::SendStatusNotification(int connectorId, CChargePointStatus status, CChargePointErrorCode errorCode) {
+        void CChargingPoint::SendStatusNotification(int connectorId, CChargePointStatus status, CChargePointErrorCode errorCode, COnMessageHandlerEvent &&OnStatusNotification) {
             CJSONMessage message;
-
-            auto OnRequest = [this](COCPPMessageHandler *AHandler, CWebSocketConnection *AWSConnection) {
-                const auto &message = AHandler->Message();
-
-                if (message.Payload.HasOwnProperty("connectorId")) {
-                    const auto connectorId = message.Payload["connectorId"].AsInteger();
-
-                    if (message.Payload.HasOwnProperty("status")) {
-                        const auto &status = COCPPMessage::StringToChargePointStatus(message.Payload["status"].AsString());
-
-                        const auto index = IndexOfConnectorId(connectorId);
-                        if (index == -1) {
-                            throw Delphi::Exception::ExceptionFrm(CP_INVALID_CONNECTION_ID, connectorId);
-                        }
-
-                        if (status == cpsPreparing) {
-                            Connectors()[index].Status(cpsCharging);
-                        } else if (status == cpsFaulted) {
-                            Connectors()[index].Status(cpsAvailable);
-                        }
-                    }
-                }
-            };
 
             message.MessageTypeId = ChargePoint::mtCall;
             message.UniqueId = GenUniqueId();
@@ -2018,7 +1997,11 @@ namespace Apostol {
             message.Payload.Object().AddPair("timestamp", GetISOTime());
             message.Payload.Object().AddPair("connectorId", connectorId);
 
-            SendMessage(message, std::move(OnRequest));
+            if (OnStatusNotification == nullptr) {
+                SendMessage(message, true);
+            } else {
+                SendMessage(message, std::move(OnStatusNotification));
+            }
         }
         //--------------------------------------------------------------------------------------------------------------
 

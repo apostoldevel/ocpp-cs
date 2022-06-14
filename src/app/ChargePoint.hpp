@@ -959,7 +959,7 @@ namespace Apostol {
             CChargePointStatus m_Status = cpsUnavailable;
             CChargePointErrorCode m_ErrorCode = cpeNoError;
 
-            void SetStatus(CChargePointStatus Status);
+            void SetStatus(CChargePointStatus Status, COnMessageHandlerEvent &&OnStatusNotification = nullptr);
 
         protected:
 
@@ -1016,7 +1016,7 @@ namespace Apostol {
             int MeterValue() const { return m_MeterValue; };
 
             void IncMeterValue(int delta);
-            void UpdateStatusNotification();
+            void UpdateStatusNotification(COnMessageHandlerEvent &&OnStatusNotification = nullptr);
 
             CRemoteStartStopStatus RemoteStartTransaction(const CString &idTag);
             CRemoteStartStopStatus RemoteStopTransaction();
@@ -1221,7 +1221,7 @@ namespace Apostol {
             void SendStartTransaction(int connectorId, const CString &idTag, int meterStart, int reservationId, COnMessageHandlerEvent &&OnRequest);
 
             /// 4.9. Status Notification
-            void SendStatusNotification(int connectorId, CChargePointStatus status, CChargePointErrorCode errorCode);
+            void SendStatusNotification(int connectorId, CChargePointStatus status, CChargePointErrorCode errorCode, COnMessageHandlerEvent &&OnStatusNotification);
 
             /// 4.10. Stop Transaction
             void SendStopTransaction(const CString &idTag, int meterStop, int transactionId, const CString &reason, COnMessageHandlerEvent &&OnRequest);
