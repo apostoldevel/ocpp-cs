@@ -1986,6 +1986,28 @@ namespace Apostol {
         //--------------------------------------------------------------------------------------------------------------
 
         void CChargingPoint::SendStatusNotification(int connectorId, CChargePointStatus status, CChargePointErrorCode errorCode, COnMessageHandlerEvent &&OnStatusNotification) {
+
+            auto OnRequest = [this](COCPPMessageHandler *AHandler, CWebSocketConnection *AWSConnection) {
+                const auto &message = AHandler->Message();
+
+                if (message.Payload.HasOwnProperty("connectorId")) {
+                    const auto connectorId = message.Payload["connectorId"].AsInteger();
+
+                    if (message.Payload.HasOwnProperty("status")) {
+                        const auto &status = COCPPMessage::StringToChargePointStatus(message.Payload["status"].AsString());
+
+                        const auto index = IndexOfConnectorId(connectorId);
+                        if (index == -1) {
+                            throw Delphi::Exception::ExceptionFrm(CP_INVALID_CONNECTION_ID, connectorId);
+                        }
+
+                        if (status == cpsFaulted) {
+                            Connectors()[index].Status(cpsAvailable);
+                        }
+                    }
+                }
+            };
+
             CJSONMessage message;
 
             message.MessageTypeId = ChargePoint::mtCall;
@@ -1998,7 +2020,7 @@ namespace Apostol {
             message.Payload.Object().AddPair("connectorId", connectorId);
 
             if (OnStatusNotification == nullptr) {
-                SendMessage(message, true);
+                SendMessage(message, OnRequest);
             } else {
                 SendMessage(message, std::move(OnStatusNotification));
             }
