@@ -1359,14 +1359,15 @@ namespace Apostol {
                             m_pChargingPoint->UpdateAuthorizationCache(m_IdTag);
                         }
 
+                        m_TransactionId = message.Payload["transactionId"].AsInteger();
+
                         if (m_IdTag.Value().status == asAccepted) {
                             if (!message.Payload.HasOwnProperty("transactionId")) {
                                 throw Delphi::Exception::ExceptionFrm("Not found required key: %s", "transactionId");
                             }
-                            m_TransactionId = message.Payload["transactionId"].AsInteger();
                             SetStatus(cpsCharging);
                         } else {
-                            SetStatus(cpsFaulted);
+                            LocalStopTransaction(COCPPMessage::AuthorizationStatusToString(m_IdTag.Value().status));
                         }
                     };
 
@@ -1407,9 +1408,7 @@ namespace Apostol {
         }
         //--------------------------------------------------------------------------------------------------------------
 
-        CRemoteStartStopStatus CChargingPointConnector::RemoteStopTransaction() {
-            if (m_Status != cpsCharging || m_pChargingPoint == nullptr)
-                return rssRejected;
+        void CChargingPointConnector::LocalStopTransaction(const CString &reason) {
 
             auto OnRequest = [this](COCPPMessageHandler *AHandler, CWebSocketConnection *AWSConnection) {
                 const auto &message = CChargingPoint::RequestToMessage(AWSConnection);
@@ -1417,17 +1416,25 @@ namespace Apostol {
                     m_IdTag.Value() << message.Payload["idTagInfo"];
                     m_pChargingPoint->UpdateAuthorizationCache(m_IdTag);
                 }
+
+                SetStatus(cpsFinishing);
             };
+
+            m_pChargingPoint->SendStopTransaction(m_IdTag.Name(), m_MeterValue, m_TransactionId, reason, OnRequest);
+
+            m_TransactionId = -1;
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
+        CRemoteStartStopStatus CChargingPointConnector::RemoteStopTransaction() {
+            if (m_Status != cpsCharging || m_pChargingPoint == nullptr)
+                return rssRejected;
 
             if (m_ReservationId > 0 && m_IdTag.Name() != m_ReservationIdTag.Name()) {
                 return rssRejected;
             }
 
-            m_pChargingPoint->SendStopTransaction(m_IdTag.Name(), m_MeterValue, m_TransactionId, "Remote", OnRequest);
-
-            m_TransactionId = -1;
-
-            SetStatus(cpsFinishing);
+            LocalStopTransaction("Remote");
 
             return rssAccepted;
         }

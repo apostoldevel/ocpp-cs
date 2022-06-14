@@ -964,6 +964,7 @@ namespace Apostol {
         protected:
 
             void ContinueRemoteStartTransaction();
+            void LocalStopTransaction(const CString &reason);
 
         public:
 
