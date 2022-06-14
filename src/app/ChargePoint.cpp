@@ -1362,9 +1362,9 @@ namespace Apostol {
                             throw Delphi::Exception::ExceptionFrm("Not found required key: %s", "transactionId");
                         }
                         m_TransactionId = message.Payload["transactionId"].AsInteger();
-                        SetStatus(cpsCharging);
-                    } else {
                         SetStatus(cpsPreparing);
+                    } else {
+                        SetStatus(cpsFaulted);
                     }
                 };
 
@@ -1389,7 +1389,7 @@ namespace Apostol {
                     if (m_IdTag.Value().status == asAccepted) {
                         ContinueRemoteStartTransaction();
                     } else {
-                        SetStatus(cpsAvailable);
+                        SetStatus(cpsFaulted);
                     }
                 }
             };
@@ -1986,6 +1986,29 @@ namespace Apostol {
         void CChargingPoint::SendStatusNotification(int connectorId, CChargePointStatus status, CChargePointErrorCode errorCode) {
             CJSONMessage message;
 
+            auto OnRequest = [this](COCPPMessageHandler *AHandler, CWebSocketConnection *AWSConnection) {
+                const auto &message = AHandler->Message();
+
+                if (message.Payload.HasOwnProperty("connectorId")) {
+                    const auto connectorId = message.Payload["connectorId"].AsInteger();
+
+                    if (message.Payload.HasOwnProperty("status")) {
+                        const auto &status = COCPPMessage::StringToChargePointStatus(message.Payload["status"].AsString());
+
+                        const auto index = IndexOfConnectorId(connectorId);
+                        if (index == -1) {
+                            throw Delphi::Exception::ExceptionFrm(CP_INVALID_CONNECTION_ID, connectorId);
+                        }
+
+                        if (status == cpsPreparing) {
+                            Connectors()[index].Status(cpsCharging);
+                        } else if (status == cpsFaulted) {
+                            Connectors()[index].Status(cpsAvailable);
+                        }
+                    }
+                }
+            };
+
             message.MessageTypeId = ChargePoint::mtCall;
             message.UniqueId = GenUniqueId();
             message.Action = "StatusNotification";
@@ -1995,7 +2018,7 @@ namespace Apostol {
             message.Payload.Object().AddPair("timestamp", GetISOTime());
             message.Payload.Object().AddPair("connectorId", connectorId);
 
-            SendMessage(message, true);
+            SendMessage(message, std::move(OnRequest));
         }
         //--------------------------------------------------------------------------------------------------------------
 
