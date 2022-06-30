@@ -28,8 +28,6 @@ Author:
 #include "ChargePoint.hpp"
 //----------------------------------------------------------------------------------------------------------------------
 
-#define CP_CONNECTION_DATA_NAME "ChargingPoint"
-
 #define CP_INVALID_CONNECTION_ID "Invalid connectorId: %d"
 #define CP_INVALID_TRANSACTION_ID "Invalid transactionId: %d"
 //----------------------------------------------------------------------------------------------------------------------
@@ -1111,22 +1109,14 @@ namespace Apostol {
 
         void CCustomChargingPoint::AddToConnection(CWebSocketConnection *AConnection) {
             if (Assigned(AConnection)) {
-                int Index = AConnection->Data().IndexOfName(CP_CONNECTION_DATA_NAME);
-                if (Index == -1) {
-                    AConnection->Data().AddObject(CP_CONNECTION_DATA_NAME, this);
-                } else {
-                    delete AConnection->Data().Objects(Index);
-                    AConnection->Data().Objects(Index, this);
-                }
+                AConnection->Session(this);
             }
         }
         //--------------------------------------------------------------------------------------------------------------
 
         void CCustomChargingPoint::DeleteFromConnection(CWebSocketConnection *AConnection) {
             if (Assigned(AConnection)) {
-                int Index = AConnection->Data().IndexOfObject(this);
-                if (Index != -1)
-                    AConnection->Data().Delete(Index);
+                AConnection->Session(nullptr);
             }
         }
         //--------------------------------------------------------------------------------------------------------------
@@ -1150,23 +1140,6 @@ namespace Apostol {
 
                 EndUpdate();
             }
-        }
-        //--------------------------------------------------------------------------------------------------------------
-
-        CCustomChargingPoint *CCustomChargingPoint::FindOfConnection(CWebSocketConnection *AConnection) {
-            int Index = AConnection->Data().IndexOfName(CP_CONNECTION_DATA_NAME);
-            if (Index == -1)
-                throw Delphi::Exception::ExceptionFrm("Not found charging point in connection");
-
-            auto Object = AConnection->Data().Objects(Index);
-            if (Object == nullptr)
-                throw Delphi::Exception::ExceptionFrm("Object in connection data is null");
-
-            auto Point = dynamic_cast<CCustomChargingPoint *> (Object);
-            if (Point == nullptr)
-                throw Delphi::Exception::Exception("Charging point is null");
-
-            return Point;
         }
         //--------------------------------------------------------------------------------------------------------------
 

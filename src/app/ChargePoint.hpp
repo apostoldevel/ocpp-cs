@@ -796,8 +796,6 @@ namespace Apostol {
             void ProtocolType(CProtocolType Value) { SetProtocolType(Value); };
             CProtocolType ProtocolType() const { return m_ProtocolType; };
 
-            static CCustomChargingPoint *FindOfConnection(CWebSocketConnection *AConnection);
-
             const COnChargingPointMessageSOAPEvent &OnMessageSOAP() const { return m_OnMessageSOAP; }
             void OnMessageSOAP(COnChargingPointMessageSOAPEvent && Value) { m_OnMessageSOAP = Value; }
 
