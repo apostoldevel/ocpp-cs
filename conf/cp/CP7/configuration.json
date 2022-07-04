@@ -3,19 +3,7 @@
     {
       "id":1,
       "voltage":"AC",
-      "interface":"Type2",
-      "meterValue":0
-    },
-    {
-      "id":2,
-      "voltage":"AC",
       "interface":"CCS1",
-      "meterValue":0
-    },
-    {
-      "id":3,
-      "voltage":"AC",
-      "interface":"CHAdeMO",
       "meterValue":0
     }
   ],
@@ -48,12 +36,12 @@
     {
       "key":"ChargePointSerialNumber",
       "readonly":true,
-      "value":"202206040003"
+      "value":"202206040007"
     },
     {
       "key":"PowermeterSerialNumber",
       "readonly":true,
-      "value":"58000403"
+      "value":"58000407"
     },
     {
       "key":"ChargePointSoftwareVersion",
@@ -63,7 +51,7 @@
     {
       "key":"StationIdentity",
       "readonly":false,
-      "value":"EM-A0000003"
+      "value":"EM-A0000007"
     },
     {
       "key":"PowerConsumptionTimeout",
@@ -78,7 +66,7 @@
     {
       "key":"AuthorizeRemoteTxRequests",
       "readonly":false,
-      "value":"true"
+      "value":"false"
     },
     {
       "key":"ReserveConnectorZeroSupported",
