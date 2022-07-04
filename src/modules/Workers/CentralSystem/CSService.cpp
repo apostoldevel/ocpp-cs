@@ -699,7 +699,7 @@ namespace Apostol {
                 auto pSocket = pConnection->Socket();
 
                 try {
-                    auto pPoint = dynamic_cast<CCSChargingPoint *> (pConnection->Session());
+                    auto pPoint = dynamic_cast<CCSChargingPoint *> (pConnection->Object());
 
                     if (pPoint != nullptr) {
 #ifdef WITH_POSTGRESQL
@@ -771,7 +771,7 @@ namespace Apostol {
                 pWSReply->SetPayload(sResponse);
                 AConnection->SendWebSocket(true);
 
-                auto pPoint = dynamic_cast<CCSChargingPoint *> (AConnection->Session());
+                auto pPoint = dynamic_cast<CCSChargingPoint *> (AConnection->Object());
 
                 if (pPoint != nullptr) {
                     Log()->Message("[%s] [%s] [%s] [%s] %s", pPoint->Identity().c_str(),
@@ -1410,7 +1410,7 @@ namespace Apostol {
 
         void CCSService::DoWebSocket(CHTTPServerConnection *AConnection) {
             try {
-                auto pPoint = dynamic_cast<CCSChargingPoint *> (AConnection->Session());
+                auto pPoint = dynamic_cast<CCSChargingPoint *> (AConnection->Object());
                 auto pWSRequest = AConnection->WSRequest();
 
                 CString Request(pWSRequest->Payload());

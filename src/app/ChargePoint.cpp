@@ -1109,14 +1109,14 @@ namespace Apostol {
 
         void CCustomChargingPoint::AddToConnection(CWebSocketConnection *AConnection) {
             if (Assigned(AConnection)) {
-                AConnection->Session(this);
+                AConnection->Object(this);
             }
         }
         //--------------------------------------------------------------------------------------------------------------
 
         void CCustomChargingPoint::DeleteFromConnection(CWebSocketConnection *AConnection) {
             if (Assigned(AConnection)) {
-                AConnection->Session(nullptr);
+                AConnection->Object(nullptr);
             }
         }
         //--------------------------------------------------------------------------------------------------------------
