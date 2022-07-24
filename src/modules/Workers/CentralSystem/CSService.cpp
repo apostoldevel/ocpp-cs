@@ -389,7 +389,8 @@ namespace Apostol {
 
                 auto pConnection = dynamic_cast<CHTTPServerConnection *>(APollQuery->Binding());
 
-                if (pConnection != nullptr && !pConnection->ClosedGracefully()) {
+                const auto index = Server().IndexOfConnection(pConnection);
+                if ((index != -1) && pConnection->Connected()) {
 
                     auto pRequest = pConnection->Request();
                     auto pReply = pConnection->Reply();
@@ -435,9 +436,12 @@ namespace Apostol {
                 }
             };
 
-            auto OnException = [AConnection](CPQPollQuery *APollQuery, const Delphi::Exception::Exception &E) {
+            auto OnException = [this](CPQPollQuery *APollQuery, const Delphi::Exception::Exception &E) {
                 auto pConnection = dynamic_cast<CHTTPServerConnection *>(APollQuery->Binding());
-                SOAPError(AConnection, "Receiver", "InternalError", "SQL exception.", E.what());
+                const auto index = Server().IndexOfConnection(pConnection);
+                if ((index != -1) && pConnection->Connected()) {
+                    SOAPError(pConnection, "Receiver", "InternalError", "SQL exception.", E.what());
+                }
             };
 
             CStringList SQL;
@@ -456,13 +460,14 @@ namespace Apostol {
 
         void CCSService::ParseJSON(CHTTPServerConnection *AConnection, const CString &Identity, const CJSONMessage &Message, const CString &Account) {
 
-            auto OnExecuted = [](CPQPollQuery *APollQuery) {
+            auto OnExecuted = [this](CPQPollQuery *APollQuery) {
 
                 CPQResult *pResult;
 
                 auto pConnection = dynamic_cast<CHTTPServerConnection *>(APollQuery->Binding());
 
-                if (pConnection != nullptr && !pConnection->ClosedGracefully()) {
+                const auto index = Server().IndexOfConnection(pConnection);
+                if ((index != -1) && pConnection->Connected()) {
 
                     auto pWSReply = pConnection->WSReply();
 
@@ -511,9 +516,12 @@ namespace Apostol {
                 }
             };
 
-            auto OnException = [](CPQPollQuery *APollQuery, const Delphi::Exception::Exception &E) {
+            auto OnException = [this](CPQPollQuery *APollQuery, const Delphi::Exception::Exception &E) {
                 auto pConnection = dynamic_cast<CHTTPServerConnection *>(APollQuery->Binding());
-                DoWebSocketError(pConnection, E);
+                const auto index = Server().IndexOfConnection(pConnection);
+                if ((index != -1) && pConnection->Connected()) {
+                    DoWebSocketError(pConnection, E);
+                }
             };
 
             LogJSONMessage(Identity, Message);
@@ -549,7 +557,8 @@ namespace Apostol {
 
                 auto pConnection = dynamic_cast<CHTTPServerConnection *>(APollQuery->Binding());
 
-                if (pConnection != nullptr && !pConnection->ClosedGracefully()) {
+                const auto index = Server().IndexOfConnection(pConnection);
+                if ((index != -1) && pConnection->Connected()) {
                     try {
                         const auto &csOperation = pConnection->Data()["operation"];
 
@@ -571,9 +580,12 @@ namespace Apostol {
                 }
             };
 
-            auto OnException = [](CPQPollQuery *APollQuery, const Delphi::Exception::Exception &E) {
+            auto OnException = [this](CPQPollQuery *APollQuery, const Delphi::Exception::Exception &E) {
                 auto pConnection = dynamic_cast<CHTTPServerConnection *>(APollQuery->Binding());
-                ReplyError(pConnection, CHTTPReply::internal_server_error, E.what());
+                const auto index = Server().IndexOfConnection(pConnection);
+                if ((index != -1) && pConnection->Connected()) {
+                    ReplyError(pConnection, CHTTPReply::internal_server_error, E.what());
+                }
             };
 
             CStringList SQL;
@@ -607,13 +619,14 @@ namespace Apostol {
 
         void CCSService::SOAPToJSON(CHTTPServerConnection *AConnection, const CString &Payload) {
 
-            auto OnExecuted = [](CPQPollQuery *APollQuery) {
+            auto OnExecuted = [this](CPQPollQuery *APollQuery) {
 
                 CPQResult *pResult;
 
                 auto pConnection = dynamic_cast<CHTTPServerConnection *>(APollQuery->Binding());
 
-                if (pConnection != nullptr && !pConnection->ClosedGracefully()) {
+                const auto index = Server().IndexOfConnection(pConnection);
+                if ((index != -1) && pConnection->Connected()) {
 
                     auto pRequest = pConnection->Request();
                     auto pReply = pConnection->Reply();
@@ -639,9 +652,12 @@ namespace Apostol {
                 }
             };
 
-            auto OnException = [](CPQPollQuery *APollQuery, const Delphi::Exception::Exception &E) {
+            auto OnException = [this](CPQPollQuery *APollQuery, const Delphi::Exception::Exception &E) {
                 auto pConnection = dynamic_cast<CHTTPServerConnection *>(APollQuery->Binding());
-                ReplyError(pConnection, CHTTPReply::internal_server_error, E.what());
+                const auto index = Server().IndexOfConnection(pConnection);
+                if ((index != -1) && pConnection->Connected()) {
+                    ReplyError(pConnection, CHTTPReply::internal_server_error, E.what());
+                }
             };
 
             CStringList SQL;
@@ -792,7 +808,7 @@ namespace Apostol {
             pReply->ContentType = CHTTPReply::xml;
 
             pReply->Content.Clear();
-            pReply->Content.Format(R"(<?xml version="1.0" encoding="UTF-8"?>)" LINEFEED R"(<se:Envelope xmlns:se="http://www.w3.org/2003/05/soap-envelope" xmlns:wsa5="http://www.w3.org/2005/08/addressing" xmlns:cp="urn://Ocpp/Cp/2015/10/" xmlns:cs="urn://Ocpp/Cs/2015/10/"><se:Body><se:Fault><se:Code><se:Value>se:%s</se:Value><cs:SubCode><se:Value>cs:%s</se:Value></cs:SubCode></se:Code><se:Reason><se:Text>%s<se:/Text></se:Reason><se:Detail><se:Text>%s</se:Text></se:Detail></se:Fault></se:Body></se:Envelope>)", Code.c_str(), SubCode.c_str(), Reason.c_str(), Delphi::Json::EncodeJsonString(Message).c_str());
+            pReply->Content.Format(R"(<?xml version="1.0" encoding="UTF-8"?>)" LINEFEED R"(<se:Envelope xmlns:se="http://www.w3.org/2003/05/soap-envelope" xmlns:wsa5="http://www.w3.org/2005/08/addressing" xmlns:cp="urn://Ocpp/Cp/2015/10/" xmlns:cs="urn://Ocpp/Cs/2015/10/"><se:Body><se:Fault><se:Code><se:Value>se:%s</se:Value><cs:SubCode><se:Value>cs:%s</se:Value></cs:SubCode></se:Code><se:Reason><se:Text>%s</se:Text></se:Reason><se:Detail><se:Text>%s</se:Text></se:Detail></se:Fault></se:Body></se:Envelope>)", Code.c_str(), SubCode.c_str(), Reason.c_str(), Delphi::Json::EncodeJsonString(Message).c_str());
 
             AConnection->SendReply(CHTTPReply::ok, "application/soap+xml", true);
 
@@ -972,27 +988,32 @@ namespace Apostol {
                 DebugRequest(Request);
             };
 
-            auto OnExecuteLocal = [AConnection](CTCPConnection *AClientConnection) {
+            auto OnExecuteLocal = [this, AConnection](CTCPConnection *AClientConnection) {
 
                 auto pConnection = dynamic_cast<CHTTPClientConnection *> (AClientConnection);
                 auto pClientReply = pConnection->Reply();
-                auto pReply = AConnection->Reply();
 
                 DebugReply(pClientReply);
 
-                pReply->ContentType = CHTTPReply::json;
+                const auto index = Server().IndexOfConnection(AConnection);
+                if (index != -1) {
+                    auto pReply = AConnection->Reply();
 
-                if (pReply->Status == CHTTPReply::ok) {
-                    CJSON Json;
-                    CSOAPProtocol::SOAPToJSON(pClientReply->Content, Json);
+                    pReply->ContentType = CHTTPReply::json;
 
-                    pReply->Content = Json.ToString();
-                    AConnection->SendReply(pReply->Content.IsEmpty() ? CHTTPReply::no_content : CHTTPReply::ok, "application/json", true);
-                } else {
-                    SendError(AConnection, pReply->Status, pReply->StatusText);
+                    if (pReply->Status == CHTTPReply::ok) {
+                        CJSON Json;
+                        CSOAPProtocol::SOAPToJSON(pClientReply->Content, Json);
+
+                        pReply->Content = Json.ToString();
+                        AConnection->SendReply(pReply->Content.IsEmpty() ? CHTTPReply::no_content : CHTTPReply::ok,
+                                               "application/json", true);
+                    } else {
+                        SendError(AConnection, pReply->Status, pReply->StatusText);
+                    }
+
+                    DebugReply(pReply);
                 }
-
-                DebugReply(pReply);
 
                 pConnection->CloseConnection(true);
 
@@ -1008,26 +1029,30 @@ namespace Apostol {
 
                 pReply->ContentType = CHTTPReply::json;
 
+                const auto index = Server().IndexOfConnection(AConnection);
+                if (index != -1) {
 #ifdef WITH_POSTGRESQL
-                if (pReply->Status == CHTTPReply::ok) {
-                    SOAPToJSON(AConnection, pReply->Content);
-                } else {
-                    SendError(AConnection, pReply->Status, pReply->StatusText);
-                }
+                    if (pReply->Status == CHTTPReply::ok) {
+                        SOAPToJSON(AConnection, pReply->Content);
+                    } else {
+                        SendError(AConnection, pReply->Status, pReply->StatusText);
+                    }
 #else
-                SendError(AConnection, CHTTPReply::not_implemented, "Not Implemented");
+                    SendError(AConnection, CHTTPReply::not_implemented, "Not Implemented");
 #endif
+                }
+
                 pConnection->CloseConnection(true);
 
                 return true;
             };
 
-            auto OnException = [](CTCPConnection *AClientConnection, const Delphi::Exception::Exception &E) {
+            auto OnException = [](CTCPConnection *AConnection, const Delphi::Exception::Exception &E) {
 
-                auto pConnection = dynamic_cast<CHTTPClientConnection *> (AClientConnection);
+                auto pConnection = dynamic_cast<CHTTPClientConnection *> (AConnection);
                 auto pClient = dynamic_cast<CHTTPClient *> (pConnection->Client());
 
-                Log()->Error(APP_LOG_ERR, 0, "[%s:%d] %s", pClient->Host().c_str(), pClient->Port(), E.what());
+                Log()->Error(APP_LOG_ERR, 0, "[%s:%d] %s", pClient->Host().IsEmpty() ? "empty" : pClient->Host().c_str(), pClient->Port(), E.what());
             };
 
             CLocation uri(APoint->Address());
@@ -1152,14 +1177,15 @@ namespace Apostol {
                 }
             }
 #ifdef WITH_POSTGRESQL
-            auto OnExecuted = [](CPQPollQuery *APollQuery) {
+            auto OnExecuted = [this](CPQPollQuery *APollQuery) {
 
                 CPQResult *pResult;
                 CString errorMessage;
 
                 auto pConnection = dynamic_cast<CHTTPServerConnection *>(APollQuery->Binding());
 
-                if (pConnection != nullptr && !pConnection->ClosedGracefully()) {
+                const auto index = Server().IndexOfConnection(pConnection);
+                if ((index != -1) && pConnection->Connected()) {
                     const auto &endpoint = pConnection->Data()["endpoint"];
 
                     try {
@@ -1192,9 +1218,12 @@ namespace Apostol {
                 }
             };
 
-            auto OnException = [](CPQPollQuery *APollQuery, const Delphi::Exception::Exception &E) {
+            auto OnException = [this](CPQPollQuery *APollQuery, const Delphi::Exception::Exception &E) {
                 auto pConnection = dynamic_cast<CHTTPServerConnection *>(APollQuery->Binding());
-                ReplyError(pConnection, CHTTPReply::internal_server_error, E.what());
+                const auto index = Server().IndexOfConnection(pConnection);
+                if ((index != -1) && pConnection->Connected()) {
+                    ReplyError(pConnection, CHTTPReply::internal_server_error, E.what());
+                }
             };
 
             AConnection->Data().Values("endpoint", Endpoint);
