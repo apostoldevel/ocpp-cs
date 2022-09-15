@@ -69,7 +69,7 @@ You can build an image yourself:
 git clone https://github.com/apostoldevel/apostol-cs.git
 ~~~
 
-Edit file `apostol-cs/docker/www/web/config.js` according to your requirements. Specify the correct addresses of your server.
+Edit file `apostol-cs/docker/www/config.js` according to your requirements. Specify the correct addresses of your server.
 
 Edit file `apostol-cs/docker/conf/sites/default.json` add IP address your server:
 

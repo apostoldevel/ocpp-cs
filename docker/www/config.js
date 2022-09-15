@@ -1,5 +1,5 @@
 var appConfig = {
-  defaultLanguage: "ru",
+  defaultLanguage: "en",
 
   creditsText: "OCPP Central System © 2022",
   creditsShortText: "OOCP CS",
@@ -17,8 +17,8 @@ var appConfig = {
   ocppApiClienId: "web-ocpp-css.com",
 
   apiTokenUrl: "/oauth2/token",
-  apiDomain: "http://localhost:8080",
-  wsDomain: "ws://localhost:9220",
+  apiDomain: "http://localhost:4977",
+  wsDomain: "ws://localhost:4977",
   apiPath: "/api/v1",
   apiClientId: "web-ocpp-css.com",
 
