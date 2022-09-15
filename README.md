@@ -42,6 +42,8 @@ This code can be used as a framework for creating your own **Central System** or
 Docker
 -
 
+### Docker Hub
+
 You can get image of the central system from the docker hub:
 
 ~~~
@@ -58,6 +60,36 @@ Then you can hit http://localhost:9220 or http://host-ip:9220 in your browser.
 Swagger will also be available at http://localhost:9220/docs/ or http://host-ip:9220/docs/ in your browser.
 
 Building for a container does not require authorization.
+
+### Custom build
+
+You can build an image yourself:
+
+~~~
+git clone https://github.com/apostoldevel/apostol-cs.git
+~~~
+
+Edit file `apostol-cs/docker/www/web/config.js` according to your requirements. Specify the correct addresses of your server.
+
+Edit file `apostol-cs/docker/conf/sites/default.json` add IP address your server:
+
+For example, your server IP address is `192.168.1.100` or DNS name is `ocpp-server`.
+
+~~~
+"hosts": ["localhost:9220", "192.168.1.100:9220", "ocpp-server:9220"]
+~~~
+
+Build `cs` image:
+###### If you already had a container named `cs`, delete it.
+~~~
+cd apostol-cs/docker
+docker build -t cs .
+~~~
+
+Run docker:
+~~~
+docker run -d -p 9220:9220 --name cs cs
+~~~
 
 Demonstration
 -
