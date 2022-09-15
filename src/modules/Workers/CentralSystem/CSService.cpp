@@ -1365,6 +1365,7 @@ namespace Apostol {
 
             const auto &caVersion = slPath[1];
             const auto &caCommand = slPath[2];
+            const auto &caAction = slPath.Count() >= 4 ? slPath[3] : CString();
 
             try {
                 if (caVersion == "v1") {
@@ -1391,7 +1392,7 @@ namespace Apostol {
                             DoCentralSystem(AConnection, Authorization.Token, slPath[3]);
                             return;
 #else
-                        if (caCommand == "ChargePointList") {
+                        if (caCommand == "ChargePointList" || (caCommand == "CentralSystem" && caAction == "ChargePointList")) {
                             DoChargePointList(AConnection);
                             return;
 #endif
