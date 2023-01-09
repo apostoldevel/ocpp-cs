@@ -283,19 +283,17 @@ namespace Apostol {
             auto pTimer = dynamic_cast<CEPollTimer *> (AHandler->Binding());
             pTimer->Read(&exp, sizeof(uint64_t));
 
-            DoHeartbeat();
+            DoHeartbeat(AHandler->TimeStamp());
         }
         //--------------------------------------------------------------------------------------------------------------
 
-        void COCPPClient::DoHeartbeat() {
-            const auto now = UTC();
-
-            if (now >= m_PingDateTime) {
-                m_PingDateTime = now + (CDateTime) 60 / SecsPerDay; // 60 sec
+        void COCPPClient::DoHeartbeat(CDateTime Now) {
+            if (Now >= m_PingDateTime) {
+                m_PingDateTime = Now + (CDateTime) 60 / SecsPerDay; // 60 sec
                 Ping();
             } else if (BootNotificationStatus() != rsAccepted) {
-                if (now >= m_BootNotificationDateTime) {
-                    m_BootNotificationDateTime = now + (CDateTime) 30 / SecsPerDay; // 30 sec
+                if (Now >= m_BootNotificationDateTime) {
+                    m_BootNotificationDateTime = Now + (CDateTime) 30 / SecsPerDay; // 30 sec
                     SendBootNotification();
                 }
             } else {
@@ -304,21 +302,25 @@ namespace Apostol {
                     if (connector.Status() == cpsCharging) {
                         connector.IncMeterValue(10);
                     } else if (connector.Status() == cpsFinishing) {
-                        connector.Status(cpsAvailable);
-                    } else if (connector.Status() == cpsReserved && connector.ExpiryDate() <= now) {
+                        const auto &caFinishingTimeout = ConfigurationKeys()["FinishingTimeout"].value;
+                        const auto timeout = caFinishingTimeout.empty() ? 60 : StrToIntDef(caFinishingTimeout.c_str(), 60);
+                        if ((timeout > 0) && ((connector.StatusUpdated() + (CDateTime) timeout / SecsPerDay) <= Now)) {
+                            connector.Status(cpsAvailable);
+                        }
+                    } else if (connector.Status() == cpsReserved && connector.ExpiryDate() <= Now) {
                         connector.CancelReservation(connector.ReservationId());
                     }
                 }
 
                 bool meterSend = false;
 
-                if (now >= m_MeterValueDateTime) {
-                    m_MeterValueDateTime = now + (CDateTime) 60 / SecsPerDay; // 60 sec
+                if (Now >= m_MeterValueDateTime) {
+                    m_MeterValueDateTime = Now + (CDateTime) 60 / SecsPerDay; // 60 sec
                     meterSend = MeterValues();
                 }
 
-                if (!meterSend && now >= m_HeartbeatDateTime) {
-                    m_HeartbeatDateTime = now + (CDateTime) m_HeartbeatInterval / SecsPerDay;
+                if (!meterSend && Now >= m_HeartbeatDateTime) {
+                    m_HeartbeatDateTime = Now + (CDateTime) m_HeartbeatInterval / SecsPerDay;
                     SendHeartbeat();
                 }
             }

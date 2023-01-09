@@ -120,7 +120,7 @@ namespace Apostol {
 
             void DoTimer(CPollEventHandler *AHandler);
 
-            void DoHeartbeat();
+            void DoHeartbeat(CDateTime Now);
 
         public:
 

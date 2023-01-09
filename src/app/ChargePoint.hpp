@@ -948,6 +948,7 @@ namespace Apostol {
             int m_MeterValue = 0;
 
             CDateTime m_ExpiryDate = 0;
+            CDateTime m_StatusUpdated = 0;
 
             CIdTag m_IdTag {};
             CIdTag m_ReservationIdTag {};
@@ -1027,6 +1028,8 @@ namespace Apostol {
 
             CChargePointStatus Status() const { return m_Status; };
             void Status(CChargePointStatus Value) { SetStatus(Value); };
+
+            CDateTime StatusUpdated() const { return m_StatusUpdated; };
 
             CChargePointErrorCode &ErrorCode() { return m_ErrorCode; };
             const CChargePointErrorCode &ErrorCode() const { return m_ErrorCode; };

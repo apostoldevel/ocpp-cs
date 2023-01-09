@@ -1302,6 +1302,7 @@ namespace Apostol {
         void CChargingPointConnector::SetStatus(CChargePointStatus Value, COnMessageHandlerEvent &&OnStatusNotification) {
             if (m_Status != Value) {
                 m_Status = Value;
+                m_StatusUpdated = Now();
                 UpdateStatusNotification(std::move(OnStatusNotification));
             }
         }
