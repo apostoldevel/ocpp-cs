@@ -960,6 +960,8 @@ namespace Apostol {
 
             void SetStatus(CChargePointStatus Status, COnMessageHandlerEvent &&OnStatusNotification = nullptr);
 
+            void SendStartTransaction();
+
         protected:
 
             void ContinueRemoteStartTransaction();

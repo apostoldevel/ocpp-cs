@@ -1320,41 +1320,53 @@ namespace Apostol {
         }
         //--------------------------------------------------------------------------------------------------------------
 
+        void CChargingPointConnector::SendStartTransaction() {
+
+            auto OnRequest = [this](COCPPMessageHandler *AHandler, CWebSocketConnection *AWSConnection) {
+                const auto &message = CChargingPoint::RequestToMessage(AWSConnection);
+
+                if (message.Payload.HasOwnProperty("idTagInfo")) {
+                    m_IdTag.Value() << message.Payload["idTagInfo"];
+                    m_pChargingPoint->UpdateAuthorizationCache(m_IdTag);
+                }
+
+                m_TransactionId = message.Payload["transactionId"].AsInteger();
+
+                if (m_IdTag.Value().status == asAccepted) {
+                    if (!message.Payload.HasOwnProperty("transactionId")) {
+                        throw Delphi::Exception::ExceptionFrm("Not found required key: %s", "transactionId");
+                    }
+                    SetStatus(cpsCharging);
+                } else {
+                    LocalStopTransaction(COCPPMessage::AuthorizationStatusToString(m_IdTag.Value().status));
+                }
+            };
+
+            m_pChargingPoint->SendStartTransaction(m_ConnectorId, m_IdTag.Name(), m_MeterValue, m_ReservationId, OnRequest);
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
         void CChargingPointConnector::ContinueRemoteStartTransaction() {
             if (m_pChargingPoint != nullptr && m_pChargingPoint->Connected()) {
 
                 auto OnStatus = [this](COCPPMessageHandler *AHandler, CWebSocketConnection *AWSConnection) {
-
-                    auto OnRequest = [this](COCPPMessageHandler *AHandler, CWebSocketConnection *AWSConnection) {
-                        const auto &message = CChargingPoint::RequestToMessage(AWSConnection);
-
-                        if (message.Payload.HasOwnProperty("idTagInfo")) {
-                            m_IdTag.Value() << message.Payload["idTagInfo"];
-                            m_pChargingPoint->UpdateAuthorizationCache(m_IdTag);
-                        }
-
-                        m_TransactionId = message.Payload["transactionId"].AsInteger();
-
-                        if (m_IdTag.Value().status == asAccepted) {
-                            if (!message.Payload.HasOwnProperty("transactionId")) {
-                                throw Delphi::Exception::ExceptionFrm("Not found required key: %s", "transactionId");
-                            }
-                            SetStatus(cpsCharging);
-                        } else {
-                            LocalStopTransaction(COCPPMessage::AuthorizationStatusToString(m_IdTag.Value().status));
-                        }
-                    };
-
-                    m_pChargingPoint->SendStartTransaction(m_ConnectorId, m_IdTag.Name(), m_MeterValue, m_ReservationId, OnRequest);
+                    SendStartTransaction();
                 };
 
-                SetStatus(cpsPreparing, OnStatus);
+                if (m_Status == cpsAvailable) {
+                    SetStatus(cpsPreparing, OnStatus);
+                } else {
+                    SendStartTransaction();
+                }
             }
         }
         //--------------------------------------------------------------------------------------------------------------
 
         CRemoteStartStopStatus CChargingPointConnector::RemoteStartTransaction(const CString &idTag) {
-            if (m_Status != cpsAvailable || m_pChargingPoint == nullptr)
+            if (m_pChargingPoint == nullptr)
+                return rssRejected;
+
+            if (m_Status > cpsPreparing)
                 return rssRejected;
 
             m_IdTag = m_pChargingPoint->AuthorizeLocal(idTag);
