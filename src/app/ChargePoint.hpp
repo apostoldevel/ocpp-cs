@@ -1165,6 +1165,8 @@ namespace Apostol {
             CAuthorizationCache &AuthorizationCache() { return m_AuthorizationCache; }
             const CAuthorizationCache &AuthorizationCache() const { return m_AuthorizationCache; }
 
+            void SetNotificationStatus(int connectorId, CChargePointStatus Status);
+
             /// CSS -> CP
 
             /// 4.1. Authorize

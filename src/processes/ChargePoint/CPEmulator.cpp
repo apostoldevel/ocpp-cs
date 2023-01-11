@@ -507,11 +507,31 @@ namespace Apostol {
             auto pClient = dynamic_cast<COCPPClient *> (Sender);
             chASSERT(pClient);
 
-            Response.Payload.Object().AddPair("status", "Accepted");
-
-            if (Request.Payload.HasOwnProperty("data")) {
-                Response.Payload.Object().AddPair("data", Request.Payload["data"]);
+            if (pClient == nullptr) {
+                return;
             }
+
+            CString Status("Invalid");
+
+            if (Request.Payload.HasOwnProperty("messageId")) {
+                const auto &messageId = Request.Payload["messageId"].AsString();
+                if (messageId == "SetStatusNotification" && Request.Payload.HasOwnProperty("data")) {
+                    const CJSON Data(DecodeJsonString(Request.Payload["data"].AsString()));
+                    if (Data.HasOwnProperty("connectorId") && Data.HasOwnProperty("status")) {
+                        const auto status = COCPPMessage::StringToChargePointStatus(Data["status"].AsString());
+                        pClient->SetNotificationStatus(Data["connectorId"].AsInteger(), status);
+                        Status = "Accepted";
+                    }
+                }
+            } else {
+                Status = "Accepted";
+
+                if (Request.Payload.HasOwnProperty("data")) {
+                    Response.Payload.Object().AddPair("data", Request.Payload["data"]);
+                }
+            }
+
+            Response.Payload.Object().AddPair("status", Status);
 
             pClient->SendMessage(Response);
         }

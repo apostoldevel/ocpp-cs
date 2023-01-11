@@ -1674,6 +1674,23 @@ namespace Apostol {
         }
         //--------------------------------------------------------------------------------------------------------------
 
+        void CChargingPoint::SetNotificationStatus(int connectorId, CChargePointStatus Status) {
+            if (connectorId == -1) {
+                for (int i = 0; i < Connectors().Count(); ++i) {
+                    Connectors()[i].Status(Status);
+                }
+            } else if (connectorId == 0) {
+                m_ConnectorZero.Status(Status);
+            } else {
+                const auto index = IndexOfConnectorId(connectorId);
+                if (index == -1) {
+                    throw Delphi::Exception::ExceptionFrm(CP_INVALID_CONNECTION_ID, connectorId);
+                }
+                Connectors()[index].Status(Status);
+            }
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
         void CChargingPoint::StatusNotification(int connectorId) {
             if (connectorId == -1) {
                 for (int i = 0; i < Connectors().Count(); ++i) {
