@@ -1413,7 +1413,7 @@ namespace Apostol {
         //--------------------------------------------------------------------------------------------------------------
 
         CRemoteStartStopStatus CChargingPointConnector::RemoteStopTransaction() {
-            if (m_Status != cpsCharging || m_pChargingPoint == nullptr)
+            if ((m_Status < cpsCharging || m_Status > cpsSuspendedEV) || m_pChargingPoint == nullptr)
                 return rssRejected;
 
             if (m_ReservationId > 0 && m_IdTag.Name() != m_ReservationIdTag.Name()) {
