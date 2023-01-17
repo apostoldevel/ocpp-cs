@@ -86,6 +86,7 @@ update_project()
 
     display_heading_message "clear log files..."
     rm -rf /etc/$PROJECT_NAME/logs/*.log
+    rm -rf /var/log/$PROJECT_NAME/*.log
 
     display_heading_message "start service $PROJECT_NAME"
     systemctl start ${PROJECT_NAME}.service
