@@ -2010,10 +2010,6 @@ namespace Apostol {
                         if (index == -1) {
                             throw Delphi::Exception::ExceptionFrm(CP_INVALID_CONNECTION_ID, connectorId);
                         }
-
-                        if (status == cpsFaulted) {
-                            Connectors()[index].Status(cpsAvailable);
-                        }
                     }
                 }
             };
