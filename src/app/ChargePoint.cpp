@@ -1336,7 +1336,11 @@ namespace Apostol {
                     if (!message.Payload.HasOwnProperty("transactionId")) {
                         throw Delphi::Exception::ExceptionFrm("Not found required key: %s", "transactionId");
                     }
-                    SetStatus(cpsCharging);
+
+                    const auto &caStartTransactionStatus = m_pChargingPoint->ConfigurationKeys()["StartTransactionStatus"].value;
+                    const auto status = COCPPMessage::StringToChargePointStatus(caStartTransactionStatus.empty() ? "Charging" : caStartTransactionStatus);
+
+                    SetStatus(status);
                 } else {
                     LocalStopTransaction(COCPPMessage::AuthorizationStatusToString(m_IdTag.Value().status));
                 }
