@@ -277,12 +277,12 @@ namespace Apostol {
         //--------------------------------------------------------------------------------------------------------------
 
         void CCSService::SendError(CHTTPServerConnection *AConnection, CHTTPReply::CStatusType ErrorCode, const CString &Message) {
-            auto pReply = AConnection->Reply();
+            auto &Reply = AConnection->Reply();
 
-            pReply->ContentType = CHTTPReply::json;
+            Reply.ContentType = CHTTPReply::json;
 
-            pReply->Content.Clear();
-            pReply->Content.Format(R"({"error": {"code": %u, "message": "%s"}})", ErrorCode, Delphi::Json::EncodeJsonString(Message).c_str());
+            Reply.Content.Clear();
+            Reply.Content.Format(R"({"error": {"code": %u, "message": "%s"}})", ErrorCode, Delphi::Json::EncodeJsonString(Message).c_str());
 
             AConnection->SendReply(CHTTPReply::ok, nullptr, true);
 
@@ -392,8 +392,7 @@ namespace Apostol {
                 const auto index = Server().IndexOfConnection(pConnection);
                 if ((index != -1) && pConnection->Connected()) {
 
-                    auto pRequest = pConnection->Request();
-                    auto pReply = pConnection->Reply();
+                    auto &Reply = pConnection->Reply();
 
                     try {
                         for (int i = 0; i < APollQuery->Count(); i++) {
@@ -420,9 +419,9 @@ namespace Apostol {
 
                             pPoint->Address() = caAddress;
 
-                            pReply->ContentType = CHTTPReply::xml;
-                            pReply->Content = R"(<?xml version="1.0" encoding="UTF-8"?>)" LINEFEED;
-                            pReply->Content << caPayload;
+                            Reply.ContentType = CHTTPReply::xml;
+                            Reply.Content = R"(<?xml version="1.0" encoding="UTF-8"?>)" LINEFEED;
+                            Reply.Content << caPayload;
 
                             pPoint->UpdateConnected(true);
                             DoPointConnected(pPoint);
@@ -628,10 +627,9 @@ namespace Apostol {
                 const auto index = Server().IndexOfConnection(pConnection);
                 if ((index != -1) && pConnection->Connected()) {
 
-                    auto pRequest = pConnection->Request();
-                    auto pReply = pConnection->Reply();
+                    auto &Reply = pConnection->Reply();
 
-                    pReply->ContentType = CHTTPReply::json;
+                    Reply.ContentType = CHTTPReply::json;
 
                     try {
                         for (int i = 0; i < APollQuery->Count(); i++) {
@@ -640,10 +638,10 @@ namespace Apostol {
                             if (pResult->ExecStatus() != PGRES_TUPLES_OK)
                                 throw Delphi::Exception::EDBError(pResult->GetErrorMessage());
 
-                            pReply->Content = pResult->GetValue(0, 0);
+                            Reply.Content = pResult->GetValue(0, 0);
                             pConnection->SendReply(CHTTPReply::ok, "application/json", true);
 
-                            DebugReply(pReply);
+                            DebugReply(Reply);
                         }
                     } catch (Delphi::Exception::Exception &E) {
                         ReplyError(pConnection, CHTTPReply::bad_request, E.what());
@@ -803,12 +801,12 @@ namespace Apostol {
         void CCSService::SOAPError(CHTTPServerConnection *AConnection, const CString &Code, const CString &SubCode,
                 const CString &Reason, const CString &Message) {
 
-            auto pReply = AConnection->Reply();
+            auto &Reply = AConnection->Reply();
 
-            pReply->ContentType = CHTTPReply::xml;
+            Reply.ContentType = CHTTPReply::xml;
 
-            pReply->Content.Clear();
-            pReply->Content.Format(R"(<?xml version="1.0" encoding="UTF-8"?>)" LINEFEED R"(<se:Envelope xmlns:se="http://www.w3.org/2003/05/soap-envelope" xmlns:wsa5="http://www.w3.org/2005/08/addressing" xmlns:cp="urn://Ocpp/Cp/2015/10/" xmlns:cs="urn://Ocpp/Cs/2015/10/"><se:Body><se:Fault><se:Code><se:Value>se:%s</se:Value><cs:SubCode><se:Value>cs:%s</se:Value></cs:SubCode></se:Code><se:Reason><se:Text>%s</se:Text></se:Reason><se:Detail><se:Text>%s</se:Text></se:Detail></se:Fault></se:Body></se:Envelope>)", Code.c_str(), SubCode.c_str(), Reason.c_str(), Delphi::Json::EncodeJsonString(Message).c_str());
+            Reply.Content.Clear();
+            Reply.Content.Format(R"(<?xml version="1.0" encoding="UTF-8"?>)" LINEFEED R"(<se:Envelope xmlns:se="http://www.w3.org/2003/05/soap-envelope" xmlns:wsa5="http://www.w3.org/2005/08/addressing" xmlns:cp="urn://Ocpp/Cp/2015/10/" xmlns:cs="urn://Ocpp/Cs/2015/10/"><se:Body><se:Fault><se:Code><se:Value>se:%s</se:Value><cs:SubCode><se:Value>cs:%s</se:Value></cs:SubCode></se:Code><se:Reason><se:Text>%s</se:Text></se:Reason><se:Detail><se:Text>%s</se:Text></se:Detail></se:Fault></se:Body></se:Envelope>)", Code.c_str(), SubCode.c_str(), Reason.c_str(), Delphi::Json::EncodeJsonString(Message).c_str());
 
             AConnection->SendReply(CHTTPReply::ok, "application/soap+xml", true);
 
@@ -865,10 +863,10 @@ namespace Apostol {
         }
         //--------------------------------------------------------------------------------------------------------------
 
-        bool CCSService::CheckAuthorizationData(CHTTPRequest *ARequest, CAuthorization &Authorization) {
+        bool CCSService::CheckAuthorizationData(const CHTTPRequest &Request, CAuthorization &Authorization) {
 
-            const auto &caHeaders = ARequest->Headers;
-            const auto &caCookies = ARequest->Cookies;
+            const auto &caHeaders = Request.Headers;
+            const auto &caCookies = Request.Cookies;
 
             const auto &caAuthorization = caHeaders.Values(_T("Authorization"));
 
@@ -896,10 +894,10 @@ namespace Apostol {
 
         bool CCSService::CheckAuthorization(CHTTPServerConnection *AConnection, CAuthorization &Authorization) {
 
-            auto pRequest = AConnection->Request();
+            const auto &caRequest = AConnection->Request();
 
             try {
-                if (CheckAuthorizationData(pRequest, Authorization)) {
+                if (CheckAuthorizationData(caRequest, Authorization)) {
                     if (Authorization.Schema == CAuthorization::asBearer) {
                         VerifyToken(Authorization.Token);
                         return true;
@@ -932,8 +930,8 @@ namespace Apostol {
 
                 if (AConnection != nullptr && !AConnection->ClosedGracefully()) {
 
-                    auto pReply = AConnection->Reply();
-                    const CString pRequest(pWSRequest->Payload());
+                    auto &Reply = AConnection->Reply();
+                    const CString Request(pWSRequest->Payload());
 
                     CHTTPReply::CStatusType Status = CHTTPReply::ok;
 
@@ -942,7 +940,7 @@ namespace Apostol {
 
                         CJSONProtocol::PrepareResponse(AHandler->Message(), jmMessage);
 
-                        if (!CJSONProtocol::Request(pRequest, jmMessage)) {
+                        if (!CJSONProtocol::Request(Request, jmMessage)) {
                             Status = CHTTPReply::bad_request;
                         }
 
@@ -957,7 +955,7 @@ namespace Apostol {
                                                         jmMessage.ErrorDescription.c_str()
                                                         ));
                         } else {
-                            pReply->Content = jmMessage.Payload.ToString();
+                            Reply.Content = jmMessage.Payload.ToString();
                             AConnection->SendReply(Status, "application/json", true);
                         }
                     } catch (std::exception &e) {
@@ -976,12 +974,12 @@ namespace Apostol {
         void CCSService::SendSOAP(CHTTPServerConnection *AConnection, CCSChargingPoint *APoint, const CString &Operation,
                 const CString &Payload) {
 
-            auto OnRequest = [](CHTTPClient *Sender, CHTTPRequest *Request) {
+            auto OnRequest = [](CHTTPClient *Sender, CHTTPRequest &Request) {
 
                 const auto &uri = Sender->Data()["uri"];
                 const auto &payload = Sender->Data()["payload"];
 
-                Request->Content = payload;
+                Request.Content = payload;
 
                 CHTTPRequest::Prepare(Request, "POST", uri.c_str(), "application/soap+xml");
 
@@ -991,28 +989,28 @@ namespace Apostol {
             auto OnExecuteLocal = [this, AConnection](CTCPConnection *AClientConnection) {
 
                 auto pConnection = dynamic_cast<CHTTPClientConnection *> (AClientConnection);
-                auto pClientReply = pConnection->Reply();
+                const auto &caClientReply = pConnection->Reply();
 
-                DebugReply(pClientReply);
+                DebugReply(caClientReply);
 
                 const auto index = Server().IndexOfConnection(AConnection);
                 if (index != -1) {
-                    auto pReply = AConnection->Reply();
+                    auto &Reply = AConnection->Reply();
 
-                    pReply->ContentType = CHTTPReply::json;
+                    Reply.ContentType = CHTTPReply::json;
 
-                    if (pReply->Status == CHTTPReply::ok) {
+                    if (Reply.Status == CHTTPReply::ok) {
                         CJSON Json;
-                        CSOAPProtocol::SOAPToJSON(pClientReply->Content, Json);
+                        CSOAPProtocol::SOAPToJSON(caClientReply.Content, Json);
 
-                        pReply->Content = Json.ToString();
-                        AConnection->SendReply(pReply->Content.IsEmpty() ? CHTTPReply::no_content : CHTTPReply::ok,
+                        Reply.Content = Json.ToString();
+                        AConnection->SendReply(Reply.Content.IsEmpty() ? CHTTPReply::no_content : CHTTPReply::ok,
                                                "application/json", true);
                     } else {
-                        SendError(AConnection, pReply->Status, pReply->StatusText);
+                        SendError(AConnection, Reply.Status, Reply.StatusText);
                     }
 
-                    DebugReply(pReply);
+                    DebugReply(Reply);
                 }
 
                 pConnection->CloseConnection(true);
@@ -1023,19 +1021,19 @@ namespace Apostol {
             auto OnExecute = [this, AConnection](CTCPConnection *AClientConnection) {
 
                 auto pConnection = dynamic_cast<CHTTPClientConnection *> (AClientConnection);
-                auto pReply = pConnection->Reply();
+                auto &Reply = pConnection->Reply();
 
-                DebugReply(pReply);
+                DebugReply(Reply);
 
-                pReply->ContentType = CHTTPReply::json;
+                Reply.ContentType = CHTTPReply::json;
 
                 const auto index = Server().IndexOfConnection(AConnection);
                 if (index != -1) {
 #ifdef WITH_POSTGRESQL
-                    if (pReply->Status == CHTTPReply::ok) {
-                        SOAPToJSON(AConnection, pReply->Content);
+                    if (Reply.Status == CHTTPReply::ok) {
+                        SOAPToJSON(AConnection, Reply.Content);
                     } else {
-                        SendError(AConnection, pReply->Status, pReply->StatusText);
+                        SendError(AConnection, Reply.Status, Reply.StatusText);
                     }
 #else
                     SendError(AConnection, CHTTPReply::not_implemented, "Not Implemented");
@@ -1076,9 +1074,9 @@ namespace Apostol {
 
         void CCSService::DoGet(CHTTPServerConnection *AConnection) {
 
-            auto pRequest = AConnection->Request();
+            const auto &caRequest = AConnection->Request();
 
-            CString sPath(pRequest->Location.pathname);
+            CString sPath(caRequest.Location.pathname);
 
             // Request path must be absolute and not contain "..".
             if (sPath.empty() || sPath.front() != '/' || sPath.find(_T("..")) != CString::npos) {
@@ -1106,10 +1104,10 @@ namespace Apostol {
 
         void CCSService::DoPost(CHTTPServerConnection *AConnection) {
 
-            auto pRequest = AConnection->Request();
+            const auto &caRequest = AConnection->Request();
 
             CStringList slPath;
-            SplitColumns(pRequest->Location.pathname, slPath, '/');
+            SplitColumns(caRequest.Location.pathname, slPath, '/');
 
             if (slPath.Count() < 2) {
                 AConnection->SendStockReply(CHTTPReply::not_found);
@@ -1132,7 +1130,7 @@ namespace Apostol {
 
         void CCSService::DoCentralSystem(CHTTPServerConnection *AConnection, const CString &Token, const CString &Endpoint) {
 
-            auto pRequest = AConnection->Request();
+            const auto &caRequest = AConnection->Request();
 
             const auto index = m_Endpoints.IndexOfName(Endpoint);
             if (index == -1) {
@@ -1149,7 +1147,7 @@ namespace Apostol {
             };
 
             CJSON Payload;
-            ContentToJson(pRequest, Payload);
+            ContentToJson(caRequest, Payload);
 
             const auto &caFields = m_Endpoints[index].Value();
             auto &Object = Payload.Object();
@@ -1189,7 +1187,7 @@ namespace Apostol {
                     const auto &endpoint = pConnection->Data()["endpoint"];
 
                     try {
-                        auto pReply = pConnection->Reply();
+                        auto &Reply = pConnection->Reply();
                         CHTTPReply::CStatusType status = CHTTPReply::ok;
 
                         for (int i = 0; i < APollQuery->Count(); i++) {
@@ -1203,7 +1201,7 @@ namespace Apostol {
                                 status = ErrorCodeToStatus(CheckError(Payload, errorMessage));
                             }
 
-                            PQResultToJson(pResult, pReply->Content, "object", endpoint);
+                            PQResultToJson(pResult, Reply.Content, "object", endpoint);
 
                             if (status == CHTTPReply::ok) {
                                 pConnection->SendReply(status, nullptr, true);
@@ -1254,7 +1252,7 @@ namespace Apostol {
 
         void CCSService::DoChargePoint(CHTTPServerConnection *AConnection, const CString &Identity, const CString &Operation) {
 
-            auto pRequest = AConnection->Request();
+            const auto &caRequest = AConnection->Request();
 
             const auto index = m_Operations.IndexOfName(Operation);
             if (index == -1) {
@@ -1279,7 +1277,7 @@ namespace Apostol {
             };
 
             CJSON Payload;
-            ContentToJson(pRequest, Payload);
+            ContentToJson(caRequest, Payload);
 
             const auto &caFields = m_Operations[index].Value();
             auto &Object = Payload.Object();
@@ -1337,19 +1335,19 @@ namespace Apostol {
         //--------------------------------------------------------------------------------------------------------------
 
         void CCSService::DoChargePointList(CHTTPServerConnection *AConnection) {
-            auto pReply = AConnection->Reply();
-            pReply->Content = GetChargePointList().ToString();
+            auto &Reply = AConnection->Reply();
+            Reply.Content = GetChargePointList().ToString();
             AConnection->SendReply(CHTTPReply::ok);
         }
         //--------------------------------------------------------------------------------------------------------------
 
         void CCSService::DoAPI(CHTTPServerConnection *AConnection) {
 
-            auto pRequest = AConnection->Request();
-            auto pReply = AConnection->Reply();
+            const auto &caRequest = AConnection->Request();
+            auto &Reply = AConnection->Reply();
 
             CStringList slPath;
-            SplitColumns(pRequest->Location.pathname, slPath, '/');
+            SplitColumns(caRequest.Location.pathname, slPath, '/');
 
             if (slPath.Count() == 0) {
                 AConnection->SendStockReply(CHTTPReply::not_found);
@@ -1369,13 +1367,13 @@ namespace Apostol {
 
             try {
                 if (caVersion == "v1") {
-                    pReply->ContentType = CHTTPReply::json;
+                    Reply.ContentType = CHTTPReply::json;
 
                     if (caCommand == "ping") {
                         AConnection->SendStockReply(CHTTPReply::ok);
                         return;
                     } else if (caCommand == "time") {
-                        pReply->Content << "{\"serverTime\": " << LongToString(MsEpoch()) << "}";
+                        Reply.Content << "{\"serverTime\": " << LongToString(MsEpoch()) << "}";
                         AConnection->SendReply(CHTTPReply::ok);
                         return;
                     } else {
@@ -1412,12 +1410,12 @@ namespace Apostol {
 
         void CCSService::DoSOAP(CHTTPServerConnection *AConnection) {
 
-            auto pRequest = AConnection->Request();
-            auto pReply = AConnection->Reply();
+            const auto &caRequest = AConnection->Request();
+            auto &Reply = AConnection->Reply();
 
 #ifdef WITH_POSTGRESQL
             // Let's process the request in the DBMS
-            ParseSOAP(AConnection, pRequest->Content);
+            ParseSOAP(AConnection, caRequest.Content);
 #else
             auto pPoint = m_PointManager.FindPointByConnection(AConnection);
 
@@ -1431,7 +1429,7 @@ namespace Apostol {
 #endif
             }
 
-            pPoint->Parse(pRequest->Content, pReply->Content);
+            pPoint->Parse(caRequest.Content, Reply.Content);
 
             AConnection->SendReply(CHTTPReply::ok, "application/soap+xml");
 #endif
@@ -1491,19 +1489,19 @@ namespace Apostol {
 
         int CCSService::DoOCPP(CHTTPServerConnection *AConnection) {
 
-            auto pRequest = AConnection->Request();
-            auto pReply = AConnection->Reply();
+            const auto &caRequest = AConnection->Request();
+            auto &Reply = AConnection->Reply();
 
-            pReply->ContentType = CHTTPReply::html;
+            Reply.ContentType = CHTTPReply::html;
 
             CStringList slPath;
-            SplitColumns(pRequest->Location.pathname, slPath, '/');
+            SplitColumns(caRequest.Location.pathname, slPath, '/');
 
             if (slPath.Count() < 2) {
                 return -1;
             }
 
-            const auto& caSecWebSocketKey = pRequest->Headers.Values("sec-websocket-key");
+            const auto& caSecWebSocketKey = caRequest.Headers.Values("sec-websocket-key");
             if (caSecWebSocketKey.IsEmpty()) {
                 AConnection->SendStockReply(CHTTPReply::bad_request);
                 return 0;
@@ -1516,7 +1514,7 @@ namespace Apostol {
             }
 
             const CString csAccept(SHA1(caSecWebSocketKey + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"));
-            const auto& caSecWebSocketProtocol = pRequest->Headers.Values("sec-websocket-protocol");
+            const auto& caSecWebSocketProtocol = caRequest.Headers.Values("sec-websocket-protocol");
             const CString csProtocol(caSecWebSocketProtocol.IsEmpty() ? "" : caSecWebSocketProtocol.SubString(0, caSecWebSocketProtocol.Find(',')));
 
             AConnection->SwitchingProtocols(csAccept, csProtocol);

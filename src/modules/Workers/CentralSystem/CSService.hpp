@@ -103,7 +103,7 @@ namespace Apostol {
 
 #ifdef WITH_AUTHORIZATION
             void VerifyToken(const CString &Token);
-            static bool CheckAuthorizationData(CHTTPRequest *ARequest, CAuthorization &Authorization);
+            static bool CheckAuthorizationData(const CHTTPRequest &Request, CAuthorization &Authorization);
             bool CheckAuthorization(CHTTPServerConnection *AConnection, CAuthorization &Authorization);
 #endif
             static void DoWebSocketError(CHTTPServerConnection *AConnection, const Delphi::Exception::Exception &E);

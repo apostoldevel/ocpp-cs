@@ -231,9 +231,9 @@ namespace Apostol {
         //--------------------------------------------------------------------------------------------------------------
 
         void COCPPClient::DoHTTP(CHTTPClientConnection *AConnection) {
-            auto pReply = AConnection->Reply();
+            const auto &Reply = AConnection->Reply();
 
-            if (pReply->Status == CHTTPReply::switching_protocols) {
+            if (Reply.Status == CHTTPReply::switching_protocols) {
 #ifdef _DEBUG
                 WSDebugConnection(AConnection);
 #endif
@@ -254,14 +254,14 @@ namespace Apostol {
         //--------------------------------------------------------------------------------------------------------------
 
         void COCPPClient::DoHandshake(COCPPConnection *AConnection) {
-            auto pRequest = AConnection->Request();
+            auto &Request = AConnection->Request();
 
-            pRequest->AddHeader("Sec-WebSocket-Version", "13");
-            pRequest->AddHeader("Sec-WebSocket-Key", base64_encode(m_Key));
-            pRequest->AddHeader("Sec-WebSocket-Protocol", "ocpp16");
-            pRequest->AddHeader("Upgrade", "websocket");
+            Request.AddHeader("Sec-WebSocket-Version", "13");
+            Request.AddHeader("Sec-WebSocket-Key", base64_encode(m_Key));
+            Request.AddHeader("Sec-WebSocket-Protocol", "ocpp16");
+            Request.AddHeader("Upgrade", "websocket");
 
-            CHTTPRequest::Prepare(pRequest, _T("GET"), m_URI.href().c_str(), nullptr, "Upgrade");
+            CHTTPRequest::Prepare(Request, _T("GET"), m_URI.href().c_str(), nullptr, "Upgrade");
 
             AConnection->SendRequest();
         }
