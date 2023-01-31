@@ -1053,10 +1053,10 @@ namespace Apostol {
                 CString sResult;
                 CJSONProtocol::Response(Message, sResult);
 
-                auto pWSReply = m_pChargingPoint->Connection()->WSReply();
+                auto &WSReply = m_pChargingPoint->Connection()->WSReply();
 
-                pWSReply->Clear();
-                pWSReply->SetPayload(sResult, Key);
+                WSReply.Clear();
+                WSReply.SetPayload(sResult, Key);
 
                 m_pChargingPoint->Connection()->SendWebSocket(true);
 
@@ -1163,7 +1163,7 @@ namespace Apostol {
             CJSONProtocol::Response(Message, sResponse);
             chASSERT(m_pConnection);
             if (m_pConnection != nullptr && m_pConnection->Connected()) {
-                m_pConnection->WSReply()->SetPayload(sResponse, (uint32_t) MsEpoch());
+                m_pConnection->WSReply().SetPayload(sResponse, (uint32_t) MsEpoch());
                 m_pConnection->SendWebSocket(ASendNow);
             }
         }
@@ -1580,12 +1580,12 @@ namespace Apostol {
         //--------------------------------------------------------------------------------------------------------------
 
         CJSONMessage CChargingPoint::RequestToMessage(CWebSocketConnection *AWSConnection) {
-            auto pWSRequest = AWSConnection->WSRequest();
+            auto &WSRequest = AWSConnection->WSRequest();
             CJSONMessage message;
-            const CString payload(pWSRequest->Payload());
+            const CString payload(WSRequest.Payload());
             CJSONProtocol::Request(payload, message);
             AWSConnection->ConnectionStatus(csReplySent);
-            pWSRequest->Clear();
+            WSRequest.Clear();
             return message;
         }
         //--------------------------------------------------------------------------------------------------------------

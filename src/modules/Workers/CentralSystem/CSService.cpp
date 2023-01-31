@@ -468,7 +468,7 @@ namespace Apostol {
                 const auto index = Server().IndexOfConnection(pConnection);
                 if ((index != -1) && pConnection->Connected()) {
 
-                    auto pWSReply = pConnection->WSReply();
+                    auto &WSReply = pConnection->WSReply();
 
                     CJSONMessage message;
                     CString identity;
@@ -508,7 +508,7 @@ namespace Apostol {
 
                     CJSONProtocol::Response(message, response);
 
-                    pWSReply->SetPayload(response);
+                    WSReply.SetPayload(response);
                     pConnection->SendWebSocket(true);
 
                     LogJSONMessage(identity, message);
@@ -761,10 +761,10 @@ namespace Apostol {
             Log()->Error(APP_LOG_ERR, 0, E.what());
 
             if (AConnection != nullptr && !AConnection->ClosedGracefully()) {
-                auto pWSRequest = AConnection->WSRequest();
-                auto pWSReply = AConnection->WSReply();
+                const auto &caWSRequest = AConnection->WSRequest();
+                auto &WSReply = AConnection->WSReply();
 
-                const CString csRequest(pWSRequest->Payload());
+                const CString csRequest(caWSRequest.Payload());
 
                 CJSONMessage jmRequest;
                 CJSONProtocol::Request(csRequest, jmRequest);
@@ -782,7 +782,7 @@ namespace Apostol {
 
                 CJSONProtocol::Response(jmResponse, sResponse);
 
-                pWSReply->SetPayload(sResponse);
+                WSReply.SetPayload(sResponse);
                 AConnection->SendWebSocket(true);
 
                 auto pPoint = dynamic_cast<CCSChargingPoint *> (AConnection->Object());
@@ -926,12 +926,12 @@ namespace Apostol {
 
             auto OnRequest = [AConnection, APoint](COCPPMessageHandler *AHandler, CWebSocketConnection *AWSConnection) {
 
-                auto pWSRequest = AWSConnection->WSRequest();
+                auto &WSRequest = AWSConnection->WSRequest();
 
                 if (AConnection != nullptr && !AConnection->ClosedGracefully()) {
 
                     auto &Reply = AConnection->Reply();
-                    const CString Request(pWSRequest->Payload());
+                    const CString Request(WSRequest.Payload());
 
                     CHTTPReply::CStatusType Status = CHTTPReply::ok;
 
@@ -964,7 +964,7 @@ namespace Apostol {
                 }
 
                 AWSConnection->ConnectionStatus(csReplySent);
-                pWSRequest->Clear();
+                WSRequest.Clear();
             };
 
             APoint->Messages().Send(Message, OnRequest);
@@ -1439,9 +1439,9 @@ namespace Apostol {
         void CCSService::DoWebSocket(CHTTPServerConnection *AConnection) {
             try {
                 auto pPoint = dynamic_cast<CCSChargingPoint *> (AConnection->Object());
-                auto pWSRequest = AConnection->WSRequest();
+                auto &WSRequest = AConnection->WSRequest();
 
-                CString Request(pWSRequest->Payload());
+                CString Request(WSRequest.Payload());
 #ifdef WITH_POSTGRESQL
                 while (Request.Position() < Request.Size()) {
                     CJSONMessage Message;
@@ -1450,7 +1450,7 @@ namespace Apostol {
                     if (size == 0)
                         throw ExceptionFrm("Invalid request data: %s", Request.c_str());
 
-                    Request.Position(size);
+                    Request.Position((ssize_t) size);
 
                     if (Message.MessageTypeId == ChargePoint::mtCall) {
                         // Let's process the request in the DBMS
@@ -1464,11 +1464,11 @@ namespace Apostol {
                             delete pHandler;
                         }
 
-                        pWSRequest->Clear();
+                        WSRequest.Clear();
                     }
                 }
 #else
-                auto pWSReply = AConnection->WSReply();
+                auto &WSReply = AConnection->WSReply();
 
                 CString Response;
 
@@ -1476,7 +1476,7 @@ namespace Apostol {
                     throw ExceptionFrm("Unknown WebSocket request: %s", Request.c_str());
 
                 if (!Response.IsEmpty()) {
-                    pWSReply->SetPayload(Response);
+                    WSReply.SetPayload(Response);
                     AConnection->SendWebSocket();
                 }
 #endif

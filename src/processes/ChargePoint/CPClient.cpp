@@ -182,15 +182,15 @@ namespace Apostol {
 
         void COCPPClient::DoWebSocket(CHTTPClientConnection *AConnection) {
 
-            auto pWSRequest = AConnection->WSRequest();
-            auto pWSReply = AConnection->WSReply();
+            const auto &caWSRequest = AConnection->WSRequest();
+            auto &WSReply = AConnection->WSReply();
 
-            pWSReply->Clear();
+            WSReply.Clear();
 
             CJSONMessage jmRequest;
             CJSONMessage jmResponse;
 
-            const CString csRequest(pWSRequest->Payload());
+            const CString csRequest(caWSRequest.Payload());
 
             CJSONProtocol::Request(csRequest, jmRequest);
 
