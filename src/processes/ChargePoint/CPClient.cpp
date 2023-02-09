@@ -283,7 +283,7 @@ namespace Apostol {
             auto pTimer = dynamic_cast<CEPollTimer *> (AHandler->Binding());
             pTimer->Read(&exp, sizeof(uint64_t));
 
-            DoHeartbeat(AHandler->TimeStamp());
+            DoHeartbeat(UTC());
         }
         //--------------------------------------------------------------------------------------------------------------
 
