@@ -43,4 +43,8 @@ html {
   width: 120px;
 }
 
+.gx-main-content-wrapper .loader {
+  height: calc(100vh - 160px);
+}
+
 /*# sourceMappingURL=loader.css.map */
