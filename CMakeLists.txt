@@ -118,6 +118,11 @@ file(GLOB lib_files ${lib_files} ${PROJECT_LIB_DIR}/picojson/*.h)
 include_directories(${PROJECT_LIB_DIR}/jwt-cpp)
 file(GLOB lib_files ${lib_files} ${PROJECT_LIB_DIR}/jwt-cpp/*.h)
 
+set(JWT_JSON_TRAITS_OPTIONS boost-json danielaparker-jsoncons kazuho-picojson nlohmann-json)
+foreach(traits ${JWT_JSON_TRAITS_OPTIONS})
+    list(APPEND lib_files ${PROJECT_LIB_DIR}/jwt-cpp/traits/${traits}/defaults.h ${PROJECT_LIB_DIR}/jwt-cpp/traits/${traits}/traits.h)
+endforeach()
+
 # Apostol
 # ----------------------------------------------------------------------------------------------------------------------
 include_directories(src/app src/core src/modules src/modules/Workers src/modules/Helpers src/processes)
