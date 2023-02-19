@@ -841,7 +841,7 @@ namespace Apostol {
             CStringList Issuers;
             Provider.GetIssuers(Application, Issuers);
             if (Issuers[iss].IsEmpty())
-                throw jwt::token_verification_exception("Token doesn't contain the required issuer.");
+                throw jwt::error::token_verification_exception(jwt::error::token_verification_error::issuer_missmatch);
 
             const auto& alg = decoded.get_algorithm();
 
@@ -908,9 +908,9 @@ namespace Apostol {
                     AConnection->Data().Values("Authorization", "Basic");
 
                 ReplyError(AConnection, CHTTPReply::unauthorized, "Unauthorized.");
-            } catch (jwt::token_expired_exception &e) {
+            } catch (jwt::error::token_expired_exception &e) {
                 ReplyError(AConnection, CHTTPReply::forbidden, e.what());
-            } catch (jwt::token_verification_exception &e) {
+            } catch (jwt::error::token_verification_exception &e) {
                 ReplyError(AConnection, CHTTPReply::bad_request, e.what());
             } catch (CAuthorizationError &e) {
                 ReplyError(AConnection, CHTTPReply::bad_request, e.what());
