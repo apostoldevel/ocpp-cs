@@ -1,3 +1,5 @@
+![image](https://user-images.githubusercontent.com/91010417/230783150-ea57f6c4-ba8a-43cf-a033-ef5ffa3a19ff.png)
+
 # OCPP Central System
 
 **OCPP Central System** and **Charge Point emulator**, implementation in C++.
