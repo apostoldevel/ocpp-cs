@@ -207,29 +207,18 @@ or
 
 Run
 -
-###### If **`INSTALL_AS_ROOT`** set to `ON`.
+###### If `INSTALL_AS_ROOT` set to `ON`.
 
-**`cs`** - it is a Linux system service (daemon).
+`cs` - it is a Linux system service (daemon).
 
-To manage **`cs`** use standard service management commands.
+To manage `cs` use standard service management commands.
 
 To start, run:
 ~~~
-sudo service cs start
+sudo systemctl start cs
 ~~~
 
 To check the status, run:
 ~~~
-sudo service cs status
+sudo systemctl status cs
 ~~~
-
-Donate
--
----
-~~~
-BTC: 1MvvFNE89NK1zQguy9RhXH3PGmSf7RcahB
-ETH: 0x417bed7f4b156d952503fb8f91644194b48dded2
-~~~
-Any help is priceless, thanks.
-
----
