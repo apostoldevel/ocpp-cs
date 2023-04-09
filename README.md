@@ -16,13 +16,13 @@ The **OCPP Central System** supports all commands for released versions of the O
 
 Version 1.5 uses SOAP over HTTP as the RPC/transport protocol. Version 1.6 uses SOAP and JSON over WebSocket protocol.
 
-See [Releases](https://github.com/apostoldevel/apostol-cs/releases) for more details.
+See [Releases](https://github.com/apostoldevel/ocpp-cs/releases) for more details.
 
 API
 -
 We use OpenAPI to interact with the Central System (CS). You can directly open Swagger UI through [http://cs.ocpp-css.com/docs](http://cs.ocpp-css.com/docs).
 
-Alternatively, you can use any OpenAPI client to import the [api.yaml](https://github.com/apostoldevel/apostol-cs/blob/master/www/docs/api.yaml) file from our repository (download).
+Alternatively, you can use any OpenAPI client to import the [api.yaml](https://github.com/apostoldevel/ocpp-cs/blob/master/www/docs/api.yaml) file from our repository (download).
 
 Authorize:
 ~~~
@@ -68,12 +68,12 @@ Building for a container does not require authorization.
 You can build an image yourself:
 
 ~~~
-git clone https://github.com/apostoldevel/apostol-cs.git
+git clone https://github.com/apostoldevel/ocpp-cs.git
 ~~~
 
-Edit file `apostol-cs/docker/www/config.js` according to your requirements. Specify the correct addresses of your server.
+Edit file `ocpp-cs/docker/www/config.js` according to your requirements. Specify the correct addresses of your server.
 
-Edit file `apostol-cs/docker/conf/sites/default.json` add IP address your server:
+Edit file `ocpp-cs/docker/conf/sites/default.json` add IP address your server:
 
 For example, your server IP address is `192.168.1.100` or DNS name is `ocpp-server`.
 
@@ -84,7 +84,7 @@ For example, your server IP address is `192.168.1.100` or DNS name is `ocpp-serv
 Build `cs` image:
 ###### If you already had a container named `cs`, delete it.
 ~~~
-cd apostol-cs/docker
+cd ocpp-cs/docker
 docker build -t cs .
 ~~~
 
@@ -121,7 +121,7 @@ Attention
 -
 The production version is designed to work with a database and all business logic is implemented in PL/pgSQL (the code is not included in this assembly).
 
-To build in emulator mode, change the following settings in the [CMakeLists.txt](https://github.com/apostoldevel/apostol-cs/blob/master/CMakeLists.txt) file:
+To build in emulator mode, change the following settings in the [CMakeLists.txt](https://github.com/apostoldevel/ocpp-cs/blob/master/CMakeLists.txt) file:
 ~~~
 WITH_AUTHORIZATION OFF
 WITH_POSTGRESQL OFF
@@ -150,7 +150,7 @@ To install PostgreSQL, use the instructions for [this](https://www.postgresql.or
 
 To install (without Git) you need:
 
-1. Download [OCPP Central System](https://github.com/ufocomp/apostol-cs/archive/master.zip);
+1. Download [OCPP Central System](https://github.com/ufocomp/ocpp-cs/archive/master.zip);
 1. Unpack;
 1. Download [libdelphi](https://github.com/ufocomp/libdelphi/archive/master.zip);
 1. Unpack in `src/lib/delphi`;
@@ -159,7 +159,7 @@ To install (without Git) you need:
 
 To install (with Git) you need:
 ~~~
-git clone https://github.com/apostoldevel/apostol-cs.git
+git clone https://github.com/apostoldevel/ocpp-cs.git
 ~~~
 
 ###### CMake configuration:
@@ -182,7 +182,7 @@ WITH_POSTGRESQL = {ON | OFF}
 
 ###### Build:
 ~~~
-cd apostol-cs
+cd ocpp-cs
 ./configure
 ~~~
 
