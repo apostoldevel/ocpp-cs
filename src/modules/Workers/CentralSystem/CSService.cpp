@@ -1373,7 +1373,7 @@ namespace Apostol {
                         AConnection->SendStockReply(CHTTPReply::ok);
                         return;
                     } else if (caCommand == "time") {
-                        Reply.Content << "{\"serverTime\": " << LongToString(MsEpoch()) << "}";
+                        Reply.Content << "{\"serverTime\": " << CString::ToString(MsEpoch()) << "}";
                         AConnection->SendReply(CHTTPReply::ok);
                         return;
                     } else {

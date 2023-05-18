@@ -8,7 +8,7 @@ RUN set -eux; \
 
 RUN set -eux; \
     rm -rf /opt/cs; \
-    git clone https://github.com/apostoldevel/apostol-cs.git /opt/cs;
+    git clone https://github.com/apostoldevel/ocpp-cs.git /opt/cs;
 
 WORKDIR /opt/cs
 

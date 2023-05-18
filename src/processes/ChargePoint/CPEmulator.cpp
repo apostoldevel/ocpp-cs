@@ -62,8 +62,6 @@ namespace Apostol {
         //--------------------------------------------------------------------------------------------------------------
 
         void CCPEmulator::BeforeRun() {
-            sigset_t set;
-
             Application()->Header(Application()->Name() + ": charging point emulator process");
 
             Log()->Debug(APP_LOG_DEBUG_CORE, MSG_PROCESS_START, GetProcessName(), Application()->Header().c_str());
@@ -78,7 +76,7 @@ namespace Apostol {
 #ifdef WITH_POSTGRESQL
             PQClientStart("helper");
 #endif
-            SigProcMask(SIG_UNBLOCK, SigAddSet(&set));
+            SigProcMask(SIG_UNBLOCK);
 
             SetTimerInterval(1000);
         }
