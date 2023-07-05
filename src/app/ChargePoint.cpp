@@ -1373,6 +1373,9 @@ namespace Apostol {
             if (m_Status > cpsPreparing)
                 return rssRejected;
 
+            if (m_TransactionId >= 0)
+                return rssRejected;
+
             m_IdTag = m_pChargingPoint->AuthorizeLocal(idTag);
 
             auto OnRequest = [this](COCPPMessageHandler *AHandler, CWebSocketConnection *AWSConnection) {

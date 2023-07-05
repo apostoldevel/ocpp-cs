@@ -115,10 +115,10 @@ namespace Apostol {
             void DoDebugReply(CObject *Sender);
 
             void DoConnectStart(CIOHandlerSocket *AIOHandler, CPollEventHandler *AHandler) override;
-            void DoConnect(CPollEventHandler *AHandler) override;
             bool DoExecute(CTCPConnection *AConnection) override;
 
-            void DoTimer(CPollEventHandler *AHandler);
+            void DoConnect(CPollEventHandler *AHandler) override;
+            void DoTimer(CPollEventHandler *AHandler) override;
 
             void DoHeartbeat(CDateTime Now);
 
