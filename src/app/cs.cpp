@@ -215,7 +215,7 @@ int main(int argc, char *argv[]) {
 
     int exitcode;
 
-    DefaultLocale.SetLocale("");
+    DefaultLocale.SetLocale("en-US");
     
     CCentralSystem cs(argc, argv);
 
@@ -239,6 +239,6 @@ int main(int argc, char *argv[]) {
         exit_failure("Unknown error...");
     }
 
-    exit(exitcode);
+    return exitcode;
 }
 //----------------------------------------------------------------------------------------------------------------------
