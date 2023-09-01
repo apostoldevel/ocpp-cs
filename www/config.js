@@ -14,7 +14,7 @@ var appConfig = {
   confAdmin: false,
   googleAuthorize: false,
 
-  mapLanguage: "ru_RU",
+  mapLanguage: "en_US",
 
   googleClientId: null,
 
