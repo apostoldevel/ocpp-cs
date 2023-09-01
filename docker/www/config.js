@@ -42,5 +42,5 @@ var appConfig = {
     network: {},
   },
 
-  maxFileSize: 512000,
+  maxFileSize: 512000
 };
