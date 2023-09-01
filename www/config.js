@@ -2,7 +2,7 @@ var appConfig = {
   defaultLanguage: "en",
 
   creditsText: "OCPP Central System © 2023",
-  creditsShortText: "OOCP CSS",
+  creditsShortText: "Central System",
 
   signIn: "/signin",
   signUp: "/signup",
@@ -14,13 +14,13 @@ var appConfig = {
   confAdmin: false,
   googleAuthorize: false,
 
-  mapLanguage: "en_US",
+  mapLanguage: "ru_RU",
 
   googleClientId: null,
 
   ocppApiDomain: "http://localhost:9220",
   ocppApiPath: "/api/v1",
-  ocppApiClienId: "web-ocpp-css.com",
+  ocppApiClientId: "web-ocpp-css.com",
 
   apiTokenUrl: "http://localhost:8080/oauth2/token",
   apiDomain: "http://localhost:8080",
