@@ -276,6 +276,25 @@ namespace Apostol {
         }
         //--------------------------------------------------------------------------------------------------------------
 
+        bool CCSService::ConnectionExists(CWebSocketConnection *AConnection) {
+            if (AConnection == nullptr) {
+                return false;
+            }
+
+            AConnection->Unlock();
+
+            if (AConnection->ClosedGracefully()) {
+                if (AConnection->AutoFree() && !AConnection->Locked()) {
+                    delete AConnection;
+                }
+
+                return false;
+            }
+
+            return true;
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
         void CCSService::SendError(CHTTPServerConnection *AConnection, CHTTPReply::CStatusType ErrorCode, const CString &Message) {
             auto &Reply = AConnection->Reply();
 
@@ -329,8 +348,8 @@ namespace Apostol {
             CPQResult *Result;
 
             try {
-                for (int I = 0; I < APollQuery->Count(); I++) {
-                    Result = APollQuery->Results(I);
+                for (int i = 0; i < APollQuery->Count(); i++) {
+                    Result = APollQuery->Results(i);
 
                     if (Result->ExecStatus() != PGRES_TUPLES_OK)
                         throw Delphi::Exception::EDBError(Result->GetErrorMessage());
@@ -353,8 +372,8 @@ namespace Apostol {
                 CPQResult *Result;
 
                 try {
-                    for (int I = 0; I < APollQuery->Count(); I++) {
-                        Result = APollQuery->Results(I);
+                    for (int i = 0; i < APollQuery->Count(); i++) {
+                        Result = APollQuery->Results(i);
 
                         if (Result->ExecStatus() != PGRES_TUPLES_OK)
                             throw Delphi::Exception::EDBError(Result->GetErrorMessage());
@@ -389,57 +408,60 @@ namespace Apostol {
 
                 auto pConnection = dynamic_cast<CHTTPServerConnection *>(APollQuery->Binding());
 
-                const auto index = Server().IndexOfConnection(pConnection);
-                if ((index != -1) && pConnection->Connected()) {
+                if (ConnectionExists(pConnection)) {
+                    const auto index = Server().IndexOfConnection(pConnection);
+                    if (index != -1) {
+                        auto &Reply = pConnection->Reply();
 
-                    auto &Reply = pConnection->Reply();
+                        try {
+                            for (int i = 0; i < APollQuery->Count(); i++) {
+                                pResult = APollQuery->Results(i);
 
-                    try {
-                        for (int i = 0; i < APollQuery->Count(); i++) {
-                            pResult = APollQuery->Results(i);
+                                if (pResult->ExecStatus() != PGRES_TUPLES_OK)
+                                    throw Delphi::Exception::EDBError(pResult->GetErrorMessage());
 
-                            if (pResult->ExecStatus() != PGRES_TUPLES_OK)
-                                throw Delphi::Exception::EDBError(pResult->GetErrorMessage());
+                                const CString caIdentity(pResult->GetValue(0, 0));
+                                const CString caAction(pResult->GetValue(0, 1));
+                                const CString caAddress(pResult->GetValue(0, 2));
+                                const CString caPayload(pResult->GetValue(0, 3));
 
-                            const CString caIdentity(pResult->GetValue(0, 0));
-                            const CString caAction(pResult->GetValue(0, 1));
-                            const CString caAddress(pResult->GetValue(0, 2));
-                            const CString caPayload(pResult->GetValue(0, 3));
+                                if (caIdentity.IsEmpty())
+                                    throw Delphi::Exception::EDBError("Identity cannot by empty.");
 
-                            if (caIdentity.IsEmpty())
-                                throw Delphi::Exception::EDBError("Identity cannot by empty.");
+                                auto pPoint = m_PointManager.FindPointByIdentity(caIdentity);
 
-                            auto pPoint = m_PointManager.FindPointByIdentity(caIdentity);
+                                if (pPoint == nullptr) {
+                                    pPoint = m_PointManager.Add(nullptr);
+                                    pPoint->ProtocolType(ChargePoint::ptSOAP);
+                                    pPoint->Identity() = caIdentity;
+                                }
 
-                            if (pPoint == nullptr) {
-                                pPoint = m_PointManager.Add(nullptr);
-                                pPoint->ProtocolType(ChargePoint::ptSOAP);
-                                pPoint->Identity() = caIdentity;
+                                pPoint->Address() = caAddress;
+
+                                Reply.ContentType = CHTTPReply::xml;
+                                Reply.Content = R"(<?xml version="1.0" encoding="UTF-8"?>)" LINEFEED;
+                                Reply.Content << caPayload;
+
+                                pPoint->UpdateConnected(true);
+                                DoPointConnected(pPoint);
+
+                                pConnection->SendReply(CHTTPReply::ok, "application/soap+xml", true);
                             }
-
-                            pPoint->Address() = caAddress;
-
-                            Reply.ContentType = CHTTPReply::xml;
-                            Reply.Content = R"(<?xml version="1.0" encoding="UTF-8"?>)" LINEFEED;
-                            Reply.Content << caPayload;
-
-                            pPoint->UpdateConnected(true);
-                            DoPointConnected(pPoint);
-
-                            pConnection->SendReply(CHTTPReply::ok, "application/soap+xml", true);
+                        } catch (Delphi::Exception::Exception &E) {
+                            SOAPError(pConnection, "Receiver", "InternalError", "Parser exception", E.what());
+                            Log()->Error(APP_LOG_ERR, 0, E.what());
                         }
-                    } catch (Delphi::Exception::Exception &E) {
-                        SOAPError(pConnection, "Receiver", "InternalError", "Parser exception", E.what());
-                        Log()->Error(APP_LOG_ERR, 0, E.what());
                     }
                 }
             };
 
             auto OnException = [this](CPQPollQuery *APollQuery, const Delphi::Exception::Exception &E) {
                 auto pConnection = dynamic_cast<CHTTPServerConnection *>(APollQuery->Binding());
-                const auto index = Server().IndexOfConnection(pConnection);
-                if ((index != -1) && pConnection->Connected()) {
-                    SOAPError(pConnection, "Receiver", "InternalError", "SQL exception.", E.what());
+                if (ConnectionExists(pConnection)) {
+                    const auto index = Server().IndexOfConnection(pConnection);
+                    if (index != -1) {
+                        SOAPError(pConnection, "Receiver", "InternalError", "SQL exception.", E.what());
+                    }
                 }
             };
 
@@ -451,6 +473,7 @@ namespace Apostol {
 
             try {
                 ExecSQL(SQL, AConnection, OnExecuted, OnException);
+                AConnection->Lock();
             } catch (Delphi::Exception::Exception &E) {
                 SOAPError(AConnection, "Receiver", "InternalError", "ExecSQL call failed.", E.what());
             }
@@ -465,61 +488,64 @@ namespace Apostol {
 
                 auto pConnection = dynamic_cast<CHTTPServerConnection *>(APollQuery->Binding());
 
-                const auto index = Server().IndexOfConnection(pConnection);
-                if ((index != -1) && pConnection->Connected()) {
+                if (ConnectionExists(pConnection)) {
+                    const auto index = Server().IndexOfConnection(pConnection);
+                    if (index != -1) {
+                        auto &WSReply = pConnection->WSReply();
 
-                    auto &WSReply = pConnection->WSReply();
+                        CJSONMessage message;
+                        CString identity;
+                        CString response;
+                        CJSON result;
 
-                    CJSONMessage message;
-                    CString identity;
-                    CString response;
-                    CJSON result;
+                        try {
+                            for (int i = 0; i < APollQuery->Count(); i++) {
+                                pResult = APollQuery->Results(i);
 
-                    try {
-                        for (int i = 0; i < APollQuery->Count(); i++) {
-                            pResult = APollQuery->Results(i);
+                                if (pResult->ExecStatus() != PGRES_TUPLES_OK)
+                                    throw Delphi::Exception::EDBError(pResult->GetErrorMessage());
 
-                            if (pResult->ExecStatus() != PGRES_TUPLES_OK)
-                                throw Delphi::Exception::EDBError(pResult->GetErrorMessage());
+                                result << pResult->GetValue(0, 0);
 
-                            result << pResult->GetValue(0, 0);
+                                identity = result["identity"].AsString();
 
-                            identity = result["identity"].AsString();
+                                message.MessageTypeId = COCPPMessage::StringToMessageTypeId(result["messageTypeId"].AsString());
+                                message.UniqueId = result["uniqueId"].AsString();
+                                message.Action = result["action"].AsString();
 
-                            message.MessageTypeId = COCPPMessage::StringToMessageTypeId(result["messageTypeId"].AsString());
-                            message.UniqueId = result["uniqueId"].AsString();
-                            message.Action = result["action"].AsString();
-
-                            if (message.MessageTypeId == ChargePoint::mtCallError) {
-                                message.ErrorCode = result["errorCode"].AsString();
-                                message.ErrorDescription = result["errorDescription"].AsString();
-                                message.Payload << result["errorDescription"];
-                            } else {
-                                message.Payload << result["payload"].ToString();
+                                if (message.MessageTypeId == ChargePoint::mtCallError) {
+                                    message.ErrorCode = result["errorCode"].AsString();
+                                    message.ErrorDescription = result["errorDescription"].AsString();
+                                    message.Payload << result["errorDescription"];
+                                } else {
+                                    message.Payload << result["payload"].ToString();
+                                }
                             }
+                        } catch (Delphi::Exception::Exception &E) {
+                            message.MessageTypeId = ChargePoint::mtCallError;
+                            message.ErrorCode = "InternalError";
+                            message.ErrorDescription = E.what();
+
+                            Log()->Error(APP_LOG_ERR, 0, E.what());
                         }
-                    } catch (Delphi::Exception::Exception &E) {
-                        message.MessageTypeId = ChargePoint::mtCallError;
-                        message.ErrorCode = "InternalError";
-                        message.ErrorDescription = E.what();
 
-                        Log()->Error(APP_LOG_ERR, 0, E.what());
+                        CJSONProtocol::Response(message, response);
+
+                        WSReply.SetPayload(response);
+                        pConnection->SendWebSocket(true);
+
+                        LogJSONMessage(identity, message);
                     }
-
-                    CJSONProtocol::Response(message, response);
-
-                    WSReply.SetPayload(response);
-                    pConnection->SendWebSocket(true);
-
-                    LogJSONMessage(identity, message);
                 }
             };
 
             auto OnException = [this](CPQPollQuery *APollQuery, const Delphi::Exception::Exception &E) {
                 auto pConnection = dynamic_cast<CHTTPServerConnection *>(APollQuery->Binding());
-                const auto index = Server().IndexOfConnection(pConnection);
-                if ((index != -1) && pConnection->Connected()) {
-                    DoWebSocketError(pConnection, E);
+                if (ConnectionExists(pConnection)) {
+                    const auto index = Server().IndexOfConnection(pConnection);
+                    if (index != -1) {
+                        DoWebSocketError(pConnection, E);
+                    }
                 }
             };
 
@@ -541,6 +567,7 @@ namespace Apostol {
 
             try {
                 ExecSQL(SQL, AConnection, OnExecuted, OnException);
+                AConnection->Lock();
             } catch (Delphi::Exception::Exception &E) {
                 DoWebSocketError(AConnection, E);
             }
@@ -556,34 +583,38 @@ namespace Apostol {
 
                 auto pConnection = dynamic_cast<CHTTPServerConnection *>(APollQuery->Binding());
 
-                const auto index = Server().IndexOfConnection(pConnection);
-                if ((index != -1) && pConnection->Connected()) {
-                    try {
-                        const auto &csOperation = pConnection->Data()["operation"];
+                if (ConnectionExists(pConnection)) {
+                    const auto index = Server().IndexOfConnection(pConnection);
+                    if (index != -1) {
+                        try {
+                            const auto &csOperation = pConnection->Data()["operation"];
 
-                        for (int i = 0; i < APollQuery->Count(); i++) {
-                            pResult = APollQuery->Results(i);
+                            for (int i = 0; i < APollQuery->Count(); i++) {
+                                pResult = APollQuery->Results(i);
 
-                            if (pResult->ExecStatus() != PGRES_TUPLES_OK)
-                                throw Delphi::Exception::EDBError(pResult->GetErrorMessage());
+                                if (pResult->ExecStatus() != PGRES_TUPLES_OK)
+                                    throw Delphi::Exception::EDBError(pResult->GetErrorMessage());
 
-                            CString caPayload(R"(<?xml version="1.0" encoding="UTF-8"?>)" LINEFEED);
-                            caPayload << pResult->GetValue(0, 0);
+                                CString caPayload(R"(<?xml version="1.0" encoding="UTF-8"?>)" LINEFEED);
+                                caPayload << pResult->GetValue(0, 0);
 
-                            SendSOAP(pConnection, APoint, csOperation, caPayload);
+                                SendSOAP(pConnection, APoint, csOperation, caPayload);
+                            }
+                        } catch (Delphi::Exception::Exception &E) {
+                            ReplyError(pConnection, CHTTPReply::bad_request, E.what());
+                            Log()->Error(APP_LOG_ERR, 0, E.what());
                         }
-                    } catch (Delphi::Exception::Exception &E) {
-                        ReplyError(pConnection, CHTTPReply::bad_request, E.what());
-                        Log()->Error(APP_LOG_ERR, 0, E.what());
                     }
                 }
             };
 
             auto OnException = [this](CPQPollQuery *APollQuery, const Delphi::Exception::Exception &E) {
                 auto pConnection = dynamic_cast<CHTTPServerConnection *>(APollQuery->Binding());
-                const auto index = Server().IndexOfConnection(pConnection);
-                if ((index != -1) && pConnection->Connected()) {
-                    ReplyError(pConnection, CHTTPReply::internal_server_error, E.what());
+                if (ConnectionExists(pConnection)) {
+                    const auto index = Server().IndexOfConnection(pConnection);
+                    if (index != -1) {
+                        ReplyError(pConnection, CHTTPReply::internal_server_error, E.what());
+                    }
                 }
             };
 
@@ -610,6 +641,7 @@ namespace Apostol {
 
             try {
                 ExecSQL(SQL, AConnection, OnExecuted, OnException);
+                AConnection->Lock();
             } catch (Delphi::Exception::Exception &E) {
                 ReplyError(AConnection, CHTTPReply::internal_server_error, E.what());
             }
@@ -624,37 +656,41 @@ namespace Apostol {
 
                 auto pConnection = dynamic_cast<CHTTPServerConnection *>(APollQuery->Binding());
 
-                const auto index = Server().IndexOfConnection(pConnection);
-                if ((index != -1) && pConnection->Connected()) {
+                if (ConnectionExists(pConnection)) {
+                    const auto index = Server().IndexOfConnection(pConnection);
+                    if (index != -1) {
 
-                    auto &Reply = pConnection->Reply();
+                        auto &Reply = pConnection->Reply();
 
-                    Reply.ContentType = CHTTPReply::json;
+                        Reply.ContentType = CHTTPReply::json;
 
-                    try {
-                        for (int i = 0; i < APollQuery->Count(); i++) {
-                            pResult = APollQuery->Results(i);
+                        try {
+                            for (int i = 0; i < APollQuery->Count(); i++) {
+                                pResult = APollQuery->Results(i);
 
-                            if (pResult->ExecStatus() != PGRES_TUPLES_OK)
-                                throw Delphi::Exception::EDBError(pResult->GetErrorMessage());
+                                if (pResult->ExecStatus() != PGRES_TUPLES_OK)
+                                    throw Delphi::Exception::EDBError(pResult->GetErrorMessage());
 
-                            Reply.Content = pResult->GetValue(0, 0);
-                            pConnection->SendReply(CHTTPReply::ok, "application/json", true);
+                                Reply.Content = pResult->GetValue(0, 0);
+                                pConnection->SendReply(CHTTPReply::ok, "application/json", true);
 
-                            DebugReply(Reply);
+                                DebugReply(Reply);
+                            }
+                        } catch (Delphi::Exception::Exception &E) {
+                            ReplyError(pConnection, CHTTPReply::bad_request, E.what());
+                            Log()->Error(APP_LOG_ERR, 0, E.what());
                         }
-                    } catch (Delphi::Exception::Exception &E) {
-                        ReplyError(pConnection, CHTTPReply::bad_request, E.what());
-                        Log()->Error(APP_LOG_ERR, 0, E.what());
                     }
                 }
             };
 
             auto OnException = [this](CPQPollQuery *APollQuery, const Delphi::Exception::Exception &E) {
                 auto pConnection = dynamic_cast<CHTTPServerConnection *>(APollQuery->Binding());
-                const auto index = Server().IndexOfConnection(pConnection);
-                if ((index != -1) && pConnection->Connected()) {
-                    ReplyError(pConnection, CHTTPReply::internal_server_error, E.what());
+                if (ConnectionExists(pConnection)) {
+                    const auto index = Server().IndexOfConnection(pConnection);
+                    if (index != -1) {
+                        ReplyError(pConnection, CHTTPReply::internal_server_error, E.what());
+                    }
                 }
             };
 
@@ -667,6 +703,7 @@ namespace Apostol {
 
             try {
                 ExecSQL(SQL, AConnection, OnExecuted, OnException);
+                AConnection->Lock();
             } catch (Delphi::Exception::Exception &E) {
                 ReplyError(AConnection, CHTTPReply::internal_server_error, E.what());
             }
@@ -741,9 +778,7 @@ namespace Apostol {
                         if (pSocket != nullptr) {
                             auto pHandle = pSocket->Binding();
                             if (pHandle != nullptr) {
-                                Log()->Notice(_T("[%s:%d] Unknown point closed connection."),
-                                               pHandle->PeerIP(), pHandle->PeerPort()
-                                               );
+                                Log()->Notice(_T("[%s:%d] Unknown point closed connection."), pHandle->PeerIP(), pHandle->PeerPort());
                             }
                         } else {
                             Log()->Warning(_T("Unknown point closed connection."));
@@ -928,8 +963,7 @@ namespace Apostol {
 
                 auto &WSRequest = AWSConnection->WSRequest();
 
-                if (AConnection != nullptr && !AConnection->ClosedGracefully()) {
-
+                if (ConnectionExists(AConnection)) {
                     auto &Reply = AConnection->Reply();
                     const CString Request(WSRequest.Payload());
 
@@ -953,7 +987,7 @@ namespace Apostol {
                                        CString().Format("%s: %s",
                                                         jmMessage.ErrorCode.c_str(),
                                                         jmMessage.ErrorDescription.c_str()
-                                                        ));
+                                       ));
                         } else {
                             Reply.Content = jmMessage.Payload.ToString();
                             AConnection->SendReply(Status, "application/json", true);
@@ -963,10 +997,11 @@ namespace Apostol {
                     }
                 }
 
-                AWSConnection->ConnectionStatus(csReplySent);
+                AWSConnection->ConnectionStatus(csRequestOk);
                 WSRequest.Clear();
             };
 
+            AConnection->Lock();
             APoint->Messages().Send(Message, OnRequest);
         }
         //--------------------------------------------------------------------------------------------------------------
@@ -989,31 +1024,34 @@ namespace Apostol {
             auto OnExecuteLocal = [this, AConnection](CTCPConnection *AClientConnection) {
 
                 auto pConnection = dynamic_cast<CHTTPClientConnection *> (AClientConnection);
-                const auto &caClientReply = pConnection->Reply();
 
-                DebugReply(caClientReply);
+                if (ConnectionExists(pConnection)) {
+                    const auto &caClientReply = pConnection->Reply();
 
-                const auto index = Server().IndexOfConnection(AConnection);
-                if (index != -1) {
-                    auto &Reply = AConnection->Reply();
+                    DebugReply(caClientReply);
 
-                    Reply.ContentType = CHTTPReply::json;
+                    const auto index = Server().IndexOfConnection(AConnection);
+                    if (index != -1) {
+                        auto &Reply = AConnection->Reply();
 
-                    if (Reply.Status == CHTTPReply::ok) {
-                        CJSON Json;
-                        CSOAPProtocol::SOAPToJSON(caClientReply.Content, Json);
+                        Reply.ContentType = CHTTPReply::json;
 
-                        Reply.Content = Json.ToString();
-                        AConnection->SendReply(Reply.Content.IsEmpty() ? CHTTPReply::no_content : CHTTPReply::ok,
-                                               "application/json", true);
-                    } else {
-                        SendError(AConnection, Reply.Status, Reply.StatusText);
+                        if (Reply.Status == CHTTPReply::ok) {
+                            CJSON Json;
+                            CSOAPProtocol::SOAPToJSON(caClientReply.Content, Json);
+
+                            Reply.Content = Json.ToString();
+                            AConnection->SendReply(Reply.Content.IsEmpty() ? CHTTPReply::no_content : CHTTPReply::ok,
+                                                   "application/json", true);
+                        } else {
+                            SendError(AConnection, Reply.Status, Reply.StatusText);
+                        }
+
+                        DebugReply(Reply);
                     }
 
-                    DebugReply(Reply);
+                    pConnection->CloseConnection(true);
                 }
-
-                pConnection->CloseConnection(true);
 
                 return true;
             };
@@ -1021,37 +1059,42 @@ namespace Apostol {
             auto OnExecute = [this, AConnection](CTCPConnection *AClientConnection) {
 
                 auto pConnection = dynamic_cast<CHTTPClientConnection *> (AClientConnection);
-                auto &Reply = pConnection->Reply();
 
-                DebugReply(Reply);
+                if (ConnectionExists(pConnection)) {
+                    auto &Reply = pConnection->Reply();
 
-                Reply.ContentType = CHTTPReply::json;
+                    DebugReply(Reply);
 
-                const auto index = Server().IndexOfConnection(AConnection);
-                if (index != -1) {
+                    Reply.ContentType = CHTTPReply::json;
+
+                    const auto index = Server().IndexOfConnection(AConnection);
+                    if (index != -1) {
 #ifdef WITH_POSTGRESQL
-                    if (Reply.Status == CHTTPReply::ok) {
-                        SOAPToJSON(AConnection, Reply.Content);
-                    } else {
-                        SendError(AConnection, Reply.Status, Reply.StatusText);
-                    }
+                        if (Reply.Status == CHTTPReply::ok) {
+                            SOAPToJSON(AConnection, Reply.Content);
+                        } else {
+                            SendError(AConnection, Reply.Status, Reply.StatusText);
+                        }
 #else
-                    SendError(AConnection, CHTTPReply::not_implemented, "Not Implemented");
+                        SendError(AConnection, CHTTPReply::not_implemented, "Not Implemented");
 #endif
-                }
+                    }
 
-                pConnection->CloseConnection(true);
+                    pConnection->CloseConnection(true);
+                }
 
                 return true;
             };
 
             auto OnException = [](CTCPConnection *AConnection, const Delphi::Exception::Exception &E) {
-
                 auto pConnection = dynamic_cast<CHTTPClientConnection *> (AConnection);
-                auto pClient = dynamic_cast<CHTTPClient *> (pConnection->Client());
-
-                Log()->Error(APP_LOG_ERR, 0, "[%s:%d] %s", pClient->Host().IsEmpty() ? "empty" : pClient->Host().c_str(), pClient->Port(), E.what());
+                if (ConnectionExists(pConnection)) {
+                    auto pClient = dynamic_cast<CHTTPClient *> (pConnection->Client());
+                    Log()->Error(APP_LOG_ERR, 0, "[%s:%d] %s", pClient->Host().IsEmpty() ? "empty" : pClient->Host().c_str(), pClient->Port(), E.what());
+                }
             };
+
+            AConnection->Lock();
 
             CLocation uri(APoint->Address());
 
@@ -1137,6 +1180,7 @@ namespace Apostol {
                 ReplyError(AConnection, CHTTPReply::bad_request, CString().Format("Invalid endpoint: %s", Endpoint.c_str()));
                 return;
             }
+
             auto IndexOfName = [](const CFields &Fields, const CString &Name) {
                 for (int i = 0; i < Fields.Count(); ++i) {
                     const auto &field = Fields[i];
@@ -1182,45 +1226,49 @@ namespace Apostol {
 
                 auto pConnection = dynamic_cast<CHTTPServerConnection *>(APollQuery->Binding());
 
-                const auto index = Server().IndexOfConnection(pConnection);
-                if ((index != -1) && pConnection->Connected()) {
-                    const auto &endpoint = pConnection->Data()["endpoint"];
+                if (ConnectionExists(pConnection)) {
+                    const auto index = Server().IndexOfConnection(pConnection);
+                    if (index != -1) {
+                        const auto &endpoint = pConnection->Data()["endpoint"];
 
-                    try {
-                        auto &Reply = pConnection->Reply();
-                        CHTTPReply::CStatusType status = CHTTPReply::ok;
+                        try {
+                            auto &Reply = pConnection->Reply();
+                            CHTTPReply::CStatusType status = CHTTPReply::ok;
 
-                        for (int i = 0; i < APollQuery->Count(); i++) {
-                            pResult = APollQuery->Results(i);
+                            for (int i = 0; i < APollQuery->Count(); i++) {
+                                pResult = APollQuery->Results(i);
 
-                            if (pResult->ExecStatus() != PGRES_TUPLES_OK)
-                                throw Delphi::Exception::EDBError(pResult->GetErrorMessage());
+                                if (pResult->ExecStatus() != PGRES_TUPLES_OK)
+                                    throw Delphi::Exception::EDBError(pResult->GetErrorMessage());
 
-                            if (pResult->nTuples() == 1) {
-                                const CJSON Payload(pResult->GetValue(0, 0));
-                                status = ErrorCodeToStatus(CheckError(Payload, errorMessage));
+                                if (pResult->nTuples() == 1) {
+                                    const CJSON Payload(pResult->GetValue(0, 0));
+                                    status = ErrorCodeToStatus(CheckError(Payload, errorMessage));
+                                }
+
+                                PQResultToJson(pResult, Reply.Content, "object", endpoint);
+
+                                if (status == CHTTPReply::ok) {
+                                    pConnection->SendReply(status, nullptr, true);
+                                } else {
+                                    ReplyError(pConnection, status, errorMessage);
+                                }
                             }
-
-                            PQResultToJson(pResult, Reply.Content, "object", endpoint);
-
-                            if (status == CHTTPReply::ok) {
-                                pConnection->SendReply(status, nullptr, true);
-                            } else {
-                                ReplyError(pConnection, status, errorMessage);
-                            }
+                        } catch (Delphi::Exception::Exception &E) {
+                            ReplyError(pConnection, CHTTPReply::bad_request, E.what());
+                            Log()->Error(APP_LOG_ERR, 0, E.what());
                         }
-                    } catch (Delphi::Exception::Exception &E) {
-                        ReplyError(pConnection, CHTTPReply::bad_request, E.what());
-                        Log()->Error(APP_LOG_ERR, 0, E.what());
                     }
                 }
             };
 
             auto OnException = [this](CPQPollQuery *APollQuery, const Delphi::Exception::Exception &E) {
                 auto pConnection = dynamic_cast<CHTTPServerConnection *>(APollQuery->Binding());
-                const auto index = Server().IndexOfConnection(pConnection);
-                if ((index != -1) && pConnection->Connected()) {
-                    ReplyError(pConnection, CHTTPReply::internal_server_error, E.what());
+                if (ConnectionExists(pConnection)) {
+                    const auto index = Server().IndexOfConnection(pConnection);
+                    if (index != -1) {
+                        ReplyError(pConnection, CHTTPReply::internal_server_error, E.what());
+                    }
                 }
             };
 
@@ -1241,6 +1289,7 @@ namespace Apostol {
 
             try {
                 ExecSQL(SQL, AConnection, OnExecuted, OnException);
+                AConnection->Lock();
             } catch (Delphi::Exception::Exception &E) {
                 ReplyError(AConnection, CHTTPReply::internal_server_error, E.what());
             }
@@ -1477,7 +1526,7 @@ namespace Apostol {
 
                 if (!Response.IsEmpty()) {
                     WSReply.SetPayload(Response);
-                    AConnection->SendWebSocket();
+                    AConnection->SendWebSocket(true);
                 }
 #endif
             } catch (std::exception &e) {

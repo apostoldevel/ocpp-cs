@@ -101,6 +101,8 @@ namespace Apostol {
             void InitOperations();
             void InitEndpoints();
 
+            static bool ConnectionExists(CWebSocketConnection *AConnection);
+
 #ifdef WITH_AUTHORIZATION
             void VerifyToken(const CString &Token);
             static bool CheckAuthorizationData(const CHTTPRequest &Request, CAuthorization &Authorization);

@@ -764,7 +764,7 @@ namespace Apostol {
 
             void SwitchConnection(CWebSocketConnection *Value);
 
-            void SendMessage(const CJSONMessage &Message, bool ASendNow = false);
+            void SendMessage(const CJSONMessage &Message);
             void SendMessage(const CJSONMessage &Message, COnMessageHandlerEvent &&Handler);
 
             void SendNotSupported(const CString &UniqueId, const CString &ErrorDescription, const CJSON &Payload = {});

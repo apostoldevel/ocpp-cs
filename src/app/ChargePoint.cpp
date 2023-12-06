@@ -1157,14 +1157,14 @@ namespace Apostol {
         }
         //--------------------------------------------------------------------------------------------------------------
 
-        void CCustomChargingPoint::SendMessage(const CJSONMessage &Message, bool ASendNow) {
+        void CCustomChargingPoint::SendMessage(const CJSONMessage &Message) {
             CString sResponse;
             DoMessageJSON(Message);
             CJSONProtocol::Response(Message, sResponse);
             chASSERT(m_pConnection);
             if (m_pConnection != nullptr && m_pConnection->Connected()) {
                 m_pConnection->WSReply().SetPayload(sResponse, (uint32_t) MsEpoch());
-                m_pConnection->SendWebSocket(ASendNow);
+                m_pConnection->SendWebSocket(true);
             }
         }
         //--------------------------------------------------------------------------------------------------------------
@@ -1587,7 +1587,7 @@ namespace Apostol {
             CJSONMessage message;
             const CString payload(WSRequest.Payload());
             CJSONProtocol::Request(payload, message);
-            AWSConnection->ConnectionStatus(csReplySent);
+            AWSConnection->ConnectionStatus(csRequestOk);
             WSRequest.Clear();
             return message;
         }
@@ -1958,7 +1958,7 @@ namespace Apostol {
             message.UniqueId = GenUniqueId();
             message.Action = "Heartbeat";
 
-            SendMessage(message, true);
+            SendMessage(message);
         }
         //--------------------------------------------------------------------------------------------------------------
 
@@ -1977,7 +1977,7 @@ namespace Apostol {
 
             message.Payload.Object().AddPair("meterValue", meterValue);
 
-            SendMessage(message, true);
+            SendMessage(message);
         }
         //--------------------------------------------------------------------------------------------------------------
 
