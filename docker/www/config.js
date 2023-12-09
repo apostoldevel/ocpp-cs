@@ -1,7 +1,7 @@
 var appConfig = {
   defaultLanguage: "en",
 
-  creditsText: "OCPP Central System © 2022",
+  creditsText: "OCPP Central System © 2023",
   creditsShortText: "Central System",
 
   signIn: "/signin",
