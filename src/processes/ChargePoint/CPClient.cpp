@@ -263,7 +263,7 @@ namespace Apostol {
 
             CHTTPRequest::Prepare(Request, _T("GET"), m_URI.href().c_str(), nullptr, "Upgrade");
 
-            AConnection->SendRequest();
+            AConnection->SendRequest(true);
         }
         //--------------------------------------------------------------------------------------------------------------
 
