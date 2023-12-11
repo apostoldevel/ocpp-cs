@@ -101,7 +101,7 @@ namespace Apostol {
             void InitOperations();
             void InitEndpoints();
 
-            static bool ConnectionExists(CHTTPServerConnection *AConnection);
+            bool ConnectionExists(CHTTPServerConnection *AConnection);
 
 #ifdef WITH_AUTHORIZATION
             void VerifyToken(const CString &Token);
@@ -122,7 +122,7 @@ namespace Apostol {
             void SetPointConnected(CCSChargingPoint *APoint, bool Value);
 #endif
             void SendSOAP(CHTTPServerConnection *AConnection, CCSChargingPoint *APoint, const CString &Operation, const CString &Payload);
-            static void SendJSON(CHTTPServerConnection *AConnection, CCSChargingPoint *APoint, const CJSONMessage &Message);
+            void SendJSON(CHTTPServerConnection *AConnection, CCSChargingPoint *APoint, const CJSONMessage &Message);
 
             static void LogJSONMessage(const CString &Identity, const CJSONMessage &Message);
 
