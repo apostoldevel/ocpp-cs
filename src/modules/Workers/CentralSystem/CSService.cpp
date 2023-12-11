@@ -276,7 +276,7 @@ namespace Apostol {
         }
         //--------------------------------------------------------------------------------------------------------------
 
-        bool CCSService::ConnectionExists(CWebSocketConnection *AConnection) {
+        bool CCSService::ConnectionExists(CHTTPServerConnection *AConnection) {
             if (AConnection == nullptr) {
                 return false;
             }
@@ -659,7 +659,6 @@ namespace Apostol {
                 if (ConnectionExists(pConnection)) {
                     const auto index = Server().IndexOfConnection(pConnection);
                     if (index != -1) {
-
                         auto &Reply = pConnection->Reply();
 
                         Reply.ContentType = CHTTPReply::json;
@@ -997,7 +996,7 @@ namespace Apostol {
                     }
                 }
 
-                AWSConnection->ConnectionStatus(csRequestOk);
+                AWSConnection->ConnectionStatus(csReplySent);
                 WSRequest.Clear();
             };
 
@@ -1025,7 +1024,7 @@ namespace Apostol {
 
                 auto pConnection = dynamic_cast<CHTTPClientConnection *> (AClientConnection);
 
-                if (ConnectionExists(pConnection)) {
+                if (ConnectionExists(AConnection) && pConnection != nullptr) {
                     const auto &caClientReply = pConnection->Reply();
 
                     DebugReply(caClientReply);
@@ -1060,7 +1059,7 @@ namespace Apostol {
 
                 auto pConnection = dynamic_cast<CHTTPClientConnection *> (AClientConnection);
 
-                if (ConnectionExists(pConnection)) {
+                if (ConnectionExists(AConnection) && pConnection != nullptr) {
                     auto &Reply = pConnection->Reply();
 
                     DebugReply(Reply);
@@ -1086,9 +1085,10 @@ namespace Apostol {
                 return true;
             };
 
-            auto OnException = [](CTCPConnection *AConnection, const Delphi::Exception::Exception &E) {
-                auto pConnection = dynamic_cast<CHTTPClientConnection *> (AConnection);
-                if (ConnectionExists(pConnection)) {
+            auto OnException = [AConnection](CTCPConnection *AClientConnection, const Delphi::Exception::Exception &E) {
+                ConnectionExists(AConnection);
+                auto pConnection = dynamic_cast<CHTTPClientConnection *> (AClientConnection);
+                if (pConnection != nullptr) {
                     auto pClient = dynamic_cast<CHTTPClient *> (pConnection->Client());
                     Log()->Error(APP_LOG_ERR, 0, "[%s:%d] %s", pClient->Host().IsEmpty() ? "empty" : pClient->Host().c_str(), pClient->Port(), E.what());
                 }
