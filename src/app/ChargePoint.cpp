@@ -1587,7 +1587,7 @@ namespace Apostol {
             CJSONMessage message;
             const CString payload(WSRequest.Payload());
             CJSONProtocol::Request(payload, message);
-            AWSConnection->ConnectionStatus(csRequestOk);
+            AWSConnection->ConnectionStatus(csReplySent);
             WSRequest.Clear();
             return message;
         }
