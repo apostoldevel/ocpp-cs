@@ -1175,14 +1175,14 @@ namespace Apostol {
                 }
 
                 const auto& caValue = caMember.Value();
-                if (caValue.IsNull() || caValue.IsEmpty()) {
+                if (caValue.IsNull() || (caValue.ValueType() >= Delphi::Json::jvtString && caValue.IsEmpty())) {
                     Object.Delete(i);
                 }
             }
 
             for (int i = 0; i < caFields.Count(); i++) {
                 const auto &field = caFields[i];
-                if (field.required && Payload[field.name].IsNull()) {
+                if (field.required && !Payload.HasOwnProperty(field.name)) {
                     ReplyError(AConnection, CHTTPReply::bad_request, CString().Format("Not found required key: %s (%s)", field.name.c_str(), field.type.c_str()));
                     return;
                 }
@@ -1304,14 +1304,14 @@ namespace Apostol {
                 }
 
                 const auto& caValue = caMember.Value();
-                if (caValue.IsNull() || caValue.IsEmpty()) {
+                if (caValue.IsNull() || (caValue.ValueType() >= Delphi::Json::jvtString && caValue.IsEmpty())) {
                     Object.Delete(i);
                 }
             }
 
             for (int i = 0; i < caFields.Count(); i++) {
                 const auto &field = caFields[i];
-                if (field.required && Payload[field.name].IsNull()) {
+                if (field.required && !Payload.HasOwnProperty(field.name)) {
                     ReplyError(AConnection, CHTTPReply::bad_request, CString().Format("Not found required key: %s (%s)", field.name.c_str(), field.type.c_str()));
                     return;
                 }

@@ -1161,7 +1161,6 @@ namespace Apostol {
             CString sResponse;
             DoMessageJSON(Message);
             CJSONProtocol::Response(Message, sResponse);
-            chASSERT(m_pConnection);
             if (m_pConnection != nullptr && m_pConnection->Connected()) {
                 m_pConnection->WSReply().SetPayload(sResponse, (uint32_t) MsEpoch());
                 m_pConnection->SendWebSocket(true);
