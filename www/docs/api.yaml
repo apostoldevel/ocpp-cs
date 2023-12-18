@@ -13,7 +13,7 @@ externalDocs:
   description: GitHub
   url: https://github.com/apostoldevel/apostol-cs
 servers:
-  - url: 'http://cs.ocpp-css.ru/api/v1'
+  - url: 'https://cs.ocpp-css.com/api/v1'
     description: OCPP CS
   - url: 'http://{host}:{port}/api/v1'
     description: Custom
@@ -1654,11 +1654,11 @@ components:
         [More info](https://github.com/apostoldevel/module-AuthServer).
       flows:
         password:
-          tokenUrl: https://ocpp-css.ru/oauth2/token
+          tokenUrl: https://ocpp-css.com/oauth2/token
           scopes:
             css: default
         implicit:
-          authorizationUrl: https://ocpp-css.ru/oauth2/authorize
+          authorizationUrl: https://ocpp-css.com/oauth2/authorize
           scopes:
             css: default
 security:
