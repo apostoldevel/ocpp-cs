@@ -178,7 +178,7 @@ namespace Apostol {
 
         enum CClearCacheStatus { ccsAccepted = 0, ccsRejected };
 
-        enum CChargePointStatus { cpsAvailable = 0, cpsPreparing, cpsCharging, cpsSuspendedEVSE, cpsSuspendedEV, cpsFinishing, cpsReserved, cpsUnavailable, cpsFaulted };
+        enum CChargePointStatus { cpsAvailable = 0, cpsReserved, cpsPreparing, cpsCharging, cpsSuspendedEVSE, cpsSuspendedEV, cpsFinishing, cpsUnavailable, cpsFaulted };
 
         enum CChargePointErrorCode { cpeConnectorLockFailure = 0, cpeHighTemperature, cpeMode3Error, cpeNoError,
             cpePowerMeterFailure, cpePowerSwitchFailure, cpeReaderFailure, cpeResetFailure, cpeGroundFailure,

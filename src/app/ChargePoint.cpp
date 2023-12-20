@@ -844,6 +844,8 @@ namespace Apostol {
         CChargePointStatus COCPPMessage::StringToChargePointStatus(const CString &Value) {
             if (Value == "Available")
                 return cpsAvailable;
+            if (Value == "Reserved")
+                return cpsReserved;
             if (Value == "Preparing")
                 return cpsPreparing;
             if (Value == "Charging")
@@ -854,8 +856,6 @@ namespace Apostol {
                 return cpsSuspendedEV;
             if (Value == "Finishing")
                 return cpsFinishing;
-            if (Value == "Reserved")
-                return cpsReserved;
             if (Value == "Unavailable")
                 return cpsUnavailable;
             if (Value == "Faulted")
@@ -868,6 +868,8 @@ namespace Apostol {
             switch (Value) {
                 case cpsAvailable:
                     return "Available";
+                case cpsReserved:
+                    return "Reserved";
                 case cpsPreparing:
                     return "Preparing";
                 case cpsCharging:
@@ -878,8 +880,6 @@ namespace Apostol {
                     return "SuspendedEV";
                 case cpsFinishing:
                     return "Finishing";
-                case cpsReserved:
-                    return "Reserved";
                 case cpsUnavailable:
                     return "Unavailable";
                 case cpsFaulted:
@@ -1356,7 +1356,7 @@ namespace Apostol {
                     SendStartTransaction();
                 };
 
-                if (m_Status == cpsAvailable) {
+                if (m_Status == cpsAvailable || m_Status == cpsReserved) {
                     SetStatus(cpsPreparing, OnStatus);
                 } else {
                     SendStartTransaction();
@@ -1370,6 +1370,9 @@ namespace Apostol {
                 return rssRejected;
 
             if (m_Status > cpsPreparing)
+                return rssRejected;
+
+            if (m_Status == cpsReserved && m_ReservationIdTag.Name() != idTag)
                 return rssRejected;
 
             if (m_TransactionId >= 0)
