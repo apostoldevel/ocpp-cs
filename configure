@@ -12,8 +12,10 @@
 #------------------------------------------------------------------------------
 set -e
 
-PROJECT_NAME=ocpp
+PROJECT_NAME=cs
 BUILD_TYPE=Release
+PULL_SELF=yes
+PULL_GITHUB=yes
 
 pop_directory()
 {
@@ -61,6 +63,8 @@ display_help()
     display_message "  --release                Release build (default)."
     display_message "  --debug                  Debug build."
     display_message "  --update                 Update build."
+    display_message "  --not-pull-self          Not pull self."
+    display_message "  --not-pull-github        Not pull from GitHub."
     display_message "  --help                   Display usage, overriding script execution."
     display_message ""
 }
@@ -106,7 +110,10 @@ download_from_github()
 github()
 {
     display_heading_message "Updating the current project"
-    git pull
+
+    if [[ $PULL_SELF == yes ]]; then
+      git pull
+    fi
 
     download_from_github src/lib ufocomp libdelphi master delphi
     download_from_github src apostoldevel apostol-core master core
@@ -135,7 +142,9 @@ make_configuration()
 
     echo '#define AUTO_VERSION _T("1.0.e00000-b0")' > version.h
 
-    github
+    if [[ $PULL_GITHUB == yes ]]; then
+      github
+    fi
 
     display_heading_message "Make: $PROJECT_NAME"
 
@@ -155,6 +164,8 @@ for OPTION in "$@"; do
         (--debug)               BUILD_TYPE="Debug";;
 
         (--update)              BUILD_UPDATE="yes";;
+        (--not-pull-self)       PULL_SELF="no";;
+        (--not-pull-github)     PULL_GITHUB="no";;
 
         # Unique script options.
         (--build-dir=*)         BUILD_DIR="${OPTION#*=}";;
