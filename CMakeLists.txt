@@ -40,7 +40,7 @@ add_custom_target(
         auto_increment_version
         ${CMAKE_COMMAND}
         -D VERSION_FILE=${CMAKE_SOURCE_DIR}/version.h
-        -P ${CMAKE_SOURCE_DIR}/AutoVersion.cmake
+        -P ${CMAKE_MODULE_PATH}/AutoVersion.cmake
 )
 
 set(PROJECT_LIB_DIR "src/lib")
