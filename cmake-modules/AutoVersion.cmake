@@ -1,7 +1,6 @@
 find_package(Git)
 
 if (GIT_FOUND)
-    message(STATUS "Found Git")
     execute_process(
             COMMAND ${GIT_EXECUTABLE} rev-parse --short HEAD
             OUTPUT_VARIABLE GIT_REVISION

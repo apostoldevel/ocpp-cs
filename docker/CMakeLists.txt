@@ -2,7 +2,8 @@ cmake_minimum_required(VERSION 3.13)
 project(ocpp-cs)
 
 set(CMAKE_CXX_STANDARD 14)
-set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -static-libgcc -static-libstdc++ -rdynamic")
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 
 set(PROJECT_NAME "cs")
 set(PROJECT_DESCRIPTION "OCPP Central System")
@@ -34,13 +35,12 @@ list( APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake-modules" )
 add_compile_options("$<$<CONFIG:DEBUG>:-D_DEBUG>")
 
 set(CORE_LIB_NAME apostol-core)
-#set(MODULES_LIB_NAME apostol-modules)
 
 add_custom_target(
         auto_increment_version
         ${CMAKE_COMMAND}
         -D VERSION_FILE=${CMAKE_SOURCE_DIR}/version.h
-        -P ${CMAKE_SOURCE_DIR}/AutoVersion.cmake
+        -P ${CMAKE_MODULE_PATH}/AutoVersion.cmake
 )
 
 set(PROJECT_LIB_DIR "src/lib")
@@ -62,22 +62,22 @@ if (WITH_AUTHORIZATION)
 endif()
 
 if (WITH_POSTGRESQL)
-    set(PQ_LIB_NAME "pq")
+    find_package(PostgreSQL REQUIRED)
     add_compile_options("-DWITH_POSTGRESQL")
 endif()
 
 if (WITH_SSL)
-    set(SSL_LIB_NAME "ssl")
+    find_package(OpenSSL REQUIRED)
     add_compile_options("-DWITH_SSL")
 endif()
 
 if (WITH_SQLITE3)
-    set(SQLITE3_LIB_NAME "sqlite3")
+    find_package(SQLite3 REQUIRED)
     add_compile_options("-DWITH_SQLITE3")
 endif()
 
 if (WITH_CURL)
-    set(CURL_LIB_NAME "curl")
+    find_package(CURL REQUIRED)
     add_compile_options("-DWITH_CURL")
 endif()
 
@@ -118,6 +118,11 @@ file(GLOB lib_files ${lib_files} ${PROJECT_LIB_DIR}/picojson/*.h)
 include_directories(${PROJECT_LIB_DIR}/jwt-cpp)
 file(GLOB lib_files ${lib_files} ${PROJECT_LIB_DIR}/jwt-cpp/*.h)
 
+set(JWT_JSON_TRAITS_OPTIONS boost-json danielaparker-jsoncons kazuho-picojson nlohmann-json)
+foreach(traits ${JWT_JSON_TRAITS_OPTIONS})
+    list(APPEND lib_files ${PROJECT_LIB_DIR}/jwt-cpp/traits/${traits}/defaults.h ${PROJECT_LIB_DIR}/jwt-cpp/traits/${traits}/traits.h)
+endforeach()
+
 # Apostol
 # ----------------------------------------------------------------------------------------------------------------------
 include_directories(src/app src/core src/modules src/modules/Workers src/modules/Helpers src/processes)
@@ -135,7 +140,7 @@ add_library(${CORE_LIB_NAME} STATIC
         ${core_files}
         ${modules_files}
         ${processes_files}
-        )
+)
 
 target_compile_definitions(${CORE_LIB_NAME} PUBLIC
         APP_NAME="${PROJECT_NAME}"
@@ -158,19 +163,13 @@ target_compile_definitions(${CORE_LIB_NAME} PUBLIC
         APP_POSTGRES_LOG_FILE="logs/postgres.log"
         APP_STREAM_LOG_FILE="logs/stream.log"
         APP_DOC_ROOT="www"
-        )
-
-target_link_libraries(${CORE_LIB_NAME} pthread ${PQ_LIB_NAME} ${SQLITE3_LIB_NAME} ${CURL_LIB_NAME} ssl crypto)
-
-# Apostol modules
-# ----------------------------------------------------------------------------------------------------------------------
-#add_library(${MODULES_LIB_NAME} STATIC ${modules_files})
-#target_link_libraries(${MODULES_LIB_NAME} ${CORE_LIB_NAME})
+)
 
 # Apostol
 # ----------------------------------------------------------------------------------------------------------------------
 add_executable(${PROJECT_NAME} ${app_files})
-target_link_libraries(${PROJECT_NAME} ${CORE_LIB_NAME})
+target_include_directories(${PROJECT_NAME} PRIVATE ${PostgreSQL_INCLUDE_DIRS} ${OPENSSL_INCLUDE_DIRS} ${SQLite3_INCLUDE_DIRS} ${CURL_INCLUDE_DIRS})
+target_link_libraries(${PROJECT_NAME} PRIVATE ${CORE_LIB_NAME} ${PostgreSQL_LIBRARIES} ${OPENSSL_LIBRARIES} ${SQLite3_LIBRARIES} ${CURL_LIBRARIES} pthread)
 
 add_dependencies(${PROJECT_NAME} auto_increment_version)
 

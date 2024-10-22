@@ -1,4 +1,7 @@
 .dockerignore
-/.idea
-/cmake-build-*
-/conf
+.idea
+www/.idea
+cmake-build-*
+conf
+src/lib/delphi
+src/core

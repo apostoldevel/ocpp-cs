@@ -2,7 +2,8 @@ cmake_minimum_required(VERSION 3.13)
 project(ocpp-cs)
 
 set(CMAKE_CXX_STANDARD 14)
-set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -static-libgcc -static-libstdc++ -rdynamic")
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
 
 set(PROJECT_NAME "cs")
 set(PROJECT_DESCRIPTION "OCPP Central System")
@@ -34,7 +35,6 @@ list( APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake-modules" )
 add_compile_options("$<$<CONFIG:DEBUG>:-D_DEBUG>")
 
 set(CORE_LIB_NAME apostol-core)
-#set(MODULES_LIB_NAME apostol-modules)
 
 add_custom_target(
         auto_increment_version
@@ -62,22 +62,22 @@ if (WITH_AUTHORIZATION)
 endif()
 
 if (WITH_POSTGRESQL)
-    set(PQ_LIB_NAME "pq")
+    find_package(PostgreSQL REQUIRED)
     add_compile_options("-DWITH_POSTGRESQL")
 endif()
 
 if (WITH_SSL)
-    set(SSL_LIB_NAME "ssl")
+    find_package(OpenSSL REQUIRED)
     add_compile_options("-DWITH_SSL")
 endif()
 
 if (WITH_SQLITE3)
-    set(SQLITE3_LIB_NAME "sqlite3")
+    find_package(SQLite3 REQUIRED)
     add_compile_options("-DWITH_SQLITE3")
 endif()
 
 if (WITH_CURL)
-    set(CURL_LIB_NAME "curl")
+    find_package(CURL REQUIRED)
     add_compile_options("-DWITH_CURL")
 endif()
 
@@ -165,17 +165,11 @@ target_compile_definitions(${CORE_LIB_NAME} PUBLIC
         APP_DOC_ROOT="www"
         )
 
-target_link_libraries(${CORE_LIB_NAME} pthread ${PQ_LIB_NAME} ${SQLITE3_LIB_NAME} ${CURL_LIB_NAME} ssl crypto)
-
-# Apostol modules
-# ----------------------------------------------------------------------------------------------------------------------
-#add_library(${MODULES_LIB_NAME} STATIC ${modules_files})
-#target_link_libraries(${MODULES_LIB_NAME} ${CORE_LIB_NAME})
-
 # Apostol
 # ----------------------------------------------------------------------------------------------------------------------
 add_executable(${PROJECT_NAME} ${app_files})
-target_link_libraries(${PROJECT_NAME} ${CORE_LIB_NAME})
+target_include_directories(${PROJECT_NAME} PRIVATE ${PostgreSQL_INCLUDE_DIRS} ${OPENSSL_INCLUDE_DIRS} ${SQLite3_INCLUDE_DIRS} ${CURL_INCLUDE_DIRS})
+target_link_libraries(${PROJECT_NAME} PRIVATE ${CORE_LIB_NAME} ${PostgreSQL_LIBRARIES} ${OPENSSL_LIBRARIES} ${SQLite3_LIBRARIES} ${CURL_LIBRARIES} pthread)
 
 add_dependencies(${PROJECT_NAME} auto_increment_version)
 
