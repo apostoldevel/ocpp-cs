@@ -227,10 +227,16 @@ namespace Apostol {
         }
         //--------------------------------------------------------------------------------------------------------------
 
+        CString CSOAPProtocol::Error(const CString &Code, const CString &SubCode, const CString &Reason, const CString &Message) {
+            CString error;
+            error.Format(R"(<?xml version="1.0" encoding="UTF-8"?>)" LINEFEED R"(<se:Envelope xmlns:se="http://www.w3.org/2003/05/soap-envelope" xmlns:wsa5="http://www.w3.org/2005/08/addressing" xmlns:cp="urn://Ocpp/Cp/2015/10/" xmlns:cs="urn://Ocpp/Cs/2015/10/"><se:Body><se:Fault><se:Code><se:Value>se:%s</se:Value><cs:SubCode><se:Value>cs:%s</se:Value></cs:SubCode></se:Code><se:Reason><se:Text>%s</se:Text></se:Reason><se:Detail><se:Text>%s</se:Text></se:Detail></se:Fault></se:Body></se:Envelope>)", Code.c_str(), SubCode.c_str(), Reason.c_str(), Delphi::Json::EncodeJsonString(Message).c_str());
+            return error;
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
         void CSOAPProtocol::PrepareResponse(const CSOAPMessage &Request, CSOAPMessage &Response) {
 
             const auto &Headers = Request.Headers;
-            const auto &Values = Request.Values;
 
             const CString &Identity = Headers.Values("chargeBoxIdentity");
             const CString &MessageID = Headers.Values("a:MessageID");
@@ -955,7 +961,7 @@ namespace Apostol {
         }
         //--------------------------------------------------------------------------------------------------------------
 
-        bool COCPPMessage::Parse(CCSChargingPoint *APoint, const CSOAPMessage &Request, CSOAPMessage &Response) {
+        void COCPPMessage::Parse(CCSChargingPoint *APoint, const CSOAPMessage &Request, CSOAPMessage &Response) {
 
             const auto& action = Request.Notification.Lower();
 
@@ -976,14 +982,12 @@ namespace Apostol {
             } else if (action == "stoptransactionrequest") {
                 APoint->StopTransaction(Request, Response);
             } else {
-                return false;
+                APoint->Error(Request, Response, "NotSupported", CString().Format("Action %s not supported", action));
             }
-
-            return true;
         }
         //--------------------------------------------------------------------------------------------------------------
 
-        bool COCPPMessage::Parse(CCSChargingPoint *APoint, const CJSONMessage &Request, CJSONMessage &Response) {
+        void COCPPMessage::Parse(CCSChargingPoint *APoint, const CJSONMessage &Request, CJSONMessage &Response) {
 
             const auto &action = Request.Action;
 
@@ -1006,10 +1010,8 @@ namespace Apostol {
             } else if (action == "StopTransaction") {
                 APoint->StopTransaction(Request, Response);
             } else {
-                return false;
+                Response = CJSONProtocol::CallError(Request.UniqueId, "NotSupported", CString().Format("Action %s not supported", action), Request.Payload);
             }
-
-            return true;
         }
 
         //--------------------------------------------------------------------------------------------------------------
@@ -1048,7 +1050,7 @@ namespace Apostol {
 
         COCPPMessageHandler *COCPPMessageHandlerManager::Send(const CJSONMessage &Message, COnMessageHandlerEvent &&Handler, uint32_t Key) {
             if (m_pChargingPoint->Connected()) {
-                auto pHandler = new COCPPMessageHandler(this, Message, static_cast<COnMessageHandlerEvent &&> (Handler));
+                const auto pHandler = new COCPPMessageHandler(this, Message, static_cast<COnMessageHandlerEvent &&> (Handler));
 
                 CString sResult;
                 CJSONProtocol::Response(Message, sResult);
@@ -1068,10 +1070,8 @@ namespace Apostol {
         //--------------------------------------------------------------------------------------------------------------
 
         COCPPMessageHandler *COCPPMessageHandlerManager::FindMessageById(const CString &Value) const {
-            COCPPMessageHandler *pHandler;
-
             for (int i = 0; i < Count(); ++i) {
-                pHandler = Get(i);
+                const auto pHandler = Get(i);
                 if (pHandler->Message().UniqueId == Value)
                     return pHandler;
             }
@@ -2278,7 +2278,6 @@ namespace Apostol {
 
         void CCSChargingPoint::Heartbeat(const CSOAPMessage &Request, CSOAPMessage &Response) {
             const auto &Headers = Request.Headers;
-            const CStringPairs &Body = Request.Values;
 
             m_Address = Headers.Values("a:From");
             m_Identity = Headers.Values("chargeBoxIdentity");
@@ -2312,56 +2311,69 @@ namespace Apostol {
         }
         //--------------------------------------------------------------------------------------------------------------
 
-        bool CCSChargingPoint::ParseSOAP(const CString &Request, CString &Response) {
-            CSOAPMessage jmRequest;
+        void CCSChargingPoint::Parse(const CSOAPMessage &Request, CString &Response) {
             CSOAPMessage jmResponse;
 
+            COCPPMessage::Parse(this, Request, jmResponse);
+
+            DoMessageSOAP(Request);
+            DoMessageSOAP(jmResponse);
+
+            CSOAPProtocol::Response(jmResponse, Response);
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
+        void CCSChargingPoint::RequestSOAP(const CString &Request, CString &Response) {
+            CSOAPMessage jmRequest;
             CSOAPProtocol::Request(Request, jmRequest);
-            if (COCPPMessage::Parse(this, jmRequest, jmResponse)) {
-                DoMessageSOAP(jmRequest);
-                CSOAPProtocol::Response(jmResponse, Response);
-                return true;
-            }
-
-            return false;
+            Parse(jmRequest, Response);
         }
         //--------------------------------------------------------------------------------------------------------------
 
-        bool CCSChargingPoint::ParseJSON(const CString &Request, CString &Response) {
-            CJSONMessage jmRequest;
+        void CCSChargingPoint::Parse(const CJSONMessage &Request, CString &Response) {
             CJSONMessage jmResponse;
+            COCPPMessage::Parse(this, Request, jmResponse);
 
-            CJSONProtocol::Request(Request, jmRequest);
-            if (jmRequest.MessageTypeId == mtCall) {
-                if (COCPPMessage::Parse(this, jmRequest, jmResponse)) {
-                    DoMessageJSON(jmRequest);
-                    DoMessageJSON(jmResponse);
-                    CJSONProtocol::Response(jmResponse, Response);
-                    return true;
-                }
-            } else {
-                auto pHandler = m_Messages.FindMessageById(jmRequest.UniqueId);
-                if (Assigned(pHandler)) {
-                    jmRequest.Action = pHandler->Message().Action;
-                    DoMessageJSON(jmRequest);
-                    pHandler->Handler(m_pConnection);
-                    delete pHandler;
-                    return true;
-                }
-            }
+            DoMessageJSON(Request);
+            DoMessageJSON(jmResponse);
 
-            return false;
+            CJSONProtocol::Response(jmResponse, Response);
         }
         //--------------------------------------------------------------------------------------------------------------
 
-        bool CCSChargingPoint::Parse(const CString &Request, CString &Response) {
-            switch (m_ProtocolType) {
-                case ptSOAP:
-                    return ParseSOAP(Request, Response);
-                case ptJSON:
-                    return ParseJSON(Request, Response);
+        void CCSChargingPoint::RequestJSON(const CString &Request, CString &Response) {
+            CJSONMessage jmRequest;
+            CJSONProtocol::Request(Request, jmRequest);
+            Parse(jmRequest, Response);
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
+        void CCSChargingPoint::Error(const CSOAPMessage &Request, CSOAPMessage &Response, const CString &SubCode, const CString &Reason) {
+            const auto &Headers = Request.Headers;
+
+            m_Address = Headers.Values("a:From");
+            m_Identity = Headers.Values("chargeBoxIdentity");
+
+            Response.Notification = "Fault";
+
+            auto& Values = Response.Values;
+            Values.AddPair("Code", "Receiver");
+            Values.AddPair("SubCode", SubCode);
+            Values.AddPair("Reason", Reason);
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
+        void CCSChargingPoint::Error(const CJSONMessage &Request, CJSONMessage &Response, const CString &Message) {
+            Response = CJSONProtocol::CallError(Request.UniqueId, "InternalError", Message, Request.Payload);
+        }
+        //--------------------------------------------------------------------------------------------------------------
+
+        void CCSChargingPoint::Parse(const CString &Request, CString &Response) {
+            if (m_ProtocolType == ptSOAP) {
+                RequestSOAP(Request, Response);
+            } else {
+                RequestJSON(Request, Response);
             }
-            return false;
         }
 
         //--------------------------------------------------------------------------------------------------------------
@@ -2387,7 +2399,7 @@ namespace Apostol {
 
         CCSChargingPoint *CCSChargingPointManager::FindPointByIdentity(const CString &Value) {
             for (int i = 0; i < Count(); ++i) {
-                auto pPoint = Get(i);
+                const auto pPoint = Get(i);
                 if (pPoint->Identity() == Value)
                     return pPoint;
             }
@@ -2398,7 +2410,7 @@ namespace Apostol {
 
         CCSChargingPoint *CCSChargingPointManager::FindPointByConnection(CWebSocketConnection *Value) {
             for (int i = 0; i < Count(); ++i) {
-                auto pPoint = Get(i);
+                const auto pPoint = Get(i);
                 if (pPoint->Connection() == Value)
                     return pPoint;
             }

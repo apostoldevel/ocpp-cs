@@ -1,0 +1,12 @@
+name: 'ocpp'
+
+services:
+
+  central-system:
+    build: .
+    container_name: cs
+    ports:
+      - "9220:9220"
+    network_mode: "host"
+#    environment:
+#      WEBHOOK_URL: http://localhost:8080/api/v1/ocpp

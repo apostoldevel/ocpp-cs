@@ -89,8 +89,49 @@ namespace Apostol {
 
         //--------------------------------------------------------------------------------------------------------------
 
+        class CWebhookEndpoint {
+
+            CLocation m_URL;
+            CAuthorization m_Authorization;
+
+            bool m_Enabled = false;
+
+        public:
+
+            CWebhookEndpoint() = default;
+
+            CWebhookEndpoint(const CWebhookEndpoint &owner) {
+                if (&owner != this) {
+                    Assign(owner);
+                }
+            }
+
+            explicit CWebhookEndpoint(const CString &url, const bool enabled = true) {
+                this->m_URL = url;
+                this->m_Enabled = enabled;
+            }
+
+            void Assign(const CWebhookEndpoint &owner) {
+                m_URL = owner.m_URL;
+                m_Enabled = owner.m_Enabled;
+            }
+
+            CAuthorization &Authorization() { return m_Authorization; }
+            const CAuthorization &Authorization() const { return m_Authorization; }
+
+            CLocation &URL() { return m_URL; }
+            const CLocation &URL() const { return m_URL; }
+
+            bool Enabled() const { return m_Enabled; }
+            void Enabled(const bool Value) { m_Enabled = Value; }
+
+        };
+        //--------------------------------------------------------------------------------------------------------------
+
         class CCSService: public CApostolModule {
         private:
+
+            CWebhookEndpoint m_Webhook;
 
             COperations m_Endpoints;
             COperations m_Operations;
@@ -108,7 +149,7 @@ namespace Apostol {
             static bool CheckAuthorizationData(const CHTTPRequest &Request, CAuthorization &Authorization);
             bool CheckAuthorization(CHTTPServerConnection *AConnection, CAuthorization &Authorization);
 #endif
-            static void DoWebSocketError(CHTTPServerConnection *AConnection, const Delphi::Exception::Exception &E);
+            void DoWebSocketError(CHTTPServerConnection *AConnection, const Delphi::Exception::Exception &E);
 
             static void SOAPError(CHTTPServerConnection *AConnection, const CString &Code, const CString &SubCode,
                                     const CString &Reason, const CString &Message);
@@ -123,6 +164,9 @@ namespace Apostol {
 #endif
             void SendSOAP(CHTTPServerConnection *AConnection, CCSChargingPoint *APoint, const CString &Operation, const CString &Payload);
             void SendJSON(CHTTPServerConnection *AConnection, CCSChargingPoint *APoint, const CJSONMessage &Message);
+
+            void WebhookJSON(CHTTPServerConnection *AConnection, const CString &Identity, const CJSONMessage &Message, const CString &Account = {});
+            void WebhookSOAP(CHTTPServerConnection *AConnection, const CString &Payload);
 
             static void LogJSONMessage(const CString &Identity, const CJSONMessage &Message);
 
@@ -162,7 +206,7 @@ namespace Apostol {
 
             ~CCSService() override = default;
 
-            static class CCSService *CreateModule(CModuleProcess *AProcess) {
+            static CCSService *CreateModule(CModuleProcess *AProcess) {
                 return new CCSService(AProcess);
             }
 

@@ -122,6 +122,8 @@ namespace Apostol {
             static void Request(const CString &xmlString, CSOAPMessage &Message);
             static void Response(const CSOAPMessage &Message, CString &xmlString);
 
+            static CString Error(const CString &Code, const CString &SubCode, const CString &Reason, const CString &Message);
+
             static void PrepareResponse(const CSOAPMessage &Request, CSOAPMessage &Response);
 
         };
@@ -231,8 +233,8 @@ namespace Apostol {
             static CChargePointErrorCode StringToChargePointErrorCode(const CString& Value);
             static CString ChargePointErrorCodeToString(CChargePointErrorCode Value);
 
-            static bool Parse(CCSChargingPoint *APoint, const CSOAPMessage &Request, CSOAPMessage &Response);
-            static bool Parse(CCSChargingPoint *APoint, const CJSONMessage &Request, CJSONMessage &Response);
+            static void Parse(CCSChargingPoint *APoint, const CSOAPMessage &Request, CSOAPMessage &Response);
+            static void Parse(CCSChargingPoint *APoint, const CJSONMessage &Request, CJSONMessage &Response);
 
         };
 
@@ -1254,8 +1256,8 @@ namespace Apostol {
             CDataTransferRequest m_DataTransferRequest;
             CMeterValuesRequest m_MeterValuesRequest;
 
-            bool ParseSOAP(const CString &Request, CString &Response);
-            bool ParseJSON(const CString &Request, CString &Response);
+            void RequestSOAP(const CString &Request, CString &Response);
+            void RequestJSON(const CString &Request, CString &Response);
 
         public:
 
@@ -1295,7 +1297,12 @@ namespace Apostol {
             void MeterValues(const CSOAPMessage &Request, CSOAPMessage &Response);
             void MeterValues(const CJSONMessage &Request, CJSONMessage &Response);
 
-            bool Parse(const CString &Request, CString &Response);
+            void Error(const CSOAPMessage &Request, CSOAPMessage &Response, const CString &SubCode, const CString &Reason);
+            void Error(const CJSONMessage &Request, CJSONMessage &Response, const CString &Message);
+
+            void Parse(const CString &Request, CString &Response);
+            void Parse(const CSOAPMessage &Request, CString &Response);
+            void Parse(const CJSONMessage &Request, CString &Response);
 
         };
 
