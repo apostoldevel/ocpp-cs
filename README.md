@@ -131,7 +131,22 @@ password=ocpp
 token=
 ```
 
-In this section, you can specify the `endpoint URL` to which the `Central System` will send packets received from charging stations. Specifically, these are ten commands from section 4 of the OCPP 1.6 specification, Operations Initiated by Charge Point. Additionally, you can set up authorization parameters on your server side, which will receive requests from the `Central System`.
+In this section, you can specify the `endpoint URL` to which the `Central System` will send packets received from charging stations. 
+
+Specifically, these are ten commands from section **4. Operations Initiated by Charge Point** of the OCPP v1.6 specification: 
+
+- 4.1. Authorize
+- 4.2. Boot Notification
+- 4.3. Data Transfer
+- 4.4. Diagnostics Status Notification
+- 4.5. Firmware Status Notification
+- 4.6. Heartbeat
+- 4.7. Meter Values
+- 4.8. Start Transaction
+- 4.9. Status Notification
+- 4.10. Stop Transaction
+
+Additionally, you can set up authorization parameters on your server side, which will receive requests from the `Central System`.
 
 Data from the `Central System` will be in the following JSON format:
 ```json lines
