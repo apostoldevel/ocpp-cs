@@ -272,8 +272,7 @@ sudo apt-get install build-essential libssl-dev libcurl4-openssl-dev make cmake 
 
 Клонируйте репозиторий:
 ```shell
-git clone https://github.com/apostoldevel/ocpp-cs.git
-cd ocpp-cs
+git clone https://github.com/apostoldevel/ocpp-cs.git && cd ocpp-cs
 ```
 
 Выполните настройки в соответствии с Вашими требованиями:

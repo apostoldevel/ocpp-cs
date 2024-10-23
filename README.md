@@ -272,8 +272,7 @@ To install PostgreSQL, use the instructions on [this](https://www.postgresql.org
 
 Clone the repository:
 ```shell
-git clone https://github.com/apostoldevel/ocpp-cs.git
-cd ocpp-cs
+git clone https://github.com/apostoldevel/ocpp-cs.git && cd ocpp-cs
 ```
 
 Configure it according to your requirements:
