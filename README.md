@@ -67,7 +67,7 @@ docker pull apostoldevel/cs
 ```
 Run the container:
 ```shell
-docker run -p 9220:9220 --rm --name cs apostoldevel/cs
+docker run -p 9220:9220 --network host --rm --name cs apostoldevel/cs
 ```
 
 Building the Container Image
