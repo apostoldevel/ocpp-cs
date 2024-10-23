@@ -112,6 +112,25 @@ Swagger UI также будет доступен по адресу http://local
 
 В файле настроек `Центральной системы`, а именно `./docker/default.conf` при сборке контейнера или `/etс/cs/cs.conf` внутри контейнера, имеется раздел `[webhook]`.
 
+```text
+## Webhook configuration
+[webhook]
+## default: false
+enable=false
+
+## Webhook endpoint URL
+url=http://localhost:8080/api/v1/ocpp
+
+## Authorization schema value: Off | Basic | Bearer
+authorization=Basic
+## Username for basic schema
+username=ocpp
+## Password for basic schema
+password=ocpp
+## Token for Bearer schema
+token=
+```
+
 В этом разделе Вы можете указать `endpoint URL` на который `Центральная система` будет направлять пакеты поступающие от зарядных станций. Если конкретнее, то это десять команд из раздела 4. Operations Initiated by Charge Point спецификации OCPP 1.6. Дополнительно можно настроить параметры авторизации на стороне Вашего сервера, который будет принимать запросы от `Центральной системы`.    
 
 Данные от `Центральной системы` будут в следующем JSON-формате:

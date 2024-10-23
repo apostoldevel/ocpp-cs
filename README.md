@@ -112,6 +112,25 @@ There are several ways to integrate the `Central System` with your project. The 
 
 In the `Central System` configuration file, specifically `./docker/default.conf` when building the container or `/etc/cs/cs.conf` inside the container, there is a section `[webhook]`.
 
+```text
+## Webhook configuration
+[webhook]
+## default: false
+enable=false
+
+## Webhook endpoint URL
+url=http://localhost:8080/api/v1/ocpp
+
+## Authorization schema value: Off | Basic | Bearer
+authorization=Basic
+## Username for basic schema
+username=ocpp
+## Password for basic schema
+password=ocpp
+## Token for Bearer schema
+token=
+```
+
 In this section, you can specify the `endpoint URL` to which the `Central System` will send packets received from charging stations. Specifically, these are ten commands from section 4 of the OCPP 1.6 specification, Operations Initiated by Charge Point. Additionally, you can set up authorization parameters on your server side, which will receive requests from the `Central System`.
 
 Data from the `Central System` will be in the following JSON format:
