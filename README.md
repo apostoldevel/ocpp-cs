@@ -67,7 +67,7 @@ docker pull apostoldevel/cs
 ```
 Run the container:
 ```shell
-docker run -p 9220:9220 --network host --rm --name cs apostoldevel/cs
+docker run -p 9220:9220 --network host --env WEBHOOK_URL=https://cloud.ocpp-css.com/api/v1/ocpp --rm --name cs apostoldevel/cs
 ```
 
 Building the Container Image
@@ -76,8 +76,7 @@ You can build the container image yourself with settings tailored to your server
 
 Clone the repository:
 ```shell
-git clone https://github.com/apostoldevel/ocpp-cs.git
-cd ocpp-cs
+git clone https://github.com/apostoldevel/ocpp-cs.git && cd ocpp-cs
 ```
 
 Configure it according to your requirements:
