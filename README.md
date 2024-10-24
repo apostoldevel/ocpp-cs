@@ -323,7 +323,7 @@ Configuration:
 
 Build and install:
 ```shell
-sudo ./deploy --make
+sudo ./deploy --install
 ```
 or
 ```shell

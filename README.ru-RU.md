@@ -323,7 +323,7 @@ WITH_POSTGRESQL = {ON | OFF}
 
 Сборка с установкой:
 ```shell
-sudo ./deploy --make
+sudo ./deploy --install
 ```
 или
 ```shell
