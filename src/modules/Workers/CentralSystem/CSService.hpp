@@ -142,7 +142,7 @@ namespace Apostol {
             void InitOperations();
             void InitEndpoints();
 
-            bool ConnectionExists(CHTTPServerConnection *AConnection);
+            bool ConnectionExists(CWebSocketConnection *AConnection);
 
 #ifdef WITH_AUTHORIZATION
             void VerifyToken(const CString &Token);

@@ -276,7 +276,7 @@ namespace Apostol {
         }
         //--------------------------------------------------------------------------------------------------------------
 
-        bool CCSService::ConnectionExists(CHTTPServerConnection *AConnection) {
+        bool CCSService::ConnectionExists(CWebSocketConnection *AConnection) {
             if (AConnection == nullptr) {
                 return false;
             }
@@ -324,7 +324,7 @@ namespace Apostol {
 
                 const auto pConnection = pPoint->Connection();
 
-                if (pConnection != nullptr && pConnection->Connected()) {
+                if (ConnectionExists(pConnection)) {
                     jsonConnection.Object().AddPair("Socket", pConnection->Socket()->Binding()->Handle());
                     jsonConnection.Object().AddPair("IP", pConnection->Socket()->Binding()->PeerIP());
                     jsonConnection.Object().AddPair("Port", pConnection->Socket()->Binding()->PeerPort());
@@ -346,10 +346,10 @@ namespace Apostol {
         void CCSService::DoPostgresQueryExecuted(CPQPollQuery *APollQuery) {
             try {
                 for (int i = 0; i < APollQuery->Count(); i++) {
-                    const auto Result = APollQuery->Results(i);
+                    const auto pResult = APollQuery->Results(i);
 
-                    if (Result->ExecStatus() != PGRES_TUPLES_OK)
-                        throw Delphi::Exception::EDBError(Result->GetErrorMessage());
+                    if (pResult->ExecStatus() != PGRES_TUPLES_OK)
+                        throw Delphi::Exception::EDBError(pResult->GetErrorMessage());
                 }
             } catch (std::exception &e) {
                 Log()->Error(APP_LOG_ERR, 0, e.what());
@@ -367,10 +367,10 @@ namespace Apostol {
             auto OnExecuted = [](CPQPollQuery *APollQuery) {
                 try {
                     for (int i = 0; i < APollQuery->Count(); i++) {
-                        const auto Result = APollQuery->Results(i);
+                        const auto pResult = APollQuery->Results(i);
 
-                        if (Result->ExecStatus() != PGRES_TUPLES_OK)
-                            throw Delphi::Exception::EDBError(Result->GetErrorMessage());
+                        if (pResult->ExecStatus() != PGRES_TUPLES_OK)
+                            throw Delphi::Exception::EDBError(pResult->GetErrorMessage());
 
                     }
                 } catch (Delphi::Exception::Exception &E) {
@@ -1298,8 +1298,8 @@ namespace Apostol {
                                 throw Delphi::Exception::EDBError(pResult->GetErrorMessage());
 
                             if (pResult->nTuples() == 1) {
-                                const CJSON Payload(pResult->GetValue(0, 0));
-                                status = ErrorCodeToStatus(CheckError(Payload, errorMessage));
+                                const CJSON Value(pResult->GetValue(0, 0));
+                                status = ErrorCodeToStatus(CheckError(Value, errorMessage));
                             }
 
                             PQResultToJson(pResult, Reply.Content, "object", endpoint);
@@ -1408,7 +1408,7 @@ namespace Apostol {
 
             const auto pConnection = pPoint->Connection();
 
-            if (pConnection != nullptr && pConnection->Protocol() == pWebSocket) {
+            if (ConnectionExists(pConnection) && pConnection->Protocol() == pWebSocket) {
 
                 if (!pConnection->Connected()) {
                     ReplyError(AConnection, CHTTPReply::bad_request, "Charge Point not connected.");
@@ -1455,8 +1455,6 @@ namespace Apostol {
                 return;
             }
 
-            const auto &caService = slPath[0];
-
             if (slPath.Count() < 3) {
                 AConnection->SendStockReply(CHTTPReply::not_found);
                 return;
@@ -1464,7 +1462,6 @@ namespace Apostol {
 
             const auto &caVersion = slPath[1];
             const auto &caCommand = slPath[2];
-            const auto &caAction = slPath.Count() >= 4 ? slPath[3] : CString();
 
             try {
                 if (caVersion == "v1") {
@@ -1497,6 +1494,7 @@ namespace Apostol {
                         return;
                     }
 #else
+                    const auto &caAction = slPath.Count() >= 4 ? slPath[3] : CString();
                     if (caCommand == "ChargePointList" || (caCommand == "CentralSystem" && caAction == "ChargePointList")) {
                         DoChargePointList(AConnection);
                         return;
