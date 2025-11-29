@@ -46,10 +46,9 @@ namespace Apostol {
                 }
             }
 
-            COperation(const CString &name, const CString &type, bool required = true) {
+            COperation(const CString &name, const CString &type, bool required = true): required(required) {
                 this->name = name;
                 this->type = type;
-                this->required = required;
             }
 
             explicit COperation(const CJSONValue &Value) {
@@ -106,9 +105,8 @@ namespace Apostol {
                 }
             }
 
-            explicit CWebhookEndpoint(const CString &url, const bool enabled = true) {
+            explicit CWebhookEndpoint(const CString &url, const bool enabled = true): m_Enabled(enabled) {
                 this->m_URL = url;
-                this->m_Enabled = enabled;
             }
 
             void Assign(const CWebhookEndpoint &owner) {
@@ -154,29 +152,32 @@ namespace Apostol {
             static void SOAPError(CHTTPServerConnection *AConnection, const CString &Code, const CString &SubCode,
                                     const CString &Reason, const CString &Message);
 #ifdef WITH_POSTGRESQL
+            void QueryResponse(CPQPollQuery *APollQuery);
+
             void ParseJSON(CHTTPServerConnection *AConnection, const CString &Identity, const CJSONMessage &Message, const CString &Account = {});
             void ParseSOAP(CHTTPServerConnection *AConnection, const CString &Payload);
 
             void JSONToSOAP(CHTTPServerConnection *AConnection, CCSChargingPoint *APoint, const CString &Operation, const CJSON &Payload);
             void SOAPToJSON(CHTTPServerConnection *AConnection, const CString &Payload);
 
-            void SetPointConnected(CCSChargingPoint *APoint, bool Value);
+            void SetPointConnected(const CString &Identity, bool Value, const CString &Metadata);
 #endif
             void SendSOAP(CHTTPServerConnection *AConnection, CCSChargingPoint *APoint, const CString &Operation, const CString &Payload);
             void SendJSON(CHTTPServerConnection *AConnection, CCSChargingPoint *APoint, const CJSONMessage &Message);
 
             void WebhookJSON(CHTTPServerConnection *AConnection, const CString &Identity, const CJSONMessage &Message, const CString &Account = {});
-            void WebhookSOAP(CHTTPServerConnection *AConnection, const CString &Payload);
+            void WebhookSOAP(CHTTPServerConnection *AConnection, const CString &Payload) const;
 
             static void LogJSONMessage(const CString &Identity, const CJSONMessage &Message);
 
+            CJSONValue ChargePointToJson(CCSChargingPoint *APoint);
             CJSON GetChargePointList();
 
             static int CheckError(const CJSON &Json, CString &ErrorMessage, bool RaiseIfError = false);
             static CHTTPReply::CStatusType ErrorCodeToStatus(int ErrorCode);
 
-            void OnChargePointMessageSOAP(CObject *Sender, const CSOAPMessage &Message);
-            void OnChargePointMessageJSON(CObject *Sender, const CJSONMessage &Message);
+            void OnChargePointMessageSOAP(CObject *Sender, const CSOAPMessage &Message) const;
+            void OnChargePointMessageJSON(CObject *Sender, const CJSONMessage &Message) const;
 
         protected:
 
@@ -194,7 +195,7 @@ namespace Apostol {
             void DoSOAP(CHTTPServerConnection *AConnection);
             int DoOCPP(CHTTPServerConnection *AConnection);
 
-            void DoPointConnected(CCSChargingPoint *APoint);
+            void DoPointConnected(CCSChargingPoint *APoint, bool Value);
             void DoPointDisconnected(CObject *Sender);
 #ifdef WITH_POSTGRESQL
             void DoPostgresQueryExecuted(CPQPollQuery *APollQuery) override;

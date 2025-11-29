@@ -1099,7 +1099,7 @@ namespace Apostol {
         }
         //--------------------------------------------------------------------------------------------------------------
 
-        bool CCustomChargingPoint::Connected() {
+        bool CCustomChargingPoint::Connected() const {
             if (Assigned(m_pConnection)) {
                 return m_pConnection->Connected();
             }
@@ -1114,43 +1114,31 @@ namespace Apostol {
         }
         //--------------------------------------------------------------------------------------------------------------
 
-        void CCustomChargingPoint::DeleteFromConnection(CWebSocketConnection *AConnection) {
-            if (Assigned(AConnection)) {
-                AConnection->Object(nullptr);
+        void CCustomChargingPoint::DisconnectConnection() const {
+            if (Assigned(m_pConnection) && m_pConnection->Object() == this) {
+                m_pConnection->Object(nullptr);
+                m_pConnection->Disconnect();
             }
         }
         //--------------------------------------------------------------------------------------------------------------
 
-        void CCustomChargingPoint::SwitchConnection(CWebSocketConnection *AConnection) {
-            if (m_pConnection != AConnection) {
-                BeginUpdate();
-
-                if (Assigned(m_pConnection)) {
-                    DeleteFromConnection(m_pConnection);
-                    m_pConnection->Disconnect();
-                    if (AConnection == nullptr)
-                        delete m_pConnection;
-                }
-
-                if (Assigned(AConnection)) {
-                    AddToConnection(AConnection);
-                }
-
-                m_pConnection = AConnection;
-
-                EndUpdate();
+        void CCustomChargingPoint::SwitchConnection(CWebSocketConnection *Value) {
+            if (m_pConnection != Value) {
+                DisconnectConnection();
+                AddToConnection(Value);
+                m_pConnection = Value;
             }
         }
         //--------------------------------------------------------------------------------------------------------------
 
-        void CCustomChargingPoint::SetProtocolType(CProtocolType Value) {
+        void CCustomChargingPoint::SetProtocolType(const CProtocolType Value) {
             if (Value != m_ProtocolType) {
                 m_ProtocolType = Value;
             }
         }
         //--------------------------------------------------------------------------------------------------------------
 
-        void CCustomChargingPoint::SetUpdateConnected(bool Value) {
+        void CCustomChargingPoint::SetUpdateConnected(const bool Value) {
             if (Value != m_bUpdateConnected) {
               m_bUpdateConnected = Value;
             }
@@ -2397,7 +2385,7 @@ namespace Apostol {
         }
         //--------------------------------------------------------------------------------------------------------------
 
-        CCSChargingPoint *CCSChargingPointManager::FindPointByIdentity(const CString &Value) {
+        CCSChargingPoint *CCSChargingPointManager::FindPointByIdentity(const CString &Value) const {
             for (int i = 0; i < Count(); ++i) {
                 const auto pPoint = Get(i);
                 if (pPoint->Identity() == Value)
@@ -2408,7 +2396,7 @@ namespace Apostol {
         }
         //--------------------------------------------------------------------------------------------------------------
 
-        CCSChargingPoint *CCSChargingPointManager::FindPointByConnection(CWebSocketConnection *Value) {
+        CCSChargingPoint *CCSChargingPointManager::FindPointByConnection(CWebSocketConnection *Value) const {
             for (int i = 0; i < Count(); ++i) {
                 const auto pPoint = Get(i);
                 if (pPoint->Connection() == Value)

@@ -695,8 +695,8 @@ namespace Apostol {
 
             COCPPMessageHandler *Send(const CJSONMessage &Message, COnMessageHandlerEvent &&Handler, uint32_t Key = 0);
 
-            COCPPMessageHandler *First() { return Get(0); };
-            COCPPMessageHandler *Last() { return Get(Count() - 1); };
+            COCPPMessageHandler *First() const { return Get(0); }
+            COCPPMessageHandler *Last() const { return Get(Count() - 1); }
 
             COCPPMessageHandler *FindMessageById(const CString &Value) const;
 
@@ -714,7 +714,6 @@ namespace Apostol {
         //--------------------------------------------------------------------------------------------------------------
 
         class CChargingPoint;
-        class CCSChargingPoint;
         //--------------------------------------------------------------------------------------------------------------
 
         typedef std::function<void (CObject *Sender, const CSOAPMessage &Message)> COnChargingPointMessageSOAPEvent;
@@ -743,7 +742,7 @@ namespace Apostol {
             COnChargingPointMessageJSONEvent m_OnMessageJSON;
 
             void AddToConnection(CWebSocketConnection *AConnection);
-            void DeleteFromConnection(CWebSocketConnection *AConnection);
+            void DisconnectConnection() const;
 
             void SetProtocolType(CProtocolType Value);
             void SetUpdateConnected(bool Value);
@@ -762,7 +761,7 @@ namespace Apostol {
 
             ~CCustomChargingPoint() override = default;
 
-            bool Connected();
+            bool Connected() const;
 
             void SwitchConnection(CWebSocketConnection *Value);
 
@@ -773,12 +772,7 @@ namespace Apostol {
             void SendProtocolError(const CString &UniqueId, const CString &ErrorDescription, const CJSON &Payload = {});
             void SendInternalError(const CString &UniqueId, const CString &ErrorDescription, const CJSON &Payload = {});
 
-            void BeginUpdate() { m_UpdateCount++; }
-            void EndUpdate() { m_UpdateCount--; }
-
-            int UpdateCount() const { return m_UpdateCount; }
-
-            CWebSocketConnection *Connection() { return m_pConnection; };
+            CWebSocketConnection *Connection() const { return m_pConnection; };
 
             COCPPMessageHandlerManager &Messages() { return m_Messages; };
             const COCPPMessageHandlerManager &Messages() const { return m_Messages; };
@@ -792,10 +786,10 @@ namespace Apostol {
             CString &Account() { return m_Account; };
             const CString &Account() const { return m_Account; };
 
-            void UpdateConnected(bool Value) { SetUpdateConnected(Value); };
+            void UpdateConnected(const bool Value) { SetUpdateConnected(Value); };
             bool UpdateConnected() const { return m_bUpdateConnected; };
 
-            void ProtocolType(CProtocolType Value) { SetProtocolType(Value); };
+            void ProtocolType(const CProtocolType Value) { SetProtocolType(Value); };
             CProtocolType ProtocolType() const { return m_ProtocolType; };
 
             const COnChargingPointMessageSOAPEvent &OnMessageSOAP() const { return m_OnMessageSOAP; }
@@ -1298,7 +1292,7 @@ namespace Apostol {
             void MeterValues(const CJSONMessage &Request, CJSONMessage &Response);
 
             void Error(const CSOAPMessage &Request, CSOAPMessage &Response, const CString &SubCode, const CString &Reason);
-            void Error(const CJSONMessage &Request, CJSONMessage &Response, const CString &Message);
+            static void Error(const CJSONMessage &Request, CJSONMessage &Response, const CString &Message);
 
             void Parse(const CString &Request, CString &Response);
             void Parse(const CSOAPMessage &Request, CString &Response);
@@ -1328,11 +1322,11 @@ namespace Apostol {
 
             CCSChargingPoint *Add(CWebSocketConnection *AConnection);
 
-            CCSChargingPoint *First() { return Get(0); };
-            CCSChargingPoint *Last() { return Get(Count() - 1); };
+            CCSChargingPoint *First() const { return Get(0); };
+            CCSChargingPoint *Last() const { return Get(Count() - 1); };
 
-            CCSChargingPoint *FindPointByIdentity(const CString &Value);
-            CCSChargingPoint *FindPointByConnection(CWebSocketConnection *Value);
+            CCSChargingPoint *FindPointByIdentity(const CString &Value) const;
+            CCSChargingPoint *FindPointByConnection(CWebSocketConnection *Value) const;
 
             CCSChargingPoint *Points(int Index) const { return Get(Index); }
             void Points(int Index, CCSChargingPoint *Value) { Set(Index, Value); }

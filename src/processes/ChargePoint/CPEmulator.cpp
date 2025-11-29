@@ -83,6 +83,8 @@ namespace Apostol {
         //--------------------------------------------------------------------------------------------------------------
 
         void CCPEmulator::AfterRun() {
+            m_ClientManager.Clear();
+
             CApplicationProcess::AfterRun();
 #ifdef WITH_POSTGRESQL
             PQClientsStop();
@@ -128,7 +130,7 @@ namespace Apostol {
         //--------------------------------------------------------------------------------------------------------------
 
         bool CCPEmulator::DoExecute(CTCPConnection *AConnection) {
-            return CModuleProcess::DoExecute(AConnection);;
+            return CModuleProcess::DoExecute(AConnection);
         }
         //--------------------------------------------------------------------------------------------------------------
 
@@ -167,7 +169,7 @@ namespace Apostol {
 
         COCPPClient *CCPEmulator::GetOCPPClient(const CLocation &URI) {
 
-            auto pClient = m_ClientManager.Add(URI);
+            const auto pClient = m_ClientManager.Add(URI);
 
             pClient->ClientName() = GApplication->Title();
             pClient->AutoConnect(false);
@@ -244,7 +246,7 @@ namespace Apostol {
 
             Log()->Notice("[%s] Configuration file: %s", stationIdentity.c_str(), fileName.c_str());
 
-            auto pClient = GetOCPPClient(CLocation(url + "/" + CHTTPServer::URLEncode(stationIdentity)));
+            const auto pClient = GetOCPPClient(CLocation(url + "/" + CHTTPServer::URLEncode(stationIdentity)));
 
             try {
                 pClient->Prefix() = prefix;
@@ -322,7 +324,7 @@ namespace Apostol {
         void CCPEmulator::DoTimer(CPollEventHandler *AHandler) {
             uint64_t exp;
 
-            auto pTimer = dynamic_cast<CEPollTimer *> (AHandler->Binding());
+            const auto pTimer = dynamic_cast<CEPollTimer *> (AHandler->Binding());
             pTimer->Read(&exp, sizeof(uint64_t));
 
             try {
@@ -334,10 +336,10 @@ namespace Apostol {
         }
         //--------------------------------------------------------------------------------------------------------------
 
-        void CCPEmulator::DoConnected(CObject *Sender) {
-            auto pConnection = dynamic_cast<COCPPConnection *>(Sender);
+        void CCPEmulator::DoConnected(CObject *Sender) const {
+            const auto pConnection = dynamic_cast<COCPPConnection *>(Sender);
             if (pConnection != nullptr) {
-                auto pBinding = pConnection->Socket()->Binding();
+                const auto pBinding = pConnection->Socket()->Binding();
                 if (pBinding != nullptr) {
                     Log()->Notice(_T("[%s] [%s:%d] OCPP client connected."),
                                    pConnection->Identity().c_str(),
@@ -351,10 +353,10 @@ namespace Apostol {
         }
         //--------------------------------------------------------------------------------------------------------------
 
-        void CCPEmulator::DoDisconnected(CObject *Sender) {
-            auto pConnection = dynamic_cast<COCPPConnection *>(Sender);
+        void CCPEmulator::DoDisconnected(CObject *Sender) const {
+            const auto pConnection = dynamic_cast<COCPPConnection *>(Sender);
             if (pConnection != nullptr) {
-                auto pBinding = pConnection->Socket()->Binding();
+                const auto pBinding = pConnection->Socket()->Binding();
                 if (pBinding != nullptr) {
                     Log()->Notice(_T("[%s] [%s:%d] OCPP client disconnected."),
                                    pConnection->Identity().c_str(),
@@ -379,18 +381,18 @@ namespace Apostol {
         }
         //--------------------------------------------------------------------------------------------------------------
 
-        void CCPEmulator::Heartbeat(CDateTime Now) {
-            if ((Now >= m_InitDate)) {
+        void CCPEmulator::Heartbeat(const CDateTime Now) {
+            if (Now >= m_InitDate) {
                 m_InitDate = Now + (CDateTime) 30 / SecsPerDay; // 30 sec
                 if (m_ClientManager.Count() == 0)
                     InitServer();
             }
 
             if (m_Status == psRunning) {
-                if ((Now >= m_CheckDate)) {
+                if (Now >= m_CheckDate) {
                     m_CheckDate = Now + (CDateTime) 30 / SecsPerDay; // 30 sec
                     for (int i = 0; i < m_ClientManager.Count(); ++i) {
-                        auto pClient = m_ClientManager.Items(i);
+                        const auto pClient = m_ClientManager.Items(i);
                         if (!pClient->Connected()) {
                             Log()->Notice(_T("[%s] Trying connect to %s."), pClient->Identity().c_str(), pClient->URI().href().c_str());
                             pClient->ConnectStart();
@@ -407,14 +409,14 @@ namespace Apostol {
         }
         //--------------------------------------------------------------------------------------------------------------
 
-        void CCPEmulator::OnChargePointMessageSOAP(CObject *Sender, const CSOAPMessage &Message) {
-            auto pPoint = dynamic_cast<CChargingPoint *> (Sender);
+        void CCPEmulator::OnChargePointMessageSOAP(CObject *Sender, const CSOAPMessage &Message) const {
+            const auto pPoint = dynamic_cast<CChargingPoint *> (Sender);
             chASSERT(pPoint);
         }
         //--------------------------------------------------------------------------------------------------------------
 
-        void CCPEmulator::OnChargePointMessageJSON(CObject *Sender, const CJSONMessage &Message) {
-            auto pPoint = dynamic_cast<CChargingPoint *> (Sender);
+        void CCPEmulator::OnChargePointMessageJSON(CObject *Sender, const CJSONMessage &Message) const {
+            const auto pPoint = dynamic_cast<CChargingPoint *> (Sender);
             chASSERT(pPoint);
             Log()->Message("[%s] [%s] [%s] [%s] %s", pPoint->Identity().c_str(),
                            Message.UniqueId.c_str(),
@@ -424,8 +426,8 @@ namespace Apostol {
         }
         //--------------------------------------------------------------------------------------------------------------
 
-        void CCPEmulator::OnCancelReservation(CObject *Sender, const CJSONMessage &Request, CJSONMessage &Response) {
-            auto pClient = dynamic_cast<COCPPClient *> (Sender);
+        void CCPEmulator::OnCancelReservation(CObject *Sender, const CJSONMessage &Request, CJSONMessage &Response) const {
+            const auto pClient = dynamic_cast<COCPPClient *> (Sender);
 
             chASSERT(pClient);
 
@@ -450,16 +452,16 @@ namespace Apostol {
         }
         //--------------------------------------------------------------------------------------------------------------
 
-        void CCPEmulator::OnChangeAvailability(CObject *Sender, const CJSONMessage &Request, CJSONMessage &Response) {
-            auto pClient = dynamic_cast<COCPPClient *> (Sender);
+        void CCPEmulator::OnChangeAvailability(CObject *Sender, const CJSONMessage &Request, CJSONMessage &Response) const {
+            const auto pClient = dynamic_cast<COCPPClient *> (Sender);
             chASSERT(pClient);
             LoadChargePointRequest(pClient->Prefix(), Request.Action, Response.Payload);
             pClient->SendMessage(Response);
         }
         //--------------------------------------------------------------------------------------------------------------
 
-        void CCPEmulator::OnChangeConfiguration(CObject *Sender, const CJSONMessage &Request, CJSONMessage &Response) {
-            auto pClient = dynamic_cast<COCPPClient *> (Sender);
+        void CCPEmulator::OnChangeConfiguration(CObject *Sender, const CJSONMessage &Request, CJSONMessage &Response) const {
+            const auto pClient = dynamic_cast<COCPPClient *> (Sender);
 
             chASSERT(pClient);
 
@@ -483,8 +485,8 @@ namespace Apostol {
         }
         //--------------------------------------------------------------------------------------------------------------
 
-        void CCPEmulator::OnClearCache(CObject *Sender, const CJSONMessage &Request, CJSONMessage &Response) {
-            auto pClient = dynamic_cast<COCPPClient *> (Sender);
+        void CCPEmulator::OnClearCache(CObject *Sender, const CJSONMessage &Request, CJSONMessage &Response) const {
+            const auto pClient = dynamic_cast<COCPPClient *> (Sender);
             chASSERT(pClient);
             const auto status = pClient->ClearCache();
             Response.Payload.Object().AddPair("status", COCPPMessage::ClearCacheStatusToString(status));
@@ -492,16 +494,16 @@ namespace Apostol {
         }
         //--------------------------------------------------------------------------------------------------------------
 
-        void CCPEmulator::OnClearChargingProfile(CObject *Sender, const CJSONMessage &Request, CJSONMessage &Response) {
-            auto pClient = dynamic_cast<COCPPClient *> (Sender);
+        void CCPEmulator::OnClearChargingProfile(CObject *Sender, const CJSONMessage &Request, CJSONMessage &Response) const {
+            const auto pClient = dynamic_cast<COCPPClient *> (Sender);
             chASSERT(pClient);
             LoadChargePointRequest(pClient->Prefix(), Request.Action, Response.Payload);
             pClient->SendMessage(Response);
         }
         //--------------------------------------------------------------------------------------------------------------
 
-        void CCPEmulator::OnDataTransfer(CObject *Sender, const CJSONMessage &Request, CJSONMessage &Response) {
-            auto pClient = dynamic_cast<COCPPClient *> (Sender);
+        void CCPEmulator::OnDataTransfer(CObject *Sender, const CJSONMessage &Request, CJSONMessage &Response) const {
+            const auto pClient = dynamic_cast<COCPPClient *> (Sender);
             chASSERT(pClient);
 
             if (pClient == nullptr) {
@@ -534,16 +536,16 @@ namespace Apostol {
         }
         //--------------------------------------------------------------------------------------------------------------
 
-        void CCPEmulator::OnGetCompositeSchedule(CObject *Sender, const CJSONMessage &Request, CJSONMessage &Response) {
-            auto pClient = dynamic_cast<COCPPClient *> (Sender);
+        void CCPEmulator::OnGetCompositeSchedule(CObject *Sender, const CJSONMessage &Request, CJSONMessage &Response) const {
+            const auto pClient = dynamic_cast<COCPPClient *> (Sender);
             chASSERT(pClient);
             LoadChargePointRequest(pClient->Prefix(), Request.Action, Response.Payload);
             pClient->SendMessage(Response);
         }
         //--------------------------------------------------------------------------------------------------------------
 
-        void CCPEmulator::OnGetConfiguration(CObject *Sender, const CJSONMessage &Request, CJSONMessage &Response) {
-            auto pClient = dynamic_cast<COCPPClient *> (Sender);
+        void CCPEmulator::OnGetConfiguration(CObject *Sender, const CJSONMessage &Request, CJSONMessage &Response) const {
+            const auto pClient = dynamic_cast<COCPPClient *> (Sender);
 
             chASSERT(pClient);
 
@@ -559,24 +561,24 @@ namespace Apostol {
         }
         //--------------------------------------------------------------------------------------------------------------
 
-        void CCPEmulator::OnGetDiagnostics(CObject *Sender, const CJSONMessage &Request, CJSONMessage &Response) {
-            auto pClient = dynamic_cast<COCPPClient *> (Sender);
+        void CCPEmulator::OnGetDiagnostics(CObject *Sender, const CJSONMessage &Request, CJSONMessage &Response) const {
+            const auto pClient = dynamic_cast<COCPPClient *> (Sender);
             chASSERT(pClient);
             LoadChargePointRequest(pClient->Prefix(), Request.Action, Response.Payload);
             pClient->SendMessage(Response);
         }
         //--------------------------------------------------------------------------------------------------------------
 
-        void CCPEmulator::OnGetLocalListVersion(CObject *Sender, const CJSONMessage &Request, CJSONMessage &Response) {
-            auto pClient = dynamic_cast<COCPPClient *> (Sender);
+        void CCPEmulator::OnGetLocalListVersion(CObject *Sender, const CJSONMessage &Request, CJSONMessage &Response) const {
+            const auto pClient = dynamic_cast<COCPPClient *> (Sender);
             chASSERT(pClient);
             LoadChargePointRequest(pClient->Prefix(), Request.Action, Response.Payload);
             pClient->SendMessage(Response);
         }
         //--------------------------------------------------------------------------------------------------------------
 
-        void CCPEmulator::OnRemoteStartTransaction(CObject *Sender, const CJSONMessage &Request, CJSONMessage &Response) {
-            auto pClient = dynamic_cast<COCPPClient *> (Sender);
+        void CCPEmulator::OnRemoteStartTransaction(CObject *Sender, const CJSONMessage &Request, CJSONMessage &Response) const {
+            const auto pClient = dynamic_cast<COCPPClient *> (Sender);
 
             chASSERT(pClient);
 
@@ -611,8 +613,8 @@ namespace Apostol {
         }
         //--------------------------------------------------------------------------------------------------------------
 
-        void CCPEmulator::OnRemoteStopTransaction(CObject *Sender, const CJSONMessage &Request, CJSONMessage &Response) {
-            auto pClient = dynamic_cast<COCPPClient *> (Sender);
+        void CCPEmulator::OnRemoteStopTransaction(CObject *Sender, const CJSONMessage &Request, CJSONMessage &Response) const {
+            const auto pClient = dynamic_cast<COCPPClient *> (Sender);
 
             chASSERT(pClient);
 
@@ -637,8 +639,8 @@ namespace Apostol {
         }
         //--------------------------------------------------------------------------------------------------------------
 
-        void CCPEmulator::OnReserveNow(CObject *Sender, const CJSONMessage &Request, CJSONMessage &Response) {
-            auto pClient = dynamic_cast<COCPPClient *> (Sender);
+        void CCPEmulator::OnReserveNow(CObject *Sender, const CJSONMessage &Request, CJSONMessage &Response) const {
+            const auto pClient = dynamic_cast<COCPPClient *> (Sender);
 
             chASSERT(pClient);
 
@@ -690,7 +692,7 @@ namespace Apostol {
         //--------------------------------------------------------------------------------------------------------------
 
         void CCPEmulator::OnReset(CObject *Sender, const CJSONMessage &Request, CJSONMessage &Response) {
-            auto pClient = dynamic_cast<COCPPClient *> (Sender);
+            const auto pClient = dynamic_cast<COCPPClient *> (Sender);
 
             chASSERT(pClient);
 
@@ -718,24 +720,24 @@ namespace Apostol {
         }
         //--------------------------------------------------------------------------------------------------------------
 
-        void CCPEmulator::OnSendLocalList(CObject *Sender, const CJSONMessage &Request, CJSONMessage &Response) {
-            auto pClient = dynamic_cast<COCPPClient *> (Sender);
+        void CCPEmulator::OnSendLocalList(CObject *Sender, const CJSONMessage &Request, CJSONMessage &Response) const {
+            const auto pClient = dynamic_cast<COCPPClient *> (Sender);
             chASSERT(pClient);
             LoadChargePointRequest(pClient->Prefix(), Request.Action, Response.Payload);
             pClient->SendMessage(Response);
         }
         //--------------------------------------------------------------------------------------------------------------
 
-        void CCPEmulator::OnSetChargingProfile(CObject *Sender, const CJSONMessage &Request, CJSONMessage &Response) {
-            auto pClient = dynamic_cast<COCPPClient *> (Sender);
+        void CCPEmulator::OnSetChargingProfile(CObject *Sender, const CJSONMessage &Request, CJSONMessage &Response) const {
+            const auto pClient = dynamic_cast<COCPPClient *> (Sender);
             chASSERT(pClient);
             LoadChargePointRequest(pClient->Prefix(), Request.Action, Response.Payload);
             pClient->SendMessage(Response);
         }
         //--------------------------------------------------------------------------------------------------------------
 
-        void CCPEmulator::OnTriggerMessage(CObject *Sender, const CJSONMessage &Request, CJSONMessage &Response) {
-            auto pClient = dynamic_cast<COCPPClient *> (Sender);
+        void CCPEmulator::OnTriggerMessage(CObject *Sender, const CJSONMessage &Request, CJSONMessage &Response) const {
+            const auto pClient = dynamic_cast<COCPPClient *> (Sender);
 
             chASSERT(pClient);
 
@@ -765,16 +767,16 @@ namespace Apostol {
         }
         //--------------------------------------------------------------------------------------------------------------
 
-        void CCPEmulator::OnUnlockConnector(CObject *Sender, const CJSONMessage &Request, CJSONMessage &Response) {
-            auto pClient = dynamic_cast<COCPPClient *> (Sender);
+        void CCPEmulator::OnUnlockConnector(CObject *Sender, const CJSONMessage &Request, CJSONMessage &Response) const {
+            const auto pClient = dynamic_cast<COCPPClient *> (Sender);
             chASSERT(pClient);
             LoadChargePointRequest(pClient->Prefix(), Request.Action, Response.Payload);
             pClient->SendMessage(Response);
         }
         //--------------------------------------------------------------------------------------------------------------
 
-        void CCPEmulator::OnUpdateFirmware(CObject *Sender, const CJSONMessage &Request, CJSONMessage &Response) {
-            auto pClient = dynamic_cast<COCPPClient *> (Sender);
+        void CCPEmulator::OnUpdateFirmware(CObject *Sender, const CJSONMessage &Request, CJSONMessage &Response) const {
+            const auto pClient = dynamic_cast<COCPPClient *> (Sender);
             chASSERT(pClient);
             LoadChargePointRequest(pClient->Prefix(), Request.Action, Response.Payload);
             pClient->SendMessage(Response);

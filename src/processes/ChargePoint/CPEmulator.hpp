@@ -67,35 +67,35 @@ namespace Apostol {
 
             void Heartbeat(CDateTime Now);
 
-            void OnChargePointMessageSOAP(CObject *Sender, const CSOAPMessage &Message);
-            void OnChargePointMessageJSON(CObject *Sender, const CJSONMessage &Message);
+            void OnChargePointMessageSOAP(CObject *Sender, const CSOAPMessage &Message) const;
+            void OnChargePointMessageJSON(CObject *Sender, const CJSONMessage &Message) const;
 
-            void OnCancelReservation(CObject *Sender, const CJSONMessage &Request, CJSONMessage &Response);
-            void OnChangeAvailability(CObject *Sender, const CJSONMessage &Request, CJSONMessage &Response);
-            void OnChangeConfiguration(CObject *Sender, const CJSONMessage &Request, CJSONMessage &Response);
-            void OnClearCache(CObject *Sender, const CJSONMessage &Request, CJSONMessage &Response);
-            void OnClearChargingProfile(CObject *Sender, const CJSONMessage &Request, CJSONMessage &Response);
-            void OnDataTransfer(CObject *Sender, const CJSONMessage &Request, CJSONMessage &Response);
-            void OnGetCompositeSchedule(CObject *Sender, const CJSONMessage &Request, CJSONMessage &Response);
-            void OnGetConfiguration(CObject *Sender, const CJSONMessage &Request, CJSONMessage &Response);
-            void OnGetDiagnostics(CObject *Sender, const CJSONMessage &Request, CJSONMessage &Response);
-            void OnGetLocalListVersion(CObject *Sender, const CJSONMessage &Request, CJSONMessage &Response);
-            void OnRemoteStartTransaction(CObject *Sender, const CJSONMessage &Request, CJSONMessage &Response);
-            void OnRemoteStopTransaction(CObject *Sender, const CJSONMessage &Request, CJSONMessage &Response);
-            void OnReserveNow(CObject *Sender, const CJSONMessage &Request, CJSONMessage &Response);
+            void OnCancelReservation(CObject *Sender, const CJSONMessage &Request, CJSONMessage &Response) const;
+            void OnChangeAvailability(CObject *Sender, const CJSONMessage &Request, CJSONMessage &Response) const;
+            void OnChangeConfiguration(CObject *Sender, const CJSONMessage &Request, CJSONMessage &Response) const;
+            void OnClearCache(CObject *Sender, const CJSONMessage &Request, CJSONMessage &Response) const;
+            void OnClearChargingProfile(CObject *Sender, const CJSONMessage &Request, CJSONMessage &Response) const;
+            void OnDataTransfer(CObject *Sender, const CJSONMessage &Request, CJSONMessage &Response) const;
+            void OnGetCompositeSchedule(CObject *Sender, const CJSONMessage &Request, CJSONMessage &Response) const;
+            void OnGetConfiguration(CObject *Sender, const CJSONMessage &Request, CJSONMessage &Response) const;
+            void OnGetDiagnostics(CObject *Sender, const CJSONMessage &Request, CJSONMessage &Response) const;
+            void OnGetLocalListVersion(CObject *Sender, const CJSONMessage &Request, CJSONMessage &Response) const;
+            void OnRemoteStartTransaction(CObject *Sender, const CJSONMessage &Request, CJSONMessage &Response) const;
+            void OnRemoteStopTransaction(CObject *Sender, const CJSONMessage &Request, CJSONMessage &Response) const;
+            void OnReserveNow(CObject *Sender, const CJSONMessage &Request, CJSONMessage &Response) const;
             void OnReset(CObject *Sender, const CJSONMessage &Request, CJSONMessage &Response);
-            void OnSendLocalList(CObject *Sender, const CJSONMessage &Request, CJSONMessage &Response);
-            void OnSetChargingProfile(CObject *Sender, const CJSONMessage &Request, CJSONMessage &Response);
-            void OnTriggerMessage(CObject *Sender, const CJSONMessage &Request, CJSONMessage &Response);
-            void OnUnlockConnector(CObject *Sender, const CJSONMessage &Request, CJSONMessage &Response);
-            void OnUpdateFirmware(CObject *Sender, const CJSONMessage &Request, CJSONMessage &Response);
+            void OnSendLocalList(CObject *Sender, const CJSONMessage &Request, CJSONMessage &Response) const;
+            void OnSetChargingProfile(CObject *Sender, const CJSONMessage &Request, CJSONMessage &Response) const;
+            void OnTriggerMessage(CObject *Sender, const CJSONMessage &Request, CJSONMessage &Response) const;
+            void OnUnlockConnector(CObject *Sender, const CJSONMessage &Request, CJSONMessage &Response) const;
+            void OnUpdateFirmware(CObject *Sender, const CJSONMessage &Request, CJSONMessage &Response) const;
 
         protected:
 
             void DoTimer(CPollEventHandler *AHandler) override;
 
-            void DoConnected(CObject *Sender);
-            void DoDisconnected(CObject *Sender);
+            void DoConnected(CObject *Sender) const;
+            void DoDisconnected(CObject *Sender) const;
 
             void DoError(const Delphi::Exception::Exception &E);
 
@@ -108,7 +108,7 @@ namespace Apostol {
 
             ~CCPEmulator() override = default;
 
-            static class CCPEmulator *CreateProcess(CCustomProcess *AParent, CApplication *AApplication) {
+            static CCPEmulator *CreateProcess(CCustomProcess *AParent, CApplication *AApplication) {
                 return new CCPEmulator(AParent, AApplication);
             }
 

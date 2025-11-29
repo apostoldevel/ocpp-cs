@@ -2,11 +2,11 @@
 
 Program name:
 
-  ocpp
+  Central System
 
 Module Name:
 
-  ocpp.hpp
+  cs.hpp
 
 Notices:
 

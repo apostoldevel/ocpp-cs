@@ -37,7 +37,7 @@ namespace Apostol {
 
         //--------------------------------------------------------------------------------------------------------------
 
-        COCPPClient::COCPPClient(): CGlobalComponent(), CHTTPClient(), CChargingPoint() {
+        COCPPClient::COCPPClient() {
             m_pTimer = nullptr;
             m_ErrorCount = -1;
             m_TimerInterval = 0;
@@ -50,9 +50,7 @@ namespace Apostol {
         }
         //--------------------------------------------------------------------------------------------------------------
 
-        COCPPClient::COCPPClient(const CLocation &URI): CGlobalComponent(), CHTTPClient(URI.hostname, URI.port),
-                CChargingPoint(), m_URI(URI) {
-
+        COCPPClient::COCPPClient(const CLocation &URI): CHTTPClient(URI.hostname, URI.port), m_URI(URI) {
             m_pTimer = nullptr;
             m_ErrorCount = -1;
             m_TimerInterval = 0;
@@ -141,7 +139,7 @@ namespace Apostol {
         //--------------------------------------------------------------------------------------------------------------
 
         void COCPPClient::DoConnect(CPollEventHandler *AHandler) {
-            auto pConnection = dynamic_cast<COCPPConnection *> (AHandler->Binding());
+            const auto pConnection = dynamic_cast<COCPPConnection *> (AHandler->Binding());
 
             if (pConnection == nullptr) {
                 AHandler->Stop();
@@ -149,7 +147,7 @@ namespace Apostol {
             }
 
             try {
-                const auto pIOHandler = dynamic_cast<CIOHandlerSocket *>(pConnection->IOHandler());
+                const auto pIOHandler = (CIOHandlerSocket *) pConnection->IOHandler();
 
                 if (pIOHandler->Binding()->CheckConnection()) {
                     ClearErrorCount();
@@ -175,7 +173,7 @@ namespace Apostol {
                 IncErrorCount();
                 AHandler->Stop();
                 SwitchConnection(nullptr);
-                throw ESocketError(E.ErrorCode(), "Connection failed");
+                throw ESocketError(E.ErrorCode(), "Connection failed ");
             }
         }
         //--------------------------------------------------------------------------------------------------------------
@@ -199,7 +197,7 @@ namespace Apostol {
                     int i;
                     for (i = 0; i < m_Actions.Count(); ++i) {
                         const auto pHandler = (CJSONActionHandler *) m_Actions.Objects(i);
-                        if (pHandler != nullptr && pHandler->Allow()) {
+                        if (pHandler->Allow()) {
                             const auto &action = m_Actions.Strings(i);
                             if (action == jmRequest.Action) {
                                 CJSONProtocol::PrepareResponse(jmRequest, jmResponse);
@@ -286,13 +284,13 @@ namespace Apostol {
         }
         //--------------------------------------------------------------------------------------------------------------
 
-        void COCPPClient::DoHeartbeat(const CDateTime Now) {
+        void COCPPClient::DoHeartbeat(CDateTime Now) {
             if (Now >= m_PingDateTime) {
-                m_PingDateTime = Now + static_cast<CDateTime>(60) / SecsPerDay; // 60 sec
+                m_PingDateTime = Now + (CDateTime) 60 / SecsPerDay; // 60 sec
                 Ping();
             } else if (BootNotificationStatus() != rsAccepted) {
                 if (Now >= m_BootNotificationDateTime) {
-                    m_BootNotificationDateTime = Now + static_cast<CDateTime>(30) / SecsPerDay; // 30 sec
+                    m_BootNotificationDateTime = Now + (CDateTime) 30 / SecsPerDay; // 30 sec
                     SendBootNotification();
                 }
             } else {
@@ -303,7 +301,7 @@ namespace Apostol {
                     } else if (connector.Status() == cpsFinishing) {
                         const auto &caFinishingTimeout = ConfigurationKeys()["FinishingTimeout"].value;
                         const auto timeout = caFinishingTimeout.empty() ? 60 : StrToIntDef(caFinishingTimeout.c_str(), 60);
-                        if ((timeout > 0) && ((connector.StatusUpdated() + static_cast<CDateTime>(timeout) / SecsPerDay) <= Now)) {
+                        if ((timeout > 0) && ((connector.StatusUpdated() + (CDateTime) timeout / SecsPerDay) <= Now)) {
                             connector.Status(cpsAvailable);
                         }
                     } else if (connector.Status() == cpsReserved && connector.ExpiryDate() <= Now) {
@@ -314,12 +312,12 @@ namespace Apostol {
                 bool meterSend = false;
 
                 if (Now >= m_MeterValueDateTime) {
-                    m_MeterValueDateTime = Now + static_cast<CDateTime>(60) / SecsPerDay; // 60 sec
+                    m_MeterValueDateTime = Now + (CDateTime) 60 / SecsPerDay; // 60 sec
                     meterSend = MeterValues();
                 }
 
                 if (!meterSend && Now >= m_HeartbeatDateTime) {
-                    m_HeartbeatDateTime = Now + static_cast<CDateTime>(m_HeartbeatInterval) / SecsPerDay;
+                    m_HeartbeatDateTime = Now + (CDateTime) m_HeartbeatInterval / SecsPerDay;
                     SendHeartbeat();
                 }
             }
@@ -347,8 +345,8 @@ namespace Apostol {
 
         //--------------------------------------------------------------------------------------------------------------
 
-        COCPPClientItem *COCPPClientManager::GetItem(const int Index) const {
-            return dynamic_cast<COCPPClientItem *>(inherited::GetItem(Index));
+        COCPPClientItem *COCPPClientManager::GetItem(int Index) const {
+            return (COCPPClientItem *) inherited::GetItem(Index);
         }
         //--------------------------------------------------------------------------------------------------------------
 
