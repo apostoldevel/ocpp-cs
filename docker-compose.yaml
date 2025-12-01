@@ -8,5 +8,5 @@ services:
     ports:
       - "9220:9220"
     network_mode: "host"
-#    environment:
-#      WEBHOOK_URL: https://cloud.ocpp-css.com/api/v1/ocpp
+    environment:
+      WEBHOOK_URL: https://api.ocpp-css.com/api/v1/ocpp/parse

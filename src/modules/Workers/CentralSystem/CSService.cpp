@@ -1121,7 +1121,7 @@ namespace Apostol {
                         if (message.MessageTypeId == ChargePoint::mtCallError) {
                             message.ErrorCode = jContent["errorCode"].AsString();
                             message.ErrorDescription = jContent["errorDescription"].AsString();
-                            message.Payload << jContent["errorDescription"];
+                            message.Payload << jContent["errorDetails"].ToString();
                         } else {
                             message.Payload << jContent["payload"].ToString();
                         }
@@ -1597,6 +1597,9 @@ namespace Apostol {
                         ParseJSON(AConnection, pPoint->Identity(), Message, pPoint->Account());
 #else
                         if (m_Webhook.Enabled()) {
+                            CJSONMessage jmResponse;
+                            COCPPMessage::Parse(pPoint, Message, jmResponse);
+
                             WebhookJSON(AConnection, pPoint->Identity(), Message, pPoint->Account());
                         } else {
                             auto &WSReply = AConnection->WSReply();
