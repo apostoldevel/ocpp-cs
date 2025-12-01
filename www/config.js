@@ -1,11 +1,12 @@
 var appConfig = {
   defaultLanguage: "en",
 
-  creditsText: "OCPP Central System © 2024",
+  creditsText: "OCPP Central System © 2025",
   creditsShortText: "Central System",
 
   signIn: "/signin",
   signUp: "/signup",
+  state: "debug",
 
   confAuthorize: true,
   confCrm: false,
@@ -14,6 +15,7 @@ var appConfig = {
   confAdmin: false,
   googleAuthorize: false,
 
+  map: "google",
   mapLanguage: "en_US",
 
   googleClientId: null,
