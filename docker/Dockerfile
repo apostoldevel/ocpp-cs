@@ -2,8 +2,8 @@ FROM debian:bookworm-slim AS builder
 
 LABEL project="cs"
 
-ENV PROJECT_NAME 'cs'
-ENV BUILD_MODE 'release'
+ENV PROJECT_NAME=cs
+ENV BUILD_MODE=release
 
 RUN set -eux; \
     apt update && apt install -y --no-install-recommends \
@@ -29,7 +29,7 @@ RUN set -eux; \
 
 FROM debian:bookworm-slim AS cs
 
-ENV PROJECT_NAME 'cs'
+ENV PROJECT_NAME=cs
 
 RUN set -eux; \
     apt update && apt install -y --no-install-recommends \

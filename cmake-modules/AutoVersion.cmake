@@ -1,12 +1,18 @@
 find_package(Git)
 
+set(GIT_REVISION "e00000")
+
 if (GIT_FOUND)
-    execute_process(
-            COMMAND ${GIT_EXECUTABLE} rev-parse --short HEAD
-            OUTPUT_VARIABLE GIT_REVISION
-            OUTPUT_STRIP_TRAILING_WHITESPACE
-    )
-    message(STATUS "Current Git commit hash: " ${GIT_REVISION})
+    if (EXISTS ../.git)
+        execute_process(
+                COMMAND ${GIT_EXECUTABLE} rev-parse --short HEAD
+                OUTPUT_VARIABLE GIT_REVISION
+                OUTPUT_STRIP_TRAILING_WHITESPACE
+        )
+        message(STATUS "Current Git commit hash: " ${GIT_REVISION})
+    else()
+        message(STATUS "Git not found!")
+    endif()
 endif()
 
 file(READ ${VERSION_FILE} VERSION_TEXT)

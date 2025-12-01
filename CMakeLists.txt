@@ -5,6 +5,8 @@ set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -static-libgcc -static-libstdc++ -rdynamic")
+
 set(PROJECT_NAME "cs")
 set(PROJECT_DESCRIPTION "OCPP Central System")
 
@@ -64,6 +66,7 @@ endif()
 if (WITH_POSTGRESQL)
     find_package(PostgreSQL REQUIRED)
     add_compile_options("-DWITH_POSTGRESQL")
+    add_compile_options("-DPOSTGRESQL_VERSION_14")
 endif()
 
 if (WITH_SSL)
