@@ -982,7 +982,7 @@ namespace Apostol {
             } else if (action == "stoptransactionrequest") {
                 APoint->StopTransaction(Request, Response);
             } else {
-                APoint->Error(Request, Response, "NotSupported", CString().Format("Action %s not supported", action));
+                APoint->Error(Request, Response, "NotSupported", CString().Format("Action %s not supported", action.c_str()));
             }
         }
         //--------------------------------------------------------------------------------------------------------------
@@ -1010,7 +1010,7 @@ namespace Apostol {
             } else if (action == "StopTransaction") {
                 APoint->StopTransaction(Request, Response);
             } else {
-                Response = CJSONProtocol::CallError(Request.UniqueId, "NotSupported", CString().Format("Action %s not supported", action), Request.Payload);
+                Response = CJSONProtocol::CallError(Request.UniqueId, "NotSupported", CString().Format("Action %s not supported", action.c_str()), Request.Payload);
             }
         }
 
@@ -1518,7 +1518,7 @@ namespace Apostol {
             if (m_BootNotificationStatus != Status) {
                 m_BootNotificationStatus = Status;
                 if (m_BootNotificationStatus == rsAccepted) {
-                    StatusNotification(-1);
+                    StatusNotification(0);
                 }
             }
         }
@@ -1665,12 +1665,12 @@ namespace Apostol {
         bool CChargingPoint::MeterValues(int connectorId) {
             bool result = false;
 
-            if (connectorId == -1) {
+            if (connectorId == 0) {
+                result = m_ConnectorZero.MeterValues();
+
                 for (int i = 0; i < Connectors().Count(); ++i) {
                     result |= Connectors()[i].MeterValues();
                 }
-            } else if (connectorId == 0) {
-                result = m_ConnectorZero.MeterValues();
             } else {
                 const auto index = IndexOfConnectorId(connectorId);
                 if (index == -1) {
@@ -1684,12 +1684,12 @@ namespace Apostol {
         //--------------------------------------------------------------------------------------------------------------
 
         void CChargingPoint::SetNotificationStatus(int connectorId, CChargePointStatus Status) {
-            if (connectorId == -1) {
+            if (connectorId == 0) {
+                m_ConnectorZero.Status(Status);
+
                 for (int i = 0; i < Connectors().Count(); ++i) {
                     Connectors()[i].Status(Status);
                 }
-            } else if (connectorId == 0) {
-                m_ConnectorZero.Status(Status);
             } else {
                 const auto index = IndexOfConnectorId(connectorId);
                 if (index == -1) {
@@ -1701,12 +1701,12 @@ namespace Apostol {
         //--------------------------------------------------------------------------------------------------------------
 
         void CChargingPoint::StatusNotification(int connectorId) {
-            if (connectorId == -1) {
+            if (connectorId == 0) {
+                m_ConnectorZero.UpdateStatusNotification();
+
                 for (int i = 0; i < Connectors().Count(); ++i) {
                     Connectors()[i].UpdateStatusNotification();
                 }
-            } else if (connectorId == 0) {
-                m_ConnectorZero.UpdateStatusNotification();
             } else {
                 const auto index = IndexOfConnectorId(connectorId);
                 if (index == -1) {
@@ -1777,18 +1777,15 @@ namespace Apostol {
                 jsonArray.Add(value);
             };
 
-            if (connectorId == -1) {
+            if (connectorId == 0) {
                 for (int i = 0; i < Connectors().Count(); ++i) {
                     add_connector(Connectors()[i]);
                 }
-            } else if (connectorId == 0) {
-                add_connector(m_ConnectorZero);
             } else {
                 const auto index = IndexOfConnectorId(connectorId);
-                if (index == -1) {
-                    throw Delphi::Exception::ExceptionFrm(CP_INVALID_CONNECTION_ID, connectorId);
+                if (index != -1) {
+                    add_connector(Connectors()[index]);
                 }
-                add_connector(Connectors()[index]);
             }
 
             json.Object().AddPair("connectorId", jsonArray);
@@ -1859,18 +1856,16 @@ namespace Apostol {
 
             int index = 0;
 
-            if (connectorId == -1) {
-                return rvsRejected;
-            } else if (connectorId == 0) {
+            if (connectorId == 0) {
                 if (m_ConfigurationKeys["ReserveConnectorZeroSupported"].value != "true") {
                     return rvsRejected;
                 }
                 return m_ConnectorZero.ReserveNow(expiryDate, idTag, parentIdTag, reservationId);
-            } else if (connectorId > 0) {
-                index = IndexOfConnectorId(connectorId);
-                if (index == -1) {
-                    throw Delphi::Exception::ExceptionFrm(CP_INVALID_CONNECTION_ID, connectorId);
-                }
+            }
+
+            index = IndexOfConnectorId(connectorId);
+            if (index == -1) {
+                throw Delphi::Exception::ExceptionFrm(CP_INVALID_CONNECTION_ID, connectorId);
             }
 
             return m_Connectors[index].ReserveNow(expiryDate, idTag, parentIdTag, reservationId);
@@ -2003,9 +1998,11 @@ namespace Apostol {
                     if (message.Payload.HasOwnProperty("status")) {
                         const auto &status = COCPPMessage::StringToChargePointStatus(message.Payload["status"].AsString());
 
-                        const auto index = IndexOfConnectorId(connectorId);
-                        if (index == -1) {
-                            throw Delphi::Exception::ExceptionFrm(CP_INVALID_CONNECTION_ID, connectorId);
+                        if (connectorId > 0) {
+                            const auto index = IndexOfConnectorId(connectorId);
+                            if (index == -1) {
+                                throw Delphi::Exception::ExceptionFrm(CP_INVALID_CONNECTION_ID, connectorId);
+                            }
                         }
                     }
                 }
@@ -2236,7 +2233,10 @@ namespace Apostol {
         //--------------------------------------------------------------------------------------------------------------
 
         void CCSChargingPoint::StatusNotification(const CJSONMessage &Request, CJSONMessage &Response) {
-            m_StatusNotificationRequest << Request.Payload;
+            const auto connectorId = Request.Payload["connectorId"].AsInteger();
+            if (connectorId == 0) {
+                m_StatusNotificationRequest << Request.Payload;
+            }
         }
         //--------------------------------------------------------------------------------------------------------------
 

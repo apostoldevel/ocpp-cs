@@ -1172,7 +1172,7 @@ namespace Apostol {
             void UpdateAuthorizationCache(const CIdTag &IdTag);
 
             /// 4.7. Meter Values
-            bool MeterValues(int connectorId = -1);
+            bool MeterValues(int connectorId = 0);
 
             /// 4.9. Status Notification
             void StatusNotification(int connectorId);
@@ -1187,7 +1187,7 @@ namespace Apostol {
             CClearCacheStatus ClearCache();
 
             /// 5.8. Get Configuration
-            CJSON ConnectorToJson(int connectorId = -1);
+            CJSON ConnectorToJson(int connectorId = 0);
             CJSON ConfigurationToJson(const CString &key = {});
 
             /// 5.11. Remote Start Transaction
