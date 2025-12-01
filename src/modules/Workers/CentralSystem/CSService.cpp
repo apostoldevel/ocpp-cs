@@ -309,20 +309,32 @@ namespace Apostol {
         CJSONValue CCSService::ChargePointToJson(CCSChargingPoint *APoint) {
             CJSONValue jsonPoint(jvtObject);
             CJSONValue jsonConnection(jvtObject);
+            CJSONValue jsonBootNotification(jvtObject);
+            CJSONValue jsonStatusNotification(jvtObject);
 
-            jsonPoint.Object().AddPair("Identity", APoint->Identity());
-            jsonPoint.Object().AddPair("Address", APoint->Address());
+            jsonPoint.Object().AddPair("identity", APoint->Identity());
+            jsonPoint.Object().AddPair("address", APoint->Address());
 
             const auto pConnection = APoint->Connection();
 
             if (ConnectionExists(pConnection)) {
-                jsonConnection.Object().AddPair("Socket", pConnection->Socket()->Binding()->Handle());
-                jsonConnection.Object().AddPair("IP", pConnection->Socket()->Binding()->PeerIP());
-                jsonConnection.Object().AddPair("Port", pConnection->Socket()->Binding()->PeerPort());
+                jsonConnection.Object().AddPair("socket", pConnection->Socket()->Binding()->Handle());
+                jsonConnection.Object().AddPair("ip", pConnection->Socket()->Binding()->PeerIP());
+                jsonConnection.Object().AddPair("port", pConnection->Socket()->Binding()->PeerPort());
 
-                jsonPoint.Object().AddPair("Connection", jsonConnection);
+                jsonPoint.Object().AddPair("connection", jsonConnection);
+
+                APoint->BootNotificationRequest() >> jsonBootNotification;
+
+                jsonPoint.Object().AddPair("bootNotification", jsonBootNotification);
+
+                APoint->StatusNotificationRequest() >> jsonStatusNotification;
+
+                jsonPoint.Object().AddPair("statusNotification", jsonStatusNotification);
             } else {
-                jsonPoint.Object().AddPair("Connection", CJSONValue());
+                jsonPoint.Object().AddPair("connection", CJSONValue());
+                jsonPoint.Object().AddPair("bootNotification", CJSONValue());
+                jsonPoint.Object().AddPair("statusNotification", CJSONValue());
             }
 
             return jsonPoint;
@@ -709,8 +721,12 @@ namespace Apostol {
         void CCSService::DoPointConnected(CCSChargingPoint *APoint, bool Value) {
 #ifdef WITH_POSTGRESQL
             if (APoint->UpdateConnected()) {
-                const auto& metaData = ChargePointToJson(APoint).ToString();
-                SetPointConnected(APoint->Identity(), Value, metaData);
+                if (Value) {
+                    const auto& metaData = ChargePointToJson(APoint).ToString();
+                    SetPointConnected(APoint->Identity(), true, metaData);
+                } else {
+                    SetPointConnected(APoint->Identity(), false, "{}");
+                }
             }
 #endif
         }
