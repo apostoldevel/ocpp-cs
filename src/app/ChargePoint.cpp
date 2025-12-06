@@ -85,7 +85,7 @@ namespace Apostol {
             xmlDocument.parse<0>((char *) xmlString.c_str());
 
             xml_node<> *timeStamp = xmlDocument.first_node("timestamp");
-            MeterValue.timestamp = StrToDateTimeDef(timeStamp->first_node("timestamp")->value(), 0, "%04d-%02d-%02dT%02d:%02d:%02d");
+            MeterValue.timestamp = StrToDateTimeDef(timeStamp->first_node("timestamp")->value(), 0);
 
             xml_node<> *sampledValue = xmlDocument.first_node("sampledValue");
             for (xml_node<> *value = sampledValue->first_node(); value; value = value->next_sibling()) {

@@ -176,7 +176,7 @@ namespace Apostol {
             pClient->AllocateEventHandlers(Server());
 
 #if defined(_GLIBCXX_RELEASE) && (_GLIBCXX_RELEASE >= 9)
-            pClient->OnVerbose([this](auto && Sender, auto && AConnection, auto && AFormat, auto && args) { DoVerbose(Sender, AConnection, AFormat, args); });
+            pClient->OnVerbose([this](auto && Sender, auto && AFormat, auto && args) { DoVerbose(Sender, AFormat, args); });
             pClient->OnAccessLog([this](auto && AConnection) { DoAccessLog(AConnection); });
             pClient->OnException([this](auto && AConnection, auto && AException) { DoException(AConnection, AException); });
             pClient->OnEventHandlerException([this](auto && AHandler, auto && AException) { DoServerEventHandlerException(AHandler, AException); });
@@ -184,7 +184,7 @@ namespace Apostol {
             pClient->OnDisconnected([this](auto && Sender) { DoDisconnected(Sender); });
             pClient->OnNoCommandHandler([this](auto && Sender, auto && AData, auto && AConnection) { DoNoCommandHandler(Sender, AData, AConnection); });
 #else
-            pClient->OnVerbose(std::bind(&CCPEmulator::DoVerbose, this, _1, _2, _3, _4));
+            pClient->OnVerbose(std::bind(&CCPEmulator::DoVerbose, this, _1, _2, _3));
             pClient->OnAccessLog(std::bind(&CCPEmulator::DoAccessLog, this, _1));
             pClient->OnException(std::bind(&CCPEmulator::DoException, this, _1, _2));
             pClient->OnEventHandlerException(std::bind(&CCPEmulator::DoServerEventHandlerException, this, _1, _2));
@@ -656,7 +656,7 @@ namespace Apostol {
                 return;
             }
 
-            const auto expiryDate = StrToDateTimeDef(Request.Payload["expiryDate"].AsString().c_str(), 0, "%04d-%02d-%02dT%02d:%02d:%02d");
+            const auto expiryDate = StrToDateTimeDef(Request.Payload["expiryDate"].AsString().c_str(), 0);
 
             if (!Request.Payload.HasOwnProperty("idTag")) {
                 pClient->SendProtocolError(Request.UniqueId, OCPP_PROTOCOL_ERROR_MESSAGE);

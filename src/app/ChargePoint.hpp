@@ -276,7 +276,7 @@ namespace Apostol {
                 idTag = Value["idTag"];
 
                 if (!Value["timestamp"].IsEmpty())
-                    timestamp = StrToDateTimeDef(Value["timestamp"].c_str(), 0, "%04d-%02d-%02dT%02d:%02d:%02d");
+                    timestamp = StrToDateTimeDef(Value["timestamp"].c_str(), 0);
 
                 if (!Value["meterStart"].IsEmpty())
                     meterStart = StrToInt(Value["meterStart"].c_str());
@@ -295,7 +295,7 @@ namespace Apostol {
                 idTag = Value["idTag"].AsString();
 
                 if (!Value["timestamp"].IsEmpty())
-                    timestamp = StrToDateTimeDef(Value["timestamp"].AsString().c_str(), 0, "%04d-%02d-%02dT%02d:%02d:%02d");
+                    timestamp = StrToDateTimeDef(Value["timestamp"].AsString().c_str(), 0);
 
                 if (!Value["meterStart"].IsEmpty())
                     meterStart = Value["meterStart"].AsInteger();
@@ -372,7 +372,7 @@ namespace Apostol {
                 idTag = Value["idTag"];
 
                 if (!Value["timestamp"].IsEmpty())
-                    timestamp = StrToDateTimeDef(Value["timestamp"].c_str(), 0, "%04d-%02d-%02dT%02d:%02d:%02d");
+                    timestamp = StrToDateTimeDef(Value["timestamp"].c_str(), 0);
 
                 if (!Value["meterStop"].IsEmpty())
                     meterStop = StrToInt(Value["meterStop"].c_str());
@@ -393,7 +393,7 @@ namespace Apostol {
                 idTag = Value["idTag"].AsString();
 
                 if (!Value["timestamp"].IsEmpty())
-                    timestamp = StrToDateTimeDef(Value["timestamp"].AsString().c_str(), 0, "%04d-%02d-%02dT%02d:%02d:%02d");
+                    timestamp = StrToDateTimeDef(Value["timestamp"].AsString().c_str(), 0);
 
                 if (!Value["meterStop"].IsEmpty())
                     meterStop = Value["meterStop"].AsInteger();
@@ -487,7 +487,7 @@ namespace Apostol {
                 status = COCPPMessage::StringToChargePointStatus(Value["status"]);
                 errorCode = COCPPMessage::StringToChargePointErrorCode(Value["errorCode"]);
                 info = Value["info"];
-                timestamp = StrToDateTimeDef(Value["timestamp"].c_str(), 0, "%04d-%02d-%02dT%02d:%02d:%02d");
+                timestamp = StrToDateTimeDef(Value["timestamp"].c_str(), 0);
                 vendorId = Value["vendorId"];
                 vendorErrorCode = Value["vendorErrorCode"];
 
@@ -500,7 +500,7 @@ namespace Apostol {
                 status = COCPPMessage::StringToChargePointStatus(Value["status"].AsString());
                 errorCode = COCPPMessage::StringToChargePointErrorCode(Value["errorCode"].AsString());
                 info = Value["info"].AsString();
-                timestamp = StrToDateTimeDef(Value["timestamp"].AsString().c_str(), 0, "%04d-%02d-%02dT%02d:%02d:%02d");
+                timestamp = StrToDateTimeDef(Value["timestamp"].AsString().c_str(), 0);
                 vendorId = Value["vendorId"].AsString();
                 vendorErrorCode = Value["vendorErrorCode"].AsString();
 
@@ -869,7 +869,7 @@ namespace Apostol {
 
             CIdTagInfo& operator<< (const CJSON& Value) {
                 if (Value.HasOwnProperty("expiryDate"))
-                    expiryDate = StrToDateTimeDef(Value["expiryDate"].AsString().c_str(), 0, "%04d-%02d-%02dT%02d:%02d:%02d");
+                    expiryDate = StrToDateTimeDef(Value["expiryDate"].AsString().c_str(), 0);
 
                 if (Value.HasOwnProperty("parentIdTag"))
                     parentIdTag = Value["parentIdTag"].AsBoolean();
