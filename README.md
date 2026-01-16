@@ -67,7 +67,7 @@ docker pull apostoldevel/cs
 ```
 Run the container:
 ```shell
-docker run -p 9220:9220 --network host --env WEBHOOK_URL=https://cloud.ocpp-css.com/api/v1/ocpp --rm --name cs apostoldevel/cs
+docker run -p 9220:9220 --network host --env WEBHOOK_URL=https://api.ocpp-css.com/api/v1/ocpp/parse --rm --name cs apostoldevel/cs
 ```
 
 Building the Container Image
