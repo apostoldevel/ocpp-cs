@@ -1,0 +1,16 @@
+#pragma once
+
+// Auto-generated at build time — do not edit.
+
+namespace apostol
+{
+
+inline constexpr const char* k_version       = "@PROJECT_VERSION@";
+inline constexpr const char* k_git_hash      = "@GIT_HASH@";
+inline constexpr const char* k_build_version = "@PROJECT_VERSION@+@GIT_HASH@";
+
+inline constexpr int k_version_major = @PROJECT_VERSION_MAJOR@;
+inline constexpr int k_version_minor = @PROJECT_VERSION_MINOR@;
+inline constexpr int k_version_patch = @PROJECT_VERSION_PATCH@;
+
+} // namespace apostol

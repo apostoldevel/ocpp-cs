@@ -1,208 +1,206 @@
-cmake_minimum_required(VERSION 3.13)
-project(ocpp-cs)
+cmake_minimum_required(VERSION 3.25)
+project(ocpp-cs VERSION 1.0.0 LANGUAGES CXX)
 
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -static-libgcc -static-libstdc++ -rdynamic")
+# ─── Project identity ─────────────────────────────────────────────────────────
 
-set(PROJECT_NAME "cs")
-set(PROJECT_DESCRIPTION "OCPP Central System")
+set(APP_NAME        "cs"                      CACHE STRING "Application name")
+set(APP_DESCRIPTION "OCPP Central System"     CACHE STRING "Application description")
 
-message(STATUS "Project name: ${PROJECT_NAME}")
-message(STATUS "Project description: ${PROJECT_DESCRIPTION}")
+message(STATUS "App name: ${APP_NAME}")
+message(STATUS "App description: ${APP_DESCRIPTION}")
 
-# Settings
-# ----------------------------------------------------------------------------------------------------------------------
-set(INSTALL_AS_ROOT    ON  CACHE BOOL "Install as root")
-set(USE_SYSTEMD        ON  CACHE BOOL "Use systemd")
-set(WITH_AUTHORIZATION ON  CACHE BOOL "Build with authorization")
-set(WITH_POSTGRESQL    ON  CACHE BOOL "Build with PostgreSQL")
-set(WITH_SSL           ON  CACHE BOOL "Build with SSL")
-set(WITH_CURL          OFF CACHE BOOL "Build with cURL")
-set(WITH_SQLITE3       OFF CACHE BOOL "Build with Sqlite3")
-# ----------------------------------------------------------------------------------------------------------------------
+# ─── Settings ─────────────────────────────────────────────────────────────────
 
-if (INSTALL_AS_ROOT)
+set(INSTALL_AS_ROOT  ON  CACHE BOOL "Install to /usr/sbin and /etc (requires root)")
+
+set(WITH_POSTGRESQL  ON  CACHE BOOL "Build with PostgreSQL (libpq)")
+set(WITH_SSL         ON  CACHE BOOL "Build with OpenSSL")
+set(WITH_CURL        OFF CACHE BOOL "Build with libcurl")
+
+if(INSTALL_AS_ROOT)
     set(INSTALL_BIN_PATH "/usr/sbin")
-    set(PROJECT_PREFIX "/etc/${PROJECT_NAME}")
+    set(APP_PREFIX "/etc/${APP_NAME}")
 else()
     set(INSTALL_BIN_PATH "/usr/local/sbin")
-    set(PROJECT_PREFIX "$ENV{HOME}/.config/${PROJECT_NAME}")
+    set(APP_PREFIX "$ENV{HOME}/.config/${APP_NAME}")
 endif()
 
-list( APPEND CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake-modules" )
+# ─── Global compile options ──────────────────────────────────────────────────
 
-add_compile_options("$<$<CONFIG:DEBUG>:-D_DEBUG>")
+add_compile_options("$<$<CONFIG:Debug>:-D_DEBUG>")
 
-set(CORE_LIB_NAME apostol-core)
+if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE Release)
+endif()
 
-add_custom_target(
-        auto_increment_version
-        ${CMAKE_COMMAND}
-        -D VERSION_FILE=${CMAKE_SOURCE_DIR}/version.h
-        -P ${CMAKE_MODULE_PATH}/AutoVersion.cmake
+# ─── libapostol (core framework) ─────────────────────────────────────────────
+
+add_subdirectory(src/lib/libapostol)
+
+target_compile_definitions(apostol PUBLIC
+    APP_NAME="${APP_NAME}"
+    APP_DESCRIPTION="${APP_DESCRIPTION}"
+    APP_DEFAULT_LOCALE="en_US.UTF-8"
+    APP_VAR="${APP_NAME}"
+    APP_OLDPID_EXT=".oldbin"
+    APP_DEFAULT_USER="nobody"
+    APP_DEFAULT_GROUP="nogroup"
+    APP_DEFAULT_LISTEN="0.0.0.0"
+    APP_PREFIX="${APP_PREFIX}/"
+    APP_CONF_PREFIX="conf/"
+    APP_CACHE_PREFIX="cache/"
+    APP_SBIN_PATH="sbin/${APP_NAME}"
+    APP_CONF_FILE="${APP_NAME}.json"
+    APP_PID_FILE="logs/${APP_NAME}.pid"
+    APP_LOCK_FILE="logs/${APP_NAME}.lock"
+    APP_ERROR_LOG_FILE="logs/error.log"
+    APP_ACCESS_LOG_FILE="logs/access.log"
+    APP_POSTGRES_LOG_FILE="logs/postgres.log"
+    APP_STREAM_LOG_FILE="logs/stream.log"
+    APP_DOC_ROOT="www"
+    APP_VERSION="${PROJECT_VERSION}"
+    APP_DEFAULT_LOG_LEVEL="notice"
+    APP_DEFAULT_LOG_MAX_SIZE=104857600
+    APP_DEFAULT_LISTEN_BACKLOG=128
+    APP_DEFAULT_WORKERS=1
+    APP_DEFAULT_PORT=9220
+    APP_DEFAULT_SERVER_TIMEOUT=5000
+    APP_DEFAULT_PG_CONNECT_TIMEOUT=5
 )
 
-set(PROJECT_LIB_DIR "src/lib")
+# ─── Build-time version header ───────────────────────────────────────────────
 
-# Delphi classes for C++
-# ----------------------------------------------------------------------------------------------------------------------
-set(DELPHI_LIB_NAME delphi)
-set(DELPHI_LIB_DIR "${PROJECT_LIB_DIR}/${DELPHI_LIB_NAME}")
+set(APOSTOL_VERSION_OUT "${CMAKE_BINARY_DIR}/include/apostol/version.hpp")
 
-# -Iinclude
-include_directories(${DELPHI_LIB_DIR}/include)
-include_directories(${DELPHI_LIB_DIR}/src)
+add_custom_target(apostol_version
+    COMMAND ${CMAKE_COMMAND}
+        -DSOURCE_DIR=${CMAKE_SOURCE_DIR}
+        -DPROJECT_VERSION=${PROJECT_VERSION}
+        -DPROJECT_VERSION_MAJOR=${PROJECT_VERSION_MAJOR}
+        -DPROJECT_VERSION_MINOR=${PROJECT_VERSION_MINOR}
+        -DPROJECT_VERSION_PATCH=${PROJECT_VERSION_PATCH}
+        -DVERSION_IN=${CMAKE_SOURCE_DIR}/cmake/version.hpp.in
+        -DVERSION_OUT=${APOSTOL_VERSION_OUT}
+        -P ${CMAKE_SOURCE_DIR}/cmake/GenerateVersion.cmake
+    BYPRODUCTS ${APOSTOL_VERSION_OUT}
+    COMMENT "Generating version header"
+)
 
-add_compile_options("-DDELPHI_LIB_EXPORTS")
-add_compile_options(-DWWWServerName="${PROJECT_DESCRIPTION}")
+# ─── Module & process auto-discovery ─────────────────────────────────────────
 
-if (WITH_AUTHORIZATION)
-    add_compile_options("-DWITH_AUTHORIZATION")
+file(GLOB_RECURSE module_files  CONFIGURE_DEPENDS src/modules/*.cpp)
+file(GLOB_RECURSE process_files CONFIGURE_DEPENDS src/processes/*.cpp)
+file(GLOB_RECURSE ocpp_files    CONFIGURE_DEPENDS src/ocpp/*.cpp)
+
+message(STATUS "Module sources : ${module_files}")
+message(STATUS "Process sources: ${process_files}")
+message(STATUS "OCPP sources   : ${ocpp_files}")
+
+# ─── Modules & processes library ─────────────────────────────────────────────
+
+set(all_module_sources ${module_files} ${process_files} ${ocpp_files})
+
+if(all_module_sources)
+    add_library(apostol_modules STATIC ${all_module_sources})
+    set(MOD_SCOPE PUBLIC)
+else()
+    add_library(apostol_modules INTERFACE)
+    set(MOD_SCOPE INTERFACE)
 endif()
 
-if (WITH_POSTGRESQL)
-    find_package(PostgreSQL REQUIRED)
-    add_compile_options("-DWITH_POSTGRESQL")
-    add_compile_options("-DPOSTGRESQL_VERSION_14")
+target_include_directories(apostol_modules
+    ${MOD_SCOPE}
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/modules
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/modules/Workers
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/modules/Helpers
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/processes
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/ocpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/lib/rapidxml
+        ${CMAKE_BINARY_DIR}/include
+)
+
+target_link_libraries(apostol_modules ${MOD_SCOPE} apostol)
+
+if(all_module_sources)
+    add_dependencies(apostol_modules apostol_version)
+    target_compile_options(apostol_modules PRIVATE
+        -Wall -Wextra -Wpedantic -Wno-unused-parameter
+    )
 endif()
 
-if (WITH_SSL)
-    find_package(OpenSSL REQUIRED)
-    add_compile_options("-DWITH_SSL")
-endif()
+# ─── Main executable ─────────────────────────────────────────────────────────
 
-if (WITH_SQLITE3)
-    find_package(SQLite3 REQUIRED)
-    add_compile_options("-DWITH_SQLITE3")
-endif()
+file(GLOB_RECURSE app_src_files CONFIGURE_DEPENDS src/app/*.cpp)
 
-if (WITH_CURL)
-    find_package(CURL REQUIRED)
-    add_compile_options("-DWITH_CURL")
-endif()
+message(STATUS "App sources    : ${app_src_files}")
 
-add_subdirectory(${DELPHI_LIB_DIR})
+add_executable(${APP_NAME} ${app_src_files})
 
-# Find PkgConfig
-#------------------------------------------------------------------------------
-find_package( PkgConfig REQUIRED )
+target_include_directories(${APP_NAME} PRIVATE
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/app
+)
 
-set( prefix "${CMAKE_PREFIX_PATH}" )
-set( exec_prefix "\${prefix}" )
-set( libdir "\${exec_prefix}/lib" )
-set( includedir "\${exec_prefix}/include" )
+target_link_libraries(${APP_NAME} PRIVATE apostol_modules)
 
-set( pkgconfigdir "${libdir}/pkgconfig" CACHE PATH "Path to pkgconfig directory." )
+# ─── Tests ────────────────────────────────────────────────────────────────────
 
-# Find dl
-#------------------------------------------------------------------------------
-if ((${CMAKE_SYSTEM_NAME} MATCHES "Linux"))
-    find_package( Dl REQUIRED )
+option(BUILD_TESTING "Build unit tests" OFF)
 
-    message(STATUS "Dl libs: ${dl_LIBS}")
-    message(STATUS "Dl libraries: ${dl_LIBRARIES}")
-endif()
+if(BUILD_TESTING)
+    include(FetchContent)
+    FetchContent_Declare(
+        Catch2
+        GIT_REPOSITORY https://github.com/catchorg/Catch2.git
+        GIT_TAG        v3.7.1
+    )
+    FetchContent_MakeAvailable(Catch2)
 
-# rapidxml
-# ----------------------------------------------------------------------------------------------------------------------
-include_directories(${PROJECT_LIB_DIR}/rapidxml)
-file(GLOB lib_files ${lib_files} ${PROJECT_LIB_DIR}/rapidxml/*.hpp)
+    include(CTest)
+    include(Catch)
 
-# picojson
-# ----------------------------------------------------------------------------------------------------------------------
-include_directories(${PROJECT_LIB_DIR}/picojson)
-file(GLOB lib_files ${lib_files} ${PROJECT_LIB_DIR}/picojson/*.h)
+    file(GLOB_RECURSE test_files CONFIGURE_DEPENDS tests/unit/*.cpp)
 
-# jwt-cpp
-# ----------------------------------------------------------------------------------------------------------------------
-include_directories(${PROJECT_LIB_DIR}/jwt-cpp)
-file(GLOB lib_files ${lib_files} ${PROJECT_LIB_DIR}/jwt-cpp/*.h)
-
-set(JWT_JSON_TRAITS_OPTIONS boost-json danielaparker-jsoncons kazuho-picojson nlohmann-json)
-foreach(traits ${JWT_JSON_TRAITS_OPTIONS})
-    list(APPEND lib_files ${PROJECT_LIB_DIR}/jwt-cpp/traits/${traits}/defaults.h ${PROJECT_LIB_DIR}/jwt-cpp/traits/${traits}/traits.h)
-endforeach()
-
-# Apostol
-# ----------------------------------------------------------------------------------------------------------------------
-include_directories(src/app src/core src/modules src/modules/Workers src/modules/Helpers src/processes)
-
-file(GLOB app_files version.h src/app/*.hpp src/app/*.cpp)
-file(GLOB core_files src/core/*.hpp src/core/*.cpp)
-file(GLOB modules_files src/modules/Modules.hpp src/modules/*/*.hpp src/modules/*/*/*.hpp src/modules/*/*/*.cpp)
-file(GLOB processes_files src/processes/Processes.hpp src/processes/*/*.hpp src/processes/*/*.cpp)
-
-# Apostol Core
-# ----------------------------------------------------------------------------------------------------------------------
-add_library(${CORE_LIB_NAME} STATIC
-        $<TARGET_OBJECTS:delphi>
-        ${lib_files}
-        ${core_files}
-        ${modules_files}
-        ${processes_files}
+    if(test_files)
+        add_executable(ocpp_tests ${test_files})
+        target_link_libraries(ocpp_tests PRIVATE Catch2::Catch2WithMain apostol_modules)
+        target_include_directories(ocpp_tests PRIVATE
+            ${CMAKE_CURRENT_SOURCE_DIR}/src/ocpp
+            ${CMAKE_CURRENT_SOURCE_DIR}/src/lib/rapidxml
         )
+        catch_discover_tests(ocpp_tests)
+    endif()
+endif()
 
-target_compile_definitions(${CORE_LIB_NAME} PUBLIC
-        APP_NAME="${PROJECT_NAME}"
-        APP_DESCRIPTION="${PROJECT_DESCRIPTION}"
-        APP_DEFAULT_LOCALE="en_US.UTF-8"
-        APP_VAR="${PROJECT_NAME}"
-        APP_OLDPID_EXT=".oldbin"
-        APP_DEFAULT_USER="nobody"
-        APP_DEFAULT_GROUP="nogroup"
-        APP_DEFAULT_LISTEN="0.0.0.0"
-        APP_PREFIX="${PROJECT_PREFIX}/"
-        APP_CONF_PREFIX="conf/"
-        APP_CACHE_PREFIX="cache/"
-        APP_SBIN_PATH="sbin/${PROJECT_NAME}"
-        APP_CONF_FILE="${PROJECT_NAME}.conf"
-        APP_PID_FILE="logs/${PROJECT_NAME}.pid"
-        APP_LOCK_FILE="logs/${PROJECT_NAME}.lock"
-        APP_ERROR_LOG_FILE="logs/error.log"
-        APP_ACCESS_LOG_FILE="logs/access.log"
-        APP_POSTGRES_LOG_FILE="logs/postgres.log"
-        APP_STREAM_LOG_FILE="logs/stream.log"
-        APP_DOC_ROOT="www"
-        )
+# ─── Install ──────────────────────────────────────────────────────────────────
 
-# Apostol
-# ----------------------------------------------------------------------------------------------------------------------
-add_executable(${PROJECT_NAME} ${app_files})
-target_include_directories(${PROJECT_NAME} PRIVATE ${PostgreSQL_INCLUDE_DIRS} ${OPENSSL_INCLUDE_DIRS} ${SQLite3_INCLUDE_DIRS} ${CURL_INCLUDE_DIRS})
-target_link_libraries(${PROJECT_NAME} PRIVATE ${CORE_LIB_NAME} ${PostgreSQL_LIBRARIES} ${OPENSSL_LIBRARIES} ${SQLite3_LIBRARIES} ${CURL_LIBRARIES} pthread)
+set(INSTALL_PATH "${APP_PREFIX}")
 
-add_dependencies(${PROJECT_NAME} auto_increment_version)
-
-# Install
-# ----------------------------------------------------------------------------------------------------------------------
-file(GLOB conf_files conf/*.conf)
-
-set(INSTALL_PATH "${PROJECT_PREFIX}")
-
-install(TARGETS ${PROJECT_NAME} DESTINATION ${INSTALL_BIN_PATH})
+install(TARGETS ${APP_NAME} DESTINATION ${INSTALL_BIN_PATH})
 
 install(DIRECTORY DESTINATION ${INSTALL_PATH})
-install(DIRECTORY DESTINATION ${INSTALL_PATH}/oauth2)
 install(DIRECTORY DESTINATION ${INSTALL_PATH}/conf)
 install(DIRECTORY DESTINATION ${INSTALL_PATH}/logs)
-install(DIRECTORY DESTINATION ${INSTALL_PATH}/sites)
-install(DIRECTORY DESTINATION ${INSTALL_PATH}/cp)
-install(DIRECTORY conf/oauth2/ DESTINATION ${INSTALL_PATH}/oauth2)
-install(DIRECTORY conf/sites/ DESTINATION ${INSTALL_PATH}/sites)
-install(DIRECTORY conf/cp/ DESTINATION ${INSTALL_PATH}/cp)
-install(DIRECTORY www/ DESTINATION ${INSTALL_PATH}/www)
-install(FILES ${conf_files} DESTINATION ${INSTALL_PATH}/conf)
-install(FILES conf/default.conf DESTINATION ${INSTALL_PATH} RENAME ${PROJECT_NAME}.conf)
+install(DIRECTORY DESTINATION ${INSTALL_PATH}/cache)
 
-if (INSTALL_AS_ROOT)
-    if (USE_SYSTEMD)
-        install(FILES auto/unit.service DESTINATION /etc/systemd/system RENAME ${PROJECT_NAME}.service PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ)
-        install(CODE "execute_process(COMMAND systemctl enable ${PROJECT_NAME}.service)")
-    else()
-        install(FILES auto/daemon DESTINATION /etc/init.d RENAME ${PROJECT_NAME} PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE)
-        install(CODE "execute_process(COMMAND update-rc.d ${PROJECT_NAME} defaults)")
+install(DIRECTORY conf/sites/ DESTINATION ${INSTALL_PATH}/sites)
+install(DIRECTORY conf/cp/    DESTINATION ${INSTALL_PATH}/cp)
+install(DIRECTORY www/        DESTINATION ${INSTALL_PATH}/www)
+
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/conf/default.json")
+    install(FILES conf/default.json DESTINATION ${INSTALL_PATH} RENAME ${APP_NAME}.json)
+endif()
+
+if(INSTALL_AS_ROOT)
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/auto/unit.service")
+        install(FILES auto/unit.service
+            DESTINATION /lib/systemd/system
+            RENAME ${APP_NAME}.service
+            PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ)
+        install(CODE "execute_process(COMMAND systemctl daemon-reload)")
+        install(CODE "execute_process(COMMAND systemctl enable ${APP_NAME}.service)")
     endif()
 endif()

@@ -1,0 +1,50 @@
+{
+  "main": {
+    "workers": 1,
+    "master": true,
+    "helper": false
+  },
+  "daemon": {
+    "daemon": true,
+    "pid": "logs/cs.pid"
+  },
+  "log": {
+    "error": "logs/error.log"
+  },
+  "server": {
+    "listen": "0.0.0.0",
+    "port": 9220,
+    "root": "www"
+  },
+  "module": {
+    "CSService": {
+      "enable": true
+    }
+  },
+  "process": {
+    "ChargePoint": {
+      "enable": false
+    }
+  },
+  "webhook": {
+    "enable": false,
+    "url": "http://localhost:8080/api/v1/ocpp/parse",
+    "authorization": "Basic",
+    "username": "ocpp",
+    "password": "ocpp",
+    "token": ""
+  },
+  "postgres": {
+    "connect": true,
+    "notice": false,
+    "timeout": 10,
+    "log": "logs/postgres.log",
+    "worker": {
+      "min": 5,
+      "max": 10,
+      "dbname": "css",
+      "user": "ocpp",
+      "password": "ocpp"
+    }
+  }
+}

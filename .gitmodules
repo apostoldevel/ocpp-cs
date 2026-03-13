@@ -1,0 +1,3 @@
+[submodule "src/lib/libapostol"]
+	path = src/lib/libapostol
+	url = https://github.com/apostoldevel/libapostol.git

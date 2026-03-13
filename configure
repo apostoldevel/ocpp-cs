@@ -1,190 +1,132 @@
 #!/bin/bash
-
-# Script to configure OCPP.
 #
-# Script options:
-# --help                   Display usage, overriding script execution.
+# Configure ocpp-cs — wraps cmake with sensible defaults.
+# libapostol is a git submodule; no external downloads needed.
 #
+# Usage: ./configure [OPTIONS]
 
-# Initialize the build environment.
-#==============================================================================
-# Exit this script on the first build error.
-#------------------------------------------------------------------------------
 set -e
 
-PROJECT_NAME=cs
+PROJECT_NAME=ocpp-cs
 BUILD_TYPE=Release
-PULL_SELF=yes
-PULL_GITHUB=yes
 
-pop_directory()
-{
-    popd >/dev/null
-}
+WITH_POSTGRESQL=ON
+WITH_SSL=ON
+WITH_CURL=OFF
+APP_NAME=cs
 
-push_directory()
-{
-    local DIRECTORY="$1"
+# --- Helpers --------------------------------------------------------------
 
-    pushd "$DIRECTORY" >/dev/null
-}
-
-create_directory()
-{
-    local DIRECTORY="$1"
-
-    rm -rf "$DIRECTORY"
-    mkdir "$DIRECTORY"
-}
-
-display_heading_message()
-{
-    echo
-    echo "********************** $@ **********************"
-    echo
-}
-
-display_message()
-{
-    echo "$@"
-}
-
-display_error()
-{
-    >&2 echo "$@"
-}
+display_heading_message() { echo; echo "********************** $* **********************"; echo; }
+display_message()         { echo "$@"; }
 
 display_help()
 {
     display_message "Usage: ./configure [OPTION]..."
-    display_message "Manage the configure."
-    display_message "Script options:"
-    display_message "  --build-dir=<path>       Location of build files (default: $BUILD_DIR)."
-    display_message "  --release                Release build (default)."
-    display_message "  --debug                  Debug build."
-    display_message "  --update                 Update build."
-    display_message "  --not-pull-self          Not pull self."
-    display_message "  --not-pull-github        Not pull from GitHub."
-    display_message "  --help                   Display usage, overriding script execution."
+    display_message ""
+    display_message "Build options:"
+    display_message "  --release                Release build (default)"
+    display_message "  --debug                  Debug build"
+    display_message "  --update                 Reconfigure without deleting the build directory"
+    display_message "  --build-dir=<path>       Location of build files (default: cmake-build-{type})"
+    display_message ""
+    display_message "Feature flags:"
+    display_message "  --with-postgresql        Enable PostgreSQL / libpq support (default: on)"
+    display_message "  --without-postgresql     Disable PostgreSQL support"
+    display_message "  --without-ssl            Disable OpenSSL support (default: on)"
+    display_message "  --with-curl              Enable libcurl support (default: off)"
+    display_message "  --with-tests             Enable unit tests (Catch2)"
+    display_message ""
+    display_message "  --help                   Display this help"
     display_message ""
 }
 
 display_configuration()
 {
-    display_message "Configuration."
+    display_message "Configuration"
     display_message "--------------------------------------------------------------------"
     display_message "PROJECT_NAME         : $PROJECT_NAME"
     display_message "BUILD_TYPE           : $BUILD_TYPE"
     display_message "BUILD_DIR            : $BUILD_DIR"
-    display_message "--------------------------------------------------------------------"
-}
-
-# Download from github.
-download_from_github()
-{
-    local DIRECTORY=$1
-    local ACCOUNT=$2
-    local REPO=$3
-    local BRANCH=$4
-    local DIR=$5
-    shift 5
-
-    push_directory "$DIRECTORY"
-
-    FORK="$ACCOUNT/$REPO"
-
-    if ! [ -d $DIR ]; then
-      # Clone the repository locally.
-      display_heading_message "Download: $FORK/$BRANCH"
-      git clone --depth 1 --branch $BRANCH --single-branch "https://github.com/$FORK" $DIR
-    else
-      push_directory "$DIR"
-      display_heading_message "Updating: $FORK/$BRANCH"
-      git pull
-      pop_directory
-    fi
-
-    pop_directory
-}
-
-github()
-{
-    display_heading_message "Updating the current project"
-
-    if [[ $PULL_SELF == yes ]]; then
-      git pull
-    fi
-
-    download_from_github src/lib ufocomp libdelphi master delphi
-    download_from_github src apostoldevel apostol-core master core
-}
-
-Success()
-{
-    display_message ""
-    echo -e "********************** \e[32;1mSUCCESS\e[0m **********************"
-    echo -e "\e[32m-- To build the $PROJECT_NAME run:\e[0m"
-    display_message "--------------------------------------------------------------------"
-    echo -e "\e[1m$ cd $BUILD_DIR \e[0m"
-    echo -e "\e[1m$ make \e[0m"
-    display_message "--------------------------------------------------------------------"
-    echo -e "\e[32m-- To install the $PROJECT_NAME run:\e[0m"
-    display_message "--------------------------------------------------------------------"
-    echo -e "\e[1m$ sudo make install\e[0m"
+    display_message "WITH_POSTGRESQL      : $WITH_POSTGRESQL"
+    display_message "WITH_SSL             : $WITH_SSL"
+    display_message "WITH_CURL            : $WITH_CURL"
+    display_message "BUILD_TESTING        : $BUILD_TESTING"
+    display_message "APP_NAME             : $APP_NAME"
     display_message "--------------------------------------------------------------------"
 }
 
 make_configuration()
 {
     if ! [[ $BUILD_UPDATE ]]; then
-        create_directory $BUILD_DIR
+        rm -rf "$BUILD_DIR"
+        mkdir -p "$BUILD_DIR"
     fi
 
-    echo '#define AUTO_VERSION _T("1.0.e00000-b0")' > version.h
+    display_heading_message "Configuring: $PROJECT_NAME"
 
-    if [[ $PULL_GITHUB == yes ]]; then
-      github
-    fi
+    cmake \
+        -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
+        -DWITH_POSTGRESQL="$WITH_POSTGRESQL" \
+        -DWITH_SSL="$WITH_SSL" \
+        -DWITH_CURL="$WITH_CURL" \
+        -DBUILD_TESTING="$BUILD_TESTING" \
+        -DAPP_NAME="$APP_NAME" \
+        -B "$BUILD_DIR" .
 
-    display_heading_message "Make: $PROJECT_NAME"
-
-    cmake -DCMAKE_BUILD_TYPE=$BUILD_TYPE . -B $BUILD_DIR
-
-    Success
+    display_message ""
+    echo -e "********************** \e[32;1mSUCCESS\e[0m **********************"
+    echo -e "\e[32m-- To build $PROJECT_NAME run:\e[0m"
+    display_message "--------------------------------------------------------------------"
+    echo -e "\e[1m\$ cmake --build $BUILD_DIR --parallel \$(nproc)\e[0m"
+    display_message "--------------------------------------------------------------------"
+    echo -e "\e[32m-- To install $PROJECT_NAME run:\e[0m"
+    display_message "--------------------------------------------------------------------"
+    echo -e "\e[1m\$ sudo cmake --install $BUILD_DIR\e[0m"
+    display_message "--------------------------------------------------------------------"
 }
 
-# Parse command line options that are handled by this script.
-#------------------------------------------------------------------------------
+# --- Parse options --------------------------------------------------------
+
+BUILD_TESTING=OFF
+
 for OPTION in "$@"; do
     case $OPTION in
-        # Standard script options.
-        (--help)                DISPLAY_HELP="yes";;
+        (--help)               DISPLAY_HELP=yes ;;
 
-        (--release)             BUILD_TYPE="Release";;
-        (--debug)               BUILD_TYPE="Debug";;
+        (--release)            BUILD_TYPE=Release ;;
+        (--debug)              BUILD_TYPE=Debug ;;
+        (--update)             BUILD_UPDATE=yes ;;
 
-        (--update)              BUILD_UPDATE="yes";;
-        (--not-pull-self)       PULL_SELF="no";;
-        (--not-pull-github)     PULL_GITHUB="no";;
+        (--with-postgresql)    WITH_POSTGRESQL=ON ;;
+        (--without-postgresql) WITH_POSTGRESQL=OFF ;;
+        (--without-ssl)        WITH_SSL=OFF ;;
+        (--with-curl)          WITH_CURL=ON ;;
+        (--with-tests)         BUILD_TESTING=ON ;;
 
-        # Unique script options.
-        (--build-dir=*)         BUILD_DIR="${OPTION#*=}";;
+        (--build-dir=*)        BUILD_DIR="${OPTION#*=}" ;;
     esac
 done
 
 if ! [[ $BUILD_DIR ]]; then
-  if [[ $BUILD_TYPE == Debug ]]; then
-    BUILD_DIR=cmake-build-debug
-  else
-    BUILD_DIR=cmake-build-release
-  fi
+    if [[ $BUILD_TYPE == Debug ]]; then
+        BUILD_DIR=cmake-build-debug
+    else
+        BUILD_DIR=cmake-build-release
+    fi
 fi
 
-# Configure.
-#==============================================================================
+# --- Run ------------------------------------------------------------------
+
 if [[ $DISPLAY_HELP ]]; then
     display_help
 else
+    # libapostol — git submodule
+    if [[ -d .git ]]; then
+        display_heading_message "Updating submodules"
+        git submodule update --init --remote
+    fi
+
     display_configuration
     make_configuration
 fi

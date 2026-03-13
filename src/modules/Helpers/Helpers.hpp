@@ -1,32 +1,11 @@
-/*++
+#pragma once
+#include "apostol/application.hpp"
 
-Program name:
-
-  apostol
-
-Module Name:
-
-  Helpers.hpp
-
-Notices:
-
-  Apostol Web Service
-
-Author:
-
-  Copyright (c) Prepodobny Alen
-
-  mailto: alienufo@inbox.ru
-  mailto: ufocomp@gmail.com
-
---*/
-
-#ifndef APOSTOL_HELPERS_HPP
-#define APOSTOL_HELPERS_HPP
-//----------------------------------------------------------------------------------------------------------------------
-
-static inline void CreateHelpers(CModuleProcess *AProcess) {
-
+namespace apostol
+{
+static inline void create_helpers(Application& app, EventLoop& loop)
+{
+    (void)app;
+    (void)loop;
 }
-
-#endif //APOSTOL_HELPERS_HPP
+} // namespace apostol
