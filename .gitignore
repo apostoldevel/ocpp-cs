@@ -1,4 +1,8 @@
 .gitignore
 /.idea
 /cmake-build-*
+Doxyfile
+docs
 version.h
+.docker
+.env
