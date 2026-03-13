@@ -334,21 +334,21 @@ inline std::string generate_unique_id()
 
 inline OcppMessage make_call(std::string_view action, nlohmann::json payload)
 {
-    return {
-        .type      = MessageType::Call,
-        .unique_id = generate_unique_id(),
-        .action    = std::string(action),
-        .payload   = std::move(payload)
-    };
+    OcppMessage msg;
+    msg.type      = MessageType::Call;
+    msg.unique_id = generate_unique_id();
+    msg.action    = std::string(action);
+    msg.payload   = std::move(payload);
+    return msg;
 }
 
 inline OcppMessage make_call_result(std::string_view unique_id, nlohmann::json payload)
 {
-    return {
-        .type      = MessageType::CallResult,
-        .unique_id = std::string(unique_id),
-        .payload   = std::move(payload)
-    };
+    OcppMessage msg;
+    msg.type      = MessageType::CallResult;
+    msg.unique_id = std::string(unique_id);
+    msg.payload   = std::move(payload);
+    return msg;
 }
 
 inline OcppMessage make_call_error(
@@ -357,13 +357,13 @@ inline OcppMessage make_call_error(
     std::string_view error_description,
     nlohmann::json details = nlohmann::json::object())
 {
-    return {
-        .type              = MessageType::CallError,
-        .unique_id         = std::string(unique_id),
-        .error_code        = std::string(error_code),
-        .error_description = std::string(error_description),
-        .payload           = std::move(details)
-    };
+    OcppMessage msg;
+    msg.type              = MessageType::CallError;
+    msg.unique_id         = std::string(unique_id);
+    msg.error_code        = std::string(error_code);
+    msg.error_description = std::string(error_description);
+    msg.payload           = std::move(details);
+    return msg;
 }
 
 } // namespace ocpp

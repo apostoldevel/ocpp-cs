@@ -118,7 +118,7 @@ target_include_directories(apostol_modules
         ${CMAKE_CURRENT_SOURCE_DIR}/src/modules/Workers
         ${CMAKE_CURRENT_SOURCE_DIR}/src/modules/Helpers
         ${CMAKE_CURRENT_SOURCE_DIR}/src/processes
-        ${CMAKE_CURRENT_SOURCE_DIR}/src/ocpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/src
         ${CMAKE_CURRENT_SOURCE_DIR}/src/lib/rapidxml
         ${CMAKE_BINARY_DIR}/include
 )
