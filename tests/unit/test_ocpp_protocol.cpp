@@ -1,5 +1,6 @@
 #include <catch2/catch_test_macros.hpp>
 #include "ocpp/protocol.hpp"
+#include "ocpp/ocpp_codec.hpp"
 
 using namespace ocpp;
 
@@ -170,4 +171,111 @@ TEST_CASE("RegistrationStatus: string conversion", "[ocpp][protocol]")
     REQUIRE(registration_status_to_string(RegistrationStatus::Accepted) == "Accepted");
     REQUIRE(registration_status_to_string(RegistrationStatus::Pending) == "Pending");
     REQUIRE(registration_status_to_string(RegistrationStatus::Rejected) == "Rejected");
+}
+
+// ── OcppCodec ──────────────────────────────────────────────────────────────
+
+TEST_CASE("OcppCodec: serialize Request produces Call array", "[ocpp][codec]")
+{
+    OcppCodec codec;
+    apostol::WsMessage msg;
+    msg.type    = apostol::WsMessage::Type::Request;
+    msg.id      = "req1";
+    msg.action  = "Heartbeat";
+    msg.payload = nlohmann::json::object();
+
+    auto text = codec.serialize(msg);
+    auto arr  = nlohmann::json::parse(text);
+
+    REQUIRE(arr.is_array());
+    REQUIRE(arr[0] == 2);
+    REQUIRE(arr[1] == "req1");
+    REQUIRE(arr[2] == "Heartbeat");
+    REQUIRE(arr[3].is_object());
+}
+
+TEST_CASE("OcppCodec: serialize Response produces CallResult array", "[ocpp][codec]")
+{
+    OcppCodec codec;
+    apostol::WsMessage msg;
+    msg.type    = apostol::WsMessage::Type::Response;
+    msg.id      = "res1";
+    msg.payload = {{"status", "Accepted"}};
+
+    auto text = codec.serialize(msg);
+    auto arr  = nlohmann::json::parse(text);
+
+    REQUIRE(arr[0] == 3);
+    REQUIRE(arr[1] == "res1");
+    REQUIRE(arr[2]["status"] == "Accepted");
+}
+
+TEST_CASE("OcppCodec: serialize Error produces CallError array", "[ocpp][codec]")
+{
+    OcppCodec codec;
+    apostol::WsMessage msg;
+    msg.type              = apostol::WsMessage::Type::Error;
+    msg.id                = "err1";
+    msg.error_code        = "InternalError";
+    msg.error_description = "Something failed";
+
+    auto text = codec.serialize(msg);
+    auto arr  = nlohmann::json::parse(text);
+
+    REQUIRE(arr[0] == 4);
+    REQUIRE(arr[1] == "err1");
+    REQUIRE(arr[2] == "InternalError");
+    REQUIRE(arr[3] == "Something failed");
+    REQUIRE(arr[4].is_object());
+}
+
+TEST_CASE("OcppCodec: deserialize Call array to Request", "[ocpp][codec]")
+{
+    OcppCodec codec;
+    auto msg = codec.deserialize(R"([2,"u1","BootNotification",{"vendor":"Test"}])");
+
+    REQUIRE(msg.type == apostol::WsMessage::Type::Request);
+    REQUIRE(msg.id == "u1");
+    REQUIRE(msg.action == "BootNotification");
+    REQUIRE(msg.payload["vendor"] == "Test");
+}
+
+TEST_CASE("OcppCodec: deserialize CallResult to Response", "[ocpp][codec]")
+{
+    OcppCodec codec;
+    auto msg = codec.deserialize(R"([3,"u1",{"status":"Accepted","interval":300}])");
+
+    REQUIRE(msg.type == apostol::WsMessage::Type::Response);
+    REQUIRE(msg.id == "u1");
+    REQUIRE(msg.action.empty());
+    REQUIRE(msg.payload["interval"] == 300);
+}
+
+TEST_CASE("OcppCodec: deserialize CallError to Error", "[ocpp][codec]")
+{
+    OcppCodec codec;
+    auto msg = codec.deserialize(R"([4,"u1","GenericError","test err",{}])");
+
+    REQUIRE(msg.type == apostol::WsMessage::Type::Error);
+    REQUIRE(msg.id == "u1");
+    REQUIRE(msg.error_code == "GenericError");
+    REQUIRE(msg.error_description == "test err");
+}
+
+TEST_CASE("OcppCodec: full roundtrip Request", "[ocpp][codec]")
+{
+    OcppCodec codec;
+    apostol::WsMessage original;
+    original.type    = apostol::WsMessage::Type::Request;
+    original.id      = "rt1";
+    original.action  = "Reset";
+    original.payload = {{"type", "Hard"}};
+
+    auto text     = codec.serialize(original);
+    auto restored = codec.deserialize(text);
+
+    REQUIRE(restored.type == original.type);
+    REQUIRE(restored.id == original.id);
+    REQUIRE(restored.action == original.action);
+    REQUIRE(restored.payload == original.payload);
 }

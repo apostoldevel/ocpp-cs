@@ -19,9 +19,7 @@
   "module": {
     "CSService": {
       "enable": true
-    }
-  },
-  "process": {
+    },
     "ChargePoint": {
       "enable": false
     }

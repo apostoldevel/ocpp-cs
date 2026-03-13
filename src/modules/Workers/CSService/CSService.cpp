@@ -189,6 +189,9 @@ void CSService::on_ws_upgrade(EventLoop& loop, WsConnection ws, const HttpReques
     set_point_connected(identity, true, charge_point_to_json(point));
 #endif
 
+    // Remove HTTP epoll registration before adding WS handler
+    loop.remove_io(fd);
+
     // Register read handler
     loop.add_io(fd, EPOLLIN, [this, fd, identity_copy = identity](uint32_t /*events*/) {
         auto ws_it = ws_connections_.find(fd);
@@ -293,7 +296,7 @@ void CSService::do_soap(const HttpRequest& req, HttpResponse& resp)
 
 void CSService::parse_soap(const HttpRequest& req, HttpResponse& resp, const std::string& payload)
 {
-    auto sql = fmt::format("SELECT * FROM ocpp.\"ParseXML\"({}::xml)",
+    auto sql = fmt::format("SELECT * FROM ocpp.parsexml({}::xml)",
         pq_quote_literal(payload));
 
     exec_sql(pool_, req, resp, std::move(sql),
@@ -350,7 +353,7 @@ void CSService::json_to_soap(HttpResponse& resp, ocpp::CSChargingPoint* point,
         {"payload", payload}
     };
 
-    auto sql = fmt::format("SELECT * FROM ocpp.\"JSONToSOAP\"({}::jsonb)",
+    auto sql = fmt::format("SELECT * FROM ocpp.jsontosoap({}::jsonb)",
         pq_quote_literal(data.dump()));
 
     // TODO: deferred response for REST API -> SOAP conversion
@@ -430,8 +433,13 @@ void CSService::do_central_system(const HttpRequest& req, HttpResponse& resp,
 {
     auto body = content_to_json(req);
 
-    auto sql = fmt::format("SELECT * FROM ocpp.\"{}\"({}::jsonb)",
-        endpoint, pq_quote_literal(body.dump()));
+    std::string lower_endpoint;
+    lower_endpoint.reserve(endpoint.size());
+    for (char c : endpoint)
+        lower_endpoint += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+
+    auto sql = fmt::format("SELECT * FROM ocpp.{}({}::jsonb)",
+        lower_endpoint, pq_quote_literal(body.dump()));
 
     exec_sql(pool_, req, resp, std::move(sql),
         [](std::shared_ptr<HttpConnection> conn, std::vector<PgResult> results) {
@@ -482,7 +490,7 @@ void CSService::set_point_connected(const std::string& identity, bool value,
                                     const nlohmann::json& metadata)
 {
     auto sql = fmt::format(
-        "SELECT * FROM ocpp.\"SetChargePointConnected\"({}, {}, {}::jsonb)",
+        "SELECT * FROM ocpp.setchargepointconnected({}, {}, {}::jsonb)",
         pq_quote_literal(identity),
         value ? "true" : "false",
         pq_quote_literal(metadata.dump()));
@@ -505,7 +513,7 @@ void CSService::parse_json_pg(ocpp::CSChargingPoint& point, const ocpp::OcppMess
                               const std::string& account)
 {
     auto sql = fmt::format(
-        "SELECT * FROM ocpp.\"Parse\"({}, {}, {}, {}::jsonb, {})",
+        "SELECT * FROM ocpp.parse({}, {}, {}, {}::jsonb, {})",
         pq_quote_literal(point.identity()),
         pq_quote_literal(msg.unique_id),
         pq_quote_literal(msg.action),
@@ -520,37 +528,32 @@ void CSService::parse_json_pg(ocpp::CSChargingPoint& point, const ocpp::OcppMess
             if (!point) return;
 
             if (results.empty() || !results[0].ok() || results[0].rows() == 0) {
-                app_.logger().error("[{}] ocpp.Parse() failed or returned empty", identity);
+                app_.logger().error("[{}] ocpp.parse() failed or returned empty", identity);
                 return;
             }
 
             const auto& result = results[0];
+            const char* json_str = result.value(0, 0);
+            if (!json_str || json_str[0] == '\0') {
+                app_.logger().error("[{}] ocpp.parse() returned null", identity);
+                return;
+            }
 
-            int col_type    = result.column_index("messageTypeId");
-            int col_uid     = result.column_index("uniqueId");
-            int col_payload = result.column_index("payload");
-            int col_err     = result.column_index("errorCode");
-            int col_errdesc = result.column_index("errorDescription");
-            int col_details = result.column_index("errorDetails");
+            auto j = json::parse(json_str);
 
             ocpp::OcppMessage response;
-            const char* type_id_raw = result.value(0, col_type);
-            int type_id = (type_id_raw && type_id_raw[0] != '\0') ? std::stoi(type_id_raw) : 3;
+            response.unique_id = j.value("uniqueId", "");
 
-            response.unique_id = result.value(0, col_uid);
+            auto msg_type = j.value("messageTypeId", "CallResult");
 
-            if (type_id == 4) {
+            if (msg_type == "CallError") {
                 response.type = ocpp::MessageType::CallError;
-                response.error_code = result.value(0, col_err);
-                response.error_description = result.value(0, col_errdesc);
-                const char* details = result.value(0, col_details);
-                response.payload = (details && details[0] != '\0')
-                    ? json::parse(details) : json::object();
+                response.error_code = j.value("errorCode", "InternalError");
+                response.error_description = j.value("errorDescription", "");
+                response.payload = j.value("errorDetails", json::object());
             } else {
                 response.type = ocpp::MessageType::CallResult;
-                const char* payload_str = result.value(0, col_payload);
-                response.payload = (payload_str && payload_str[0] != '\0')
-                    ? json::parse(payload_str) : json::object();
+                response.payload = j.value("payload", json::object());
             }
 
             send_json_response(*point, response);
