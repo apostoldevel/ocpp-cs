@@ -168,7 +168,7 @@ if(BUILD_TESTING)
         add_executable(ocpp_tests ${test_files})
         target_link_libraries(ocpp_tests PRIVATE Catch2::Catch2WithMain apostol_modules)
         target_include_directories(ocpp_tests PRIVATE
-            ${CMAKE_CURRENT_SOURCE_DIR}/src/ocpp
+            ${CMAKE_CURRENT_SOURCE_DIR}/src
             ${CMAKE_CURRENT_SOURCE_DIR}/src/lib/rapidxml
         )
         catch_discover_tests(ocpp_tests)
