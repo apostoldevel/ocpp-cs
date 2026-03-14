@@ -17,15 +17,11 @@ RUN set -eux; \
 WORKDIR /opt/$PROJECT_NAME
 
 RUN set -eux; \
-    cp -r docker/CMakeLists.txt .; \
-    cp -r docker/conf .; \
-    cp -r docker/www .; \
+    cp -r docker/conf/* conf/; \
     ./configure --not-pull-self --$BUILD_MODE; \
-    cd cmake-build-$BUILD_MODE; \
-    make install; \
-    cd ..; \
-    rm -rf cmake-build-$BUILD_MODE; \
-    rm -rf src;
+    cmake --build cmake-build-$BUILD_MODE --parallel $(nproc); \
+    cmake --install cmake-build-$BUILD_MODE; \
+    rm -rf cmake-build-$BUILD_MODE src;
 
 FROM debian:bookworm-slim AS cs
 

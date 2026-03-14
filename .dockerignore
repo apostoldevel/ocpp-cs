@@ -4,5 +4,6 @@
 www/.idea
 cmake-build-*
 conf
+!conf/cp
 !conf/schemas
 logs

@@ -27,8 +27,7 @@ WORKDIR /opt/${PROJECT_NAME}
 COPY . .
 
 RUN set -eux; \
-    cp -r docker/conf . && \
-    cp -r docker/www . && \
+    cp -r docker/conf/* conf/; \
     PG_FLAG="--without-postgresql"; \
     if [ "${WITH_POSTGRESQL}" = "ON" ]; then PG_FLAG="--with-postgresql"; fi; \
     ./configure --${BUILD_MODE} ${PG_FLAG}; \
@@ -57,7 +56,6 @@ RUN mkdir -p /var/log/${PROJECT_NAME}
 
 COPY --from=builder /usr/sbin/${PROJECT_NAME}    /usr/sbin/${PROJECT_NAME}
 COPY --from=builder /etc/${PROJECT_NAME}         /etc/${PROJECT_NAME}
-COPY --from=builder /opt/${PROJECT_NAME}/www     /opt/${PROJECT_NAME}/www
 
 EXPOSE 9220
 
