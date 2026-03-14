@@ -261,7 +261,7 @@ void CPEmulator::create_station(const std::string& dir_name)
                     for (const auto& conn_json : evse_json["connectors"]) {
                         ConnectorState201 conn;
                         conn.connector_id = conn_json["connectorId"].get<int>();
-                        conn.connector_type = conn_json.value("type", "cType2");
+                        conn.connector_type = conn_json.value("type", "cCCS2");
                         evse.connectors.push_back(std::move(conn));
                     }
                 }

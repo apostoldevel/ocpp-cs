@@ -1,0 +1,29 @@
+{
+  "OcppVersion": "2.0.1",
+  "ChargePointVendor": "Emulator",
+  "ChargePointModel": "DualCable-201",
+  "ChargePointSerialNumber": "EM-201-004",
+  "ChargePointSoftwareVersion": "2.0.0",
+  "CentralSystemURL": "ws://localhost:9220/ocpp/",
+  "Evses": [
+    {
+      "evseId": 1,
+      "connectors": [
+        {"connectorId": 1, "type": "cCCS2"},
+        {"connectorId": 2, "type": "cCCS1"}
+      ]
+    },
+    {
+      "evseId": 2,
+      "connectors": [
+        {"connectorId": 1, "type": "cCCS2"},
+        {"connectorId": 2, "type": "cChaoJi"}
+      ]
+    }
+  ],
+  "ConfigurationKeys": {
+    "HeartbeatInterval": {"value": "60", "readonly": false},
+    "MeterValueSampleInterval": {"value": "90", "readonly": false},
+    "AuthorizeRemoteTxRequests": {"value": "true", "readonly": false}
+  }
+}

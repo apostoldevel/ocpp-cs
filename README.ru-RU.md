@@ -4,7 +4,7 @@
 
 # OCPP Central System
 
-**Центральная система и эмулятор зарядных станций для OCPP 1.5 (SOAP) и 1.6 (JSON/WebSocket) на C++20.**
+**Центральная система и эмулятор зарядных станций для OCPP 1.5 (SOAP), 1.6 и 2.0.1 (JSON/WebSocket) на C++20.**
 
 Построена на [A-POST-OL](https://github.com/apostoldevel/libapostol) — высокопроизводительном фреймворке C++20 с единым циклом событий `epoll` для HTTP, WebSocket и PostgreSQL.
 
@@ -30,7 +30,7 @@ docker compose up
 ```
 ws://IP_ВАШЕГО_СЕРВЕРА:9220/ocpp/ID_ВАШЕЙ_СТАНЦИИ
 ```
-Станция автоматически появится в веб-интерфейсе после подключения.
+Станция автоматически появится в веб-интерфейсе после подключения. Версия протокола (1.6 или 2.0.1) определяется по заголовку `Sec-WebSocket-Protocol`, который отправляет станция.
 
 Это всё. Контейнер запускает полнофункциональную Центральную систему со встроенным эмулятором зарядных станций — без базы данных, без внешних сервисов, без настройки.
 
@@ -38,12 +38,38 @@ ws://IP_ВАШЕГО_СЕРВЕРА:9220/ocpp/ID_ВАШЕЙ_СТАНЦИИ
 
 | Возможность | Детали |
 |-------------|--------|
-| Центральная система | Полная поддержка OCPP 1.5 (SOAP/HTTP) и 1.6 (JSON/WebSocket) |
-| Эмулятор станций | Встроенный, автоматически подключается при запуске |
-| Веб-интерфейс | Дашборд, управление станциями, 19 команд OCPP, лог сообщений в реальном времени |
+| Центральная система | OCPP 1.5 (SOAP/HTTP), 1.6 и 2.0.1 (JSON/WebSocket) |
+| Валидация по схемам | Все входящие сообщения проверяются по официальным OCPP JSON Schema |
+| Эмулятор станций | Встроенные станции OCPP 1.6 и 2.0.1, автоматическое подключение при запуске |
+| Веб-интерфейс | Дашборд, управление станциями, команды OCPP, лог сообщений в реальном времени |
 | REST API | OpenAPI-спецификация + Swagger UI на `/docs/` |
 | Установка одной командой | `curl \| bash` — Docker за 30 секунд |
 | Интеграция | Webhook или PostgreSQL — на ваш выбор |
+
+## Поддержка OCPP 2.0.1
+
+Центральная система поддерживает 13 сообщений OCPP 2.0.1, покрывающих полный цикл зарядной сессии:
+
+| Направление | Сообщения |
+|-------------|-----------|
+| CP → CSMS | BootNotification, Heartbeat, StatusNotification, Authorize, TransactionEvent, MeterValues |
+| CSMS → CP | RequestStartTransaction, RequestStopTransaction, Reset, SetVariables, GetVariables, ChangeAvailability |
+| Оба | DataTransfer |
+
+Ключевые отличия от OCPP 1.6:
+- **3-уровневая модель** — Станция → EVSE → Коннектор (вместо плоского списка коннекторов)
+- **TransactionEvent** — одно сообщение заменяет StartTransaction, StopTransaction и MeterValues
+- **Device Model** — SetVariables/GetVariables заменяют ChangeConfiguration/GetConfiguration
+- **Валидация по схемам** — все сообщения проверяются по официальным OCPP 2.0.1 JSON Schema
+
+Встроенный эмулятор включает 4 станции OCPP 2.0.1 с разными конфигурациями:
+
+| Станция | Модель | EVSE | Коннекторы |
+|---------|--------|------|------------|
+| CP201 | Virtual-201 | 2 | CCS2, CCS1 |
+| CP202 | SingleDC-201 | 1 | CCS1 |
+| CP203 | TripleDC-201 | 3 | CCS2, CCS1, ChaoJi |
+| CP204 | DualCable-201 | 2 | по 2 на EVSE (CCS2+CCS1, CCS2+ChaoJi) |
 
 ## Демонстрация
 
@@ -152,7 +178,7 @@ mkdir -p logs
 }
 ```
 
-Центральная система пересылает все сообщения от зарядных станций (Authorize, BootNotification, StartTransaction, StopTransaction и т.д.) на ваш endpoint в формате JSON:
+Центральная система пересылает все сообщения от зарядных станций (Authorize, BootNotification, StartTransaction, StopTransaction, TransactionEvent и т.д.) на ваш endpoint в формате JSON:
 
 ```json
 {
@@ -206,6 +232,30 @@ mkdir -p logs
 Встроенный эмулятор создаёт виртуальные зарядные станции для разработки и тестирования.
 
 Настройки эмуляторов находятся в `conf/cp/` — каждая подпапка содержит `configuration.json` для одной эмулируемой станции.
+
+### Станции OCPP 1.6
+
+Конфигурации по умолчанию создают 4 станции (`CP1`–`CP4`) с плоским списком коннекторов. Используется массив `ConnectorIds`.
+
+### Станции OCPP 2.0.1
+
+Станция `CP201` демонстрирует 3-уровневую модель с EVSE и коннекторами:
+
+```json
+{
+  "OcppVersion": "2.0.1",
+  "ChargePointVendor": "Emulator",
+  "ChargePointModel": "Virtual-201",
+  "Evses": [
+    {"evseId": 1, "connectors": [{"connectorId": 1, "type": "cCCS2"}]},
+    {"evseId": 2, "connectors": [{"connectorId": 1, "type": "cCCS1"}]}
+  ]
+}
+```
+
+Установите `"OcppVersion": "2.0.1"` для использования протокола OCPP 2.0.1. Если не указано — по умолчанию `"1.6"`.
+
+### Настройка
 
 Включение в `conf/default.json`:
 ```json

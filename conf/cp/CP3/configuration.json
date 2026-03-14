@@ -2,8 +2,8 @@
   "connectorId":[
     {
       "id":1,
-      "voltage":"AC",
-      "interface":"Type2",
+      "voltage":"DC",
+      "interface":"CCS2",
       "meterValue":0
     },
     {

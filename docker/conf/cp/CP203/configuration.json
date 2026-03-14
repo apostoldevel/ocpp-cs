@@ -1,8 +1,8 @@
 {
   "OcppVersion": "2.0.1",
   "ChargePointVendor": "Emulator",
-  "ChargePointModel": "Virtual-201",
-  "ChargePointSerialNumber": "EM-201-001",
+  "ChargePointModel": "TripleDC-201",
+  "ChargePointSerialNumber": "EM-201-003",
   "ChargePointSoftwareVersion": "2.0.0",
   "CentralSystemURL": "ws://localhost:9220/ocpp/",
   "Evses": [
@@ -17,10 +17,17 @@
       "connectors": [
         {"connectorId": 1, "type": "cCCS1"}
       ]
+    },
+    {
+      "evseId": 3,
+      "connectors": [
+        {"connectorId": 1, "type": "cChaoJi"}
+      ]
     }
   ],
   "ConfigurationKeys": {
-    "HeartbeatInterval": {"value": "60", "readonly": false},
-    "MeterValueSampleInterval": {"value": "60", "readonly": false}
+    "HeartbeatInterval": {"value": "120", "readonly": false},
+    "MeterValueSampleInterval": {"value": "60", "readonly": false},
+    "AuthorizeRemoteTxRequests": {"value": "true", "readonly": false}
   }
 }

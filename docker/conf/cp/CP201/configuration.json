@@ -9,13 +9,13 @@
     {
       "evseId": 1,
       "connectors": [
-        {"connectorId": 1, "type": "cType2"}
+        {"connectorId": 1, "type": "cCCS2"}
       ]
     },
     {
       "evseId": 2,
       "connectors": [
-        {"connectorId": 1, "type": "cCCS2"}
+        {"connectorId": 1, "type": "cCCS1"}
       ]
     }
   ],

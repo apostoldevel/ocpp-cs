@@ -4,7 +4,7 @@
 
 # OCPP Central System
 
-**Central system and charge point emulator for OCPP 1.5 (SOAP) and 1.6 (JSON/WebSocket) in C++20.**
+**Central system and charge point emulator for OCPP 1.5 (SOAP), 1.6 and 2.0.1 (JSON/WebSocket) in C++20.**
 
 Built on [A-POST-OL](https://github.com/apostoldevel/libapostol) — a high-performance C++20 framework with a single `epoll` event loop for HTTP, WebSocket, and PostgreSQL.
 
@@ -30,7 +30,7 @@ Open in your browser:
 ```
 ws://YOUR_SERVER_IP:9220/ocpp/YOUR_STATION_ID
 ```
-The station will appear in the Web UI automatically after it connects.
+The station will appear in the Web UI automatically after it connects. The protocol version (1.6 or 2.0.1) is determined by the `Sec-WebSocket-Protocol` header sent by the station.
 
 That's it. The container runs a fully functional Central System with a built-in charge point emulator — no database, no external services, no configuration needed.
 
@@ -38,12 +38,38 @@ That's it. The container runs a fully functional Central System with a built-in 
 
 | Feature | Details |
 |---------|---------|
-| Central System | Full OCPP 1.5 (SOAP/HTTP) and 1.6 (JSON/WebSocket) support |
-| Charge Point Emulator | Built-in, auto-connects to the Central System on startup |
-| Web UI | Dashboard, station management, 19 OCPP commands, live message log |
+| Central System | OCPP 1.5 (SOAP/HTTP), 1.6 and 2.0.1 (JSON/WebSocket) |
+| Schema Validation | All incoming messages validated against official OCPP JSON Schemas |
+| Charge Point Emulator | Built-in OCPP 1.6 and 2.0.1 stations, auto-connect on startup |
+| Web UI | Dashboard, station management, OCPP commands, live message log |
 | REST API | OpenAPI spec + Swagger UI at `/docs/` |
 | One-command install | `curl \| bash` — Docker setup in 30 seconds |
 | Integration | Webhook or PostgreSQL — your choice |
+
+## OCPP 2.0.1 Support
+
+The Central System supports 13 OCPP 2.0.1 messages covering the full charging session lifecycle:
+
+| Direction | Messages |
+|-----------|----------|
+| CP → CSMS | BootNotification, Heartbeat, StatusNotification, Authorize, TransactionEvent, MeterValues |
+| CSMS → CP | RequestStartTransaction, RequestStopTransaction, Reset, SetVariables, GetVariables, ChangeAvailability |
+| Both | DataTransfer |
+
+Key differences from OCPP 1.6:
+- **3-tier model** — Station → EVSE → Connector (instead of flat connector list)
+- **TransactionEvent** — single message replaces StartTransaction, StopTransaction, and MeterValues
+- **Device Model** — SetVariables/GetVariables replace ChangeConfiguration/GetConfiguration
+- **Schema validation** — all messages validated against official OCPP 2.0.1 JSON Schemas
+
+The built-in emulator includes 4 OCPP 2.0.1 stations with different configurations:
+
+| Station | Model | EVSEs | Connectors |
+|---------|-------|-------|------------|
+| CP201 | Virtual-201 | 2 | CCS2, CCS1 |
+| CP202 | SingleDC-201 | 1 | CCS1 |
+| CP203 | TripleDC-201 | 3 | CCS2, CCS1, ChaoJi |
+| CP204 | DualCable-201 | 2 | 2 per EVSE (CCS2+CCS1, CCS2+ChaoJi) |
 
 ## Live Demo
 
@@ -152,7 +178,7 @@ The simplest integration method. Configure in `conf/default.json`:
 }
 ```
 
-The Central System forwards all charge point-initiated messages (Authorize, BootNotification, StartTransaction, StopTransaction, etc.) to your endpoint as JSON:
+The Central System forwards all charge point-initiated messages (Authorize, BootNotification, StartTransaction, StopTransaction, TransactionEvent, etc.) to your endpoint as JSON:
 
 ```json
 {
@@ -206,6 +232,30 @@ The Central System calls these functions during charge point communication, pass
 The built-in emulator creates virtual charge points for development and testing.
 
 Emulator configs are in `conf/cp/` — each subfolder contains a `configuration.json` for one emulated station.
+
+### OCPP 1.6 Stations
+
+Default configs create 4 stations (`CP1`–`CP4`) with flat connector lists. Configuration uses `ConnectorIds` array.
+
+### OCPP 2.0.1 Stations
+
+The `CP201` station demonstrates the 3-tier model with EVSEs and connectors:
+
+```json
+{
+  "OcppVersion": "2.0.1",
+  "ChargePointVendor": "Emulator",
+  "ChargePointModel": "Virtual-201",
+  "Evses": [
+    {"evseId": 1, "connectors": [{"connectorId": 1, "type": "cCCS2"}]},
+    {"evseId": 2, "connectors": [{"connectorId": 1, "type": "cCCS1"}]}
+  ]
+}
+```
+
+Set `"OcppVersion": "2.0.1"` to use the OCPP 2.0.1 protocol. If absent, defaults to `"1.6"`.
+
+### Configuration
 
 Enable in `conf/default.json`:
 ```json

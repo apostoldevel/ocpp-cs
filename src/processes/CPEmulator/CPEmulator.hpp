@@ -74,7 +74,7 @@ private:
     // ── OCPP 2.0.1: 3-tier model ──────────────────────────────────────────
     struct ConnectorState201 {
         int connector_id = 1;
-        std::string connector_type = "cType2";  // ConnectorEnumType
+        std::string connector_type = "cCCS2";  // ConnectorEnumType
     };
 
     struct EvseState {
