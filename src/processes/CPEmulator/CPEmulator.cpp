@@ -271,7 +271,7 @@ void CPEmulator::create_station(const std::string& dir_name)
     } else {
         // Initialize per-connector state (1.6)
         for (int cid : connector_ids)
-            station->connector_states.push_back(ConnectorState{.connector_id = cid});
+            station->connector_states.push_back(ConnectorState{.connector_id = cid, .id_tag = {}, .reservation_id_tag = {}});
     }
 
     // Create WsClient with OcppCodec
