@@ -67,8 +67,20 @@ void CPEmulator::heartbeat(std::chrono::system_clock::time_point now)
                     evse.meter_value += kMeterIncrementWh;
             }
 
-            // Heartbeat
-            if (now >= station->next_heartbeat) {
+            // Periodic TransactionEvent(Updated) with MeterValues
+            bool meter_sent = false;
+            if (now >= station->next_meter_values) {
+                station->next_meter_values = now + std::chrono::seconds(60);
+                for (auto& evse : station->evses) {
+                    if (!evse.transaction_id.empty() && evse.status == "Occupied") {
+                        send_transaction_event(*station, evse, "Updated", "MeterValuePeriodic");
+                        meter_sent = true;
+                    }
+                }
+            }
+
+            // Heartbeat (only if no meter values sent this tick)
+            if (!meter_sent && now >= station->next_heartbeat) {
                 send_heartbeat_201(*station);
                 station->next_heartbeat = now +
                     std::chrono::seconds(station->heartbeat_interval);
@@ -539,6 +551,102 @@ void CPEmulator::send_status_notification_201(Station& station, int evse_id, int
 void CPEmulator::send_heartbeat_201(Station& station)
 {
     send_request(station, "Heartbeat", nlohmann::json::object());
+}
+
+// ── OCPP 2.0.1 Transactions ────────────────────────────────────────────────
+
+void CPEmulator::send_transaction_event(Station& station, EvseState& evse,
+                                         const std::string& event_type,
+                                         const std::string& trigger_reason)
+{
+    nlohmann::json payload = {
+        {"eventType", event_type},
+        {"timestamp", ocpp::iso_time_now()},
+        {"triggerReason", trigger_reason},
+        {"seqNo", evse.seq_no++},
+        {"transactionInfo", {
+            {"transactionId", evse.transaction_id}
+        }}
+    };
+
+    // Add EVSE info
+    nlohmann::json evse_info = {{"id", evse.evse_id}};
+    if (!evse.connectors.empty())
+        evse_info["connectorId"] = evse.connectors[0].connector_id;
+    payload["evse"] = evse_info;
+
+    // Add idToken for Started
+    if (event_type == "Started" && !evse.id_token.empty()) {
+        payload["idToken"] = {
+            {"idTag", evse.id_token},
+            {"type", evse.id_token_type}
+        };
+    }
+
+    // Add meterValue for Updated and Ended
+    if (event_type == "Updated" || event_type == "Ended") {
+        payload["meterValue"] = nlohmann::json::array({
+            {
+                {"timestamp", ocpp::iso_time_now()},
+                {"sampledValue", nlohmann::json::array({
+                    {
+                        {"value", evse.meter_value},
+                        {"measurand", "Energy.Active.Import.Register"},
+                        {"unitOfMeasure", {{"unit", "Wh"}}}
+                    }
+                })}
+            }
+        });
+    }
+
+    // Add stoppedReason for Ended
+    if (event_type == "Ended") {
+        payload["transactionInfo"]["stoppedReason"] =
+            (trigger_reason == "RemoteStop") ? "Remote" : "Local";
+    }
+
+    WsClient::ResponseHandler handler;
+    if (event_type == "Started") {
+        handler = [this, &station, &evse](const WsMessage& resp) {
+            if (resp.type == WsMessage::Type::Error) return;
+
+            if (resp.payload.contains("idTokenInfo")) {
+                auto status = resp.payload["idTokenInfo"].value("status", "Invalid");
+                if (status == "Accepted") {
+                    evse.status = "Occupied";
+                    evse.status_updated = std::chrono::system_clock::now();
+                    if (!evse.connectors.empty())
+                        send_status_notification_201(station, evse.evse_id,
+                                                     evse.connectors[0].connector_id);
+                }
+            }
+        };
+    }
+
+    send_request(station, "TransactionEvent", std::move(payload), std::move(handler));
+}
+
+void CPEmulator::send_authorize_201(Station& station, EvseState& evse)
+{
+    send_request(station, "Authorize", {
+        {"idToken", {
+            {"idTag", evse.id_token},
+            {"type", evse.id_token_type}
+        }}
+    }, [this, &station, &evse](const WsMessage& resp) {
+        if (resp.type == WsMessage::Type::Error) return;
+
+        if (resp.payload.contains("idTokenInfo")) {
+            auto status = resp.payload["idTokenInfo"].value("status", "Invalid");
+            if (status == "Accepted") {
+                // Generate transaction ID and start transaction
+                evse.transaction_id = generate_transaction_id();
+                evse.seq_no = 0;
+                evse.status_updated = std::chrono::system_clock::now();
+                send_transaction_event(station, evse, "Started", "RemoteStart");
+            }
+        }
+    });
 }
 
 // ── OCPP 2.0.1 Helpers ──────────────────────────────────────────────────────
