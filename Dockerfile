@@ -29,8 +29,9 @@ COPY . .
 RUN set -eux; \
     cp -r docker/conf . && \
     cp -r docker/www . && \
-    ./configure --${BUILD_MODE}; \
-    cmake -B cmake-build-${BUILD_MODE} -DWITH_POSTGRESQL=${WITH_POSTGRESQL}; \
+    PG_FLAG="--without-postgresql"; \
+    if [ "${WITH_POSTGRESQL}" = "ON" ]; then PG_FLAG="--with-postgresql"; fi; \
+    ./configure --${BUILD_MODE} ${PG_FLAG}; \
     cmake --build cmake-build-${BUILD_MODE} --parallel $(nproc); \
     cmake --install cmake-build-${BUILD_MODE}; \
     rm -rf cmake-build-${BUILD_MODE} src
