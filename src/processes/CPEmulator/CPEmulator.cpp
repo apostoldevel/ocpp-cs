@@ -335,25 +335,35 @@ void CPEmulator::register_action_handlers(Station& station)
             });
     };
 
-    reg("CancelReservation",      &CPEmulator::on_cancel_reservation);
-    reg("ChangeAvailability",     &CPEmulator::on_change_availability);
-    reg("ChangeConfiguration",    &CPEmulator::on_change_configuration);
-    reg("ClearCache",             &CPEmulator::on_clear_cache);
-    reg("ClearChargingProfile",   &CPEmulator::on_clear_charging_profile);
-    reg("DataTransfer",           &CPEmulator::on_data_transfer);
-    reg("GetCompositeSchedule",   &CPEmulator::on_get_composite_schedule);
-    reg("GetConfiguration",       &CPEmulator::on_get_configuration);
-    reg("GetDiagnostics",         &CPEmulator::on_get_diagnostics);
-    reg("GetLocalListVersion",    &CPEmulator::on_get_local_list_version);
-    reg("RemoteStartTransaction", &CPEmulator::on_remote_start_transaction);
-    reg("RemoteStopTransaction",  &CPEmulator::on_remote_stop_transaction);
-    reg("ReserveNow",             &CPEmulator::on_reserve_now);
-    reg("Reset",                  &CPEmulator::on_reset);
-    reg("SendLocalList",          &CPEmulator::on_send_local_list);
-    reg("SetChargingProfile",     &CPEmulator::on_set_charging_profile);
-    reg("TriggerMessage",         &CPEmulator::on_trigger_message);
-    reg("UnlockConnector",        &CPEmulator::on_unlock_connector);
-    reg("UpdateFirmware",         &CPEmulator::on_update_firmware);
+    if (station.ocpp_version == "2.0.1") {
+        reg("RequestStartTransaction", &CPEmulator::on_request_start_transaction);
+        reg("RequestStopTransaction",  &CPEmulator::on_request_stop_transaction);
+        reg("Reset",                   &CPEmulator::on_reset_201);
+        reg("SetVariables",            &CPEmulator::on_set_variables);
+        reg("GetVariables",            &CPEmulator::on_get_variables);
+        reg("ChangeAvailability",      &CPEmulator::on_change_availability_201);
+        reg("DataTransfer",            &CPEmulator::on_data_transfer_201);
+    } else {
+        reg("CancelReservation",      &CPEmulator::on_cancel_reservation);
+        reg("ChangeAvailability",     &CPEmulator::on_change_availability);
+        reg("ChangeConfiguration",    &CPEmulator::on_change_configuration);
+        reg("ClearCache",             &CPEmulator::on_clear_cache);
+        reg("ClearChargingProfile",   &CPEmulator::on_clear_charging_profile);
+        reg("DataTransfer",           &CPEmulator::on_data_transfer);
+        reg("GetCompositeSchedule",   &CPEmulator::on_get_composite_schedule);
+        reg("GetConfiguration",       &CPEmulator::on_get_configuration);
+        reg("GetDiagnostics",         &CPEmulator::on_get_diagnostics);
+        reg("GetLocalListVersion",    &CPEmulator::on_get_local_list_version);
+        reg("RemoteStartTransaction", &CPEmulator::on_remote_start_transaction);
+        reg("RemoteStopTransaction",  &CPEmulator::on_remote_stop_transaction);
+        reg("ReserveNow",             &CPEmulator::on_reserve_now);
+        reg("Reset",                  &CPEmulator::on_reset);
+        reg("SendLocalList",          &CPEmulator::on_send_local_list);
+        reg("SetChargingProfile",     &CPEmulator::on_set_charging_profile);
+        reg("TriggerMessage",         &CPEmulator::on_trigger_message);
+        reg("UnlockConnector",        &CPEmulator::on_unlock_connector);
+        reg("UpdateFirmware",         &CPEmulator::on_update_firmware);
+    }
 }
 
 // ── WebSocket callbacks ──────────────────────────────────────────────────────
@@ -1401,6 +1411,191 @@ nlohmann::json CPEmulator::on_update_firmware(Station& station, const nlohmann::
 {
     auto file = load_response_file(station.prefix, "UpdateFirmware");
     return file.is_null() ? nlohmann::json::object() : file;
+}
+
+// ── OCPP 2.0.1 CSMS→CP handlers ────────────────────────────────────────────
+
+nlohmann::json CPEmulator::on_request_start_transaction(Station& station, const nlohmann::json& payload)
+{
+    int evse_id = payload.value("evseId", 0);
+    auto id_token = payload.value("idToken", nlohmann::json::object());
+    auto id_tag = id_token.value("idTag", "");
+    auto id_type = id_token.value("type", "ISO14443");
+
+    EvseState* evse = nullptr;
+    if (evse_id > 0) {
+        evse = find_evse(station, evse_id);
+    } else {
+        // Find first available EVSE
+        for (auto& e : station.evses) {
+            if (e.status == "Available" && e.transaction_id.empty()) {
+                evse = &e;
+                break;
+            }
+        }
+    }
+
+    if (!evse || !evse->transaction_id.empty())
+        return {{"status", "Rejected"}};
+
+    evse->id_token = id_tag;
+    evse->id_token_type = id_type;
+
+    // Authorize then start
+    send_authorize_201(station, *evse);
+
+    return {{"status", "Accepted"}};
+}
+
+nlohmann::json CPEmulator::on_request_stop_transaction(Station& station, const nlohmann::json& payload)
+{
+    auto tx_id = payload.value("transactionId", "");
+
+    for (auto& evse : station.evses) {
+        if (evse.transaction_id == tx_id) {
+            send_transaction_event(station, evse, "Ended", "RemoteStop");
+
+            evse.reset();
+            if (!evse.connectors.empty())
+                send_status_notification_201(station, evse.evse_id, evse.connectors[0].connector_id);
+
+            return {{"status", "Accepted"}};
+        }
+    }
+
+    return {{"status", "Rejected"}};
+}
+
+nlohmann::json CPEmulator::on_reset_201(Station& station, const nlohmann::json& payload)
+{
+    auto type = payload.value("type", "Immediate");
+    int evse_id = payload.value("evseId", 0);
+
+    app_->logger().info("[{}] Reset (2.0.1): type={} evseId={}", station.identity, type, evse_id);
+
+    if (evse_id > 0) {
+        // Partial reset: specific EVSE
+        auto* evse = find_evse(station, evse_id);
+        if (!evse)
+            return {{"status", "Rejected"}};
+
+        if (!evse->transaction_id.empty())
+            send_transaction_event(station, *evse, "Ended", "Other");
+        evse->reset();
+    } else {
+        // Full reset: all EVSEs
+        for (auto& evse : station.evses) {
+            if (!evse.transaction_id.empty())
+                send_transaction_event(station, evse, "Ended", "Other");
+            evse.reset();
+        }
+    }
+
+    // Schedule reconnect
+    loop_->add_timer(std::chrono::seconds(2), [this, &station] {
+        station.ws->reconnect();
+    });
+
+    return {{"status", "Accepted"}};
+}
+
+nlohmann::json CPEmulator::on_set_variables(Station& station, const nlohmann::json& payload)
+{
+    nlohmann::json results = nlohmann::json::array();
+
+    if (payload.contains("setVariableData") && payload["setVariableData"].is_array()) {
+        for (const auto& item : payload["setVariableData"]) {
+            auto component = item.value("component", nlohmann::json::object());
+            auto variable = item.value("variable", nlohmann::json::object());
+            auto value = item.value("attributeValue", "");
+            auto var_name = variable.value("name", "");
+
+            auto it = station.config_keys.find(var_name);
+            if (it != station.config_keys.end()) {
+                if (it->second.readonly) {
+                    results.push_back({{"attributeStatus", "Rejected"},
+                                       {"component", component}, {"variable", variable}});
+                } else {
+                    it->second.value = value;
+                    results.push_back({{"attributeStatus", "Accepted"},
+                                       {"component", component}, {"variable", variable}});
+                }
+            } else {
+                results.push_back({{"attributeStatus", "UnknownVariable"},
+                                   {"component", component}, {"variable", variable}});
+            }
+        }
+    }
+
+    return {{"setVariableResult", results}};
+}
+
+nlohmann::json CPEmulator::on_get_variables(Station& station, const nlohmann::json& payload)
+{
+    nlohmann::json results = nlohmann::json::array();
+
+    if (payload.contains("getVariableData") && payload["getVariableData"].is_array()) {
+        for (const auto& item : payload["getVariableData"]) {
+            auto component = item.value("component", nlohmann::json::object());
+            auto variable = item.value("variable", nlohmann::json::object());
+            auto var_name = variable.value("name", "");
+
+            auto it = station.config_keys.find(var_name);
+            if (it != station.config_keys.end()) {
+                results.push_back({{"attributeStatus", "Accepted"},
+                                   {"component", component}, {"variable", variable},
+                                   {"attributeValue", it->second.value}});
+            } else {
+                results.push_back({{"attributeStatus", "UnknownVariable"},
+                                   {"component", component}, {"variable", variable}});
+            }
+        }
+    }
+
+    return {{"getVariableResult", results}};
+}
+
+nlohmann::json CPEmulator::on_change_availability_201(Station& station, const nlohmann::json& payload)
+{
+    auto op_status = payload.value("operationalStatus", "Operative");
+    int evse_id = 0;
+
+    if (payload.contains("evse") && payload["evse"].is_object()) {
+        evse_id = payload["evse"].value("id", 0);
+    }
+
+    std::string new_status = (op_status == "Inoperative") ? "Unavailable" : "Available";
+
+    if (evse_id > 0) {
+        auto* evse = find_evse(station, evse_id);
+        if (!evse)
+            return {{"status", "Rejected"}};
+        if (evse->transaction_id.empty()) {
+            evse->status = new_status;
+            if (!evse->connectors.empty())
+                send_status_notification_201(station, evse->evse_id, evse->connectors[0].connector_id);
+        }
+    } else {
+        for (auto& evse : station.evses) {
+            if (evse.transaction_id.empty()) {
+                evse.status = new_status;
+                for (auto& conn : evse.connectors)
+                    send_status_notification_201(station, evse.evse_id, conn.connector_id);
+            }
+        }
+    }
+
+    return {{"status", "Accepted"}};
+}
+
+nlohmann::json CPEmulator::on_data_transfer_201(Station& station, const nlohmann::json& payload)
+{
+    app_->logger().info("[{}] DataTransfer (2.0.1): vendorId={} messageId={}",
+        station.identity,
+        payload.value("vendorId", ""),
+        payload.value("messageId", ""));
+
+    return {{"status", "Accepted"}};
 }
 
 } // namespace apostol
