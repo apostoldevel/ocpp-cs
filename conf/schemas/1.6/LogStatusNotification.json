@@ -1,0 +1,28 @@
+﻿{
+  "$schema": "http://json-schema.org/draft-06/schema#",
+  "$id": "urn:OCPP:Cp:1.6:2018:11:LogStatusNotification.req",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "status": {
+      "type": "string",
+      "additionalProperties": false,
+      "enum": [
+        "BadMessage",
+        "Idle",
+        "NotSupportedOperation",
+        "PermissionDenied",
+        "Uploaded",
+        "UploadFailure",
+        "Uploading"
+      ]
+    },
+    "requestId": {
+      "type": "integer"
+    }
+  },
+  "required": [
+    "status",
+    "requestId"
+  ]
+}

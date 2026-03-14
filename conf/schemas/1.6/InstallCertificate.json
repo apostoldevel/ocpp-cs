@@ -1,0 +1,24 @@
+﻿{
+  "$schema": "http://json-schema.org/draft-06/schema#",
+  "$id": "urn:OCPP:Cp:1.6:2018:11:InstallCertificate.req",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "certificateType": {
+      "type": "string",
+      "additionalProperties": false,
+      "enum": [        
+        "CentralSystemRootCertificate",
+        "ManufacturerRootCertificate"
+      ]
+    },
+    "certificate": {
+      "type": "string",
+      "maxLength": 5500
+    }
+  },
+  "required": [
+    "certificateType",
+    "certificate"
+  ]
+}
