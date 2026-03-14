@@ -124,17 +124,8 @@ void CSService::do_get(const HttpRequest& req, HttpResponse& resp)
         return;
     }
 
-    // Serve static files from www/
-    auto rel = path.substr(1);
-    auto file_path = rel.empty()
-        ? app_.settings().doc_root / "index.html"
-        : app_.settings().doc_root / rel;
-    if (!serve_file(file_path, resp, false)) {
-        auto index = app_.settings().doc_root / "index.html";
-        if (!serve_file(index, resp, false)) {
-            reply_error(resp, HttpStatus::not_found, "Not Found");
-        }
-    }
+    // Serve static files with try-files fallback
+    try_files(app_.settings().doc_root, req, resp, false);
 }
 
 // ── HTTP POST ───────────────────────────────────────────────────────────────
