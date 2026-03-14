@@ -46,8 +46,12 @@ ENV PROJECT_NAME="${PROJECT_NAME}"
 
 RUN set -eux; \
     apt-get update && apt-get install -y --no-install-recommends \
-        bash ca-certificates && \
+        bash ca-certificates locales && \
+    sed -i 's/# en_US.UTF-8/en_US.UTF-8/' /etc/locale.gen && \
+    locale-gen && \
     rm -rf /var/lib/apt/lists/*
+
+ENV LANG=en_US.UTF-8
 
 RUN mkdir -p /var/log/${PROJECT_NAME}
 

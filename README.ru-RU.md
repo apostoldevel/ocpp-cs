@@ -4,223 +4,143 @@
 
 # OCPP Central System
 
-**OCPP Central System** — Центральная система и эмулятор зарядных станций на C++20.
+**Центральная система и эмулятор зарядных станций для OCPP 1.5 (SOAP) и 1.6 (JSON/WebSocket) на C++20.**
 
-Построена на [A-POST-OL](https://github.com/apostoldevel/libapostol) (libapostol) — высокопроизводительном фреймворке C++20 с единым циклом событий `epoll` для HTTP, WebSocket и PostgreSQL.
+Построена на [A-POST-OL](https://github.com/apostoldevel/libapostol) — высокопроизводительном фреймворке C++20 с единым циклом событий `epoll` для HTTP, WebSocket и PostgreSQL.
 
-## Описание
-
-**OCPP Central System** — это и готовое решение, которое вы легко можете интегрировать в ваш проект, и набор инструментов для создания приложений, работающих по протоколу OCPP.
-
-Данное решение можно использовать для:
-- Разработки или интеграции центральной системы зарядных станций;
-- Эмуляции зарядных станций;
-- Разработки прошивки зарядных станций.
-
-## OCPP
-
-Open Charge Point Protocol [OCPP](http://ocppforum.net) — это протокол связи между зарядными станциями («зарядными точками») и единой управляющей системой («центральной системой»).
-
-**OCPP Central System** поддерживает все команды для версий протокола OCPP 1.5 и 1.6.
-
-Версия 1.5 использует SOAP поверх HTTP в качестве RPC/транспортного протокола. Версия 1.6 использует SOAP и JSON поверх протокола WebSocket.
-
-## API
-
-Мы используем OpenAPI для взаимодействия с Центральной системой. Вы можете напрямую открыть Swagger UI по адресу [http://cs.ocpp-css.com/docs](http://cs.ocpp-css.com/docs).
-
-Кроме того, вы можете использовать любой клиент OpenAPI, чтобы импортировать файл [api.yaml](https://github.com/apostoldevel/ocpp-cs/blob/master/www/docs/api.yaml) из нашего репозитория.
-
-## Демонстрация
-
-Вы можете подключить свою зарядную станцию к демонстрационной версии Центральной системы.
-
----
-Адреса подключения:
-- WebSocket: ws://ws.ocpp-css.com/ocpp
-- SOAP: http://soap.ocpp-css.com/Ocpp
----
-
-Для управления зарядной станцией используйте веб-интерфейс по адресу:
-- [http://cs.ocpp-css.com](http://cs.ocpp-css.com)
-
-Авторизация:
-```
-username: demo
-password: demo
-```
-
-RFID-карта:
-```
-idTag: demo
-```
-
-## Сборка и установка
-
-Самый простой способ установки Центральной системы — в виде контейнера.
-
-### Docker Hub
+## Быстрый старт
 
 ```shell
-docker pull apostoldevel/cs
-```
-
-Запустить контейнер:
-```shell
-docker run -p 9220:9220 --network host --env WEBHOOK_URL=https://api.ocpp-css.com/api/v1/ocpp/parse --rm --name cs apostoldevel/cs
-```
-
-### Сборка образа контейнера
-
-Клонируйте репозиторий:
-```shell
-git clone https://github.com/apostoldevel/ocpp-cs.git && cd ocpp-cs
-```
-
-Выполните настройки в соответствии с вашими требованиями:
-
-- Отредактируйте файл `./docker/conf/default.json`, обратите особое внимание на раздел `"webhook"`;
-- Отредактируйте файл `./docker/www/config.js`, укажите доменное имя или IP-адрес сервера;
-- Отредактируйте файл `./docker/conf/sites/default.json`, добавьте IP-адрес вашего сервера:
-
-  Например, IP-адрес вашего сервера `192.168.1.100` или DNS-имя `cs.example.com`.
-  ```json
-  {
-    "hosts": ["cs.example.com", "cs.example.com:9220", "192.168.1.100:9220", "localhost:9220"]
-  }
-  ```
-
-Создайте и запустите контейнер одной командой:
-```shell
+git clone --recursive https://github.com/apostoldevel/ocpp-cs.git
+cd ocpp-cs
 docker compose up
 ```
 
-### Веб-приложение
+Откройте в браузере:
+- **http://localhost:9220** — Веб-интерфейс (без авторизации)
+- **http://localhost:9220/docs/** — Swagger UI (REST API)
 
-После запуска контейнера Центральная система будет доступна по адресу http://localhost:9220 в вашем браузере.
+Это всё. Контейнер запускает полнофункциональную Центральную систему со встроенным эмулятором зарядных станций — без базы данных, без внешних сервисов, без настройки.
 
-Swagger UI также будет доступен по адресу http://localhost:9220/docs/.
+## Что вы получаете
 
-###### Запуск из контейнера не потребует авторизации.
+| Возможность | Детали |
+|-------------|--------|
+| Центральная система | Полная поддержка OCPP 1.5 (SOAP/HTTP) и 1.6 (JSON/WebSocket) |
+| Эмулятор станций | Встроенный, автоматически подключается при запуске |
+| Веб-интерфейс | Мониторинг станций, запуск/остановка зарядки, просмотр транзакций |
+| REST API | OpenAPI-спецификация + Swagger UI на `/docs/` |
+| Интеграция | Webhook или PostgreSQL — на ваш выбор |
 
-### Сборка из исходных кодов
+## Демонстрация
 
-#### Требования
+Подключите свою зарядную станцию к демо-серверу:
+
+| Протокол | Адрес |
+|----------|-------|
+| WebSocket (OCPP 1.6) | `ws://ws.ocpp-css.com/ocpp` |
+| SOAP (OCPP 1.5) | `http://soap.ocpp-css.com/Ocpp` |
+
+Веб-интерфейс: [http://cs.ocpp-css.com](http://cs.ocpp-css.com) (логин: `demo` / `demo`, RFID: `demo`)
+
+## Docker
+
+### Быстрый запуск (Docker Hub)
+
+```shell
+docker pull apostoldevel/cs
+docker run -p 9220:9220 --rm --name cs apostoldevel/cs
+```
+
+### Сборка и запуск локально
+
+```shell
+git clone --recursive https://github.com/apostoldevel/ocpp-cs.git && cd ocpp-cs
+docker compose up
+```
+
+### Пользовательская настройка
+
+Перед сборкой можно отредактировать:
+
+| Файл | Назначение |
+|------|------------|
+| `docker/conf/default.json` | Настройки сервера, webhook |
+| `docker/www/config.js` | Адрес сервера для веб-интерфейса |
+| `docker/conf/sites/default.json` | Разрешённые имена хостов |
+
+Пример `sites/default.json` для вашего сервера:
+```json
+{
+  "hosts": ["cs.example.com", "cs.example.com:9220", "192.168.1.100:9220", "localhost:9220"]
+}
+```
+
+## Сборка из исходных кодов
+
+### Требования
 
 - Компилятор **C++20**: GCC 12+ или Clang 16+
 - **CMake** 3.25+
-- `libssl-dev`, `libpq-dev`
-- **PostgreSQL** 12+ (опционально — можно отключить)
+- `libssl-dev`, `zlib1g-dev`
+- `libpq-dev` (опционально, только с `WITH_POSTGRESQL`)
 
-Чтобы установить компилятор C++ и необходимые библиотеки в Debian/Ubuntu:
 ```shell
-sudo apt-get install build-essential libssl-dev libcurl4-openssl-dev make cmake gcc g++
+sudo apt-get install build-essential libssl-dev zlib1g-dev make cmake gcc g++
 ```
 
-Клонируйте репозиторий:
-```shell
-git clone https://github.com/apostoldevel/ocpp-cs.git && cd ocpp-cs
-```
-
-#### Сборка
+### Сборка
 
 ```shell
-# Настройка (запускает cmake)
+git clone --recursive https://github.com/apostoldevel/ocpp-cs.git && cd ocpp-cs
+
 ./configure               # релизная сборка
-./configure --debug       # отладочная сборка
-
-# Сборка
 cmake --build cmake-build-release --parallel $(nproc)
-
-# Установка
 sudo cmake --install cmake-build-release
 ```
 
-По умолчанию **cs** будет установлен в `/usr/sbin/`. Файлы конфигурации — в `/etc/cs/`.
-
-#### Локальная разработка
+### Локальная разработка
 
 ```shell
+./configure --debug
+cmake --build cmake-build-debug --parallel $(nproc)
 mkdir -p logs
 ./cmake-build-debug/cs -p . -c conf/default.json
 ```
 
-#### Параметры CMake
+### Параметры CMake
 
 | Параметр | По умолчанию | Описание |
 |----------|-------------|----------|
-| `INSTALL_AS_ROOT` | ON | Установить как root. Отключить для локальной установки. |
-| `WITH_POSTGRESQL` | ON | Поддержка PostgreSQL для промышленной интеграции. Отключить для автономного эмулятора. |
-| `WITH_SSL` | ON | TLS, проверка JWT, авторизация OAuth 2.0. |
+| `INSTALL_AS_ROOT` | ON | Установка в системные каталоги (`/usr/sbin/`, `/etc/cs/`) |
+| `WITH_POSTGRESQL` | ON | Интеграция с PostgreSQL. Отключить для автономного режима |
+| `WITH_SSL` | ON | TLS, JWT, OAuth 2.0 |
 
-Чтобы собрать без интеграции с базой данных:
-```cmake
-WITH_POSTGRESQL OFF
-WITH_SSL OFF
+Автономная сборка (без базы данных):
+```shell
+./configure --release --without-postgresql --without-ssl
 ```
 
 ## Интеграция
 
-Существует несколько способов интеграции Центральной системы с вашим проектом.
-
 ### Webhook
 
-Самый простой способ — через Webhook endpoint.
-
-В файле настроек Центральной системы `conf/default.json` имеется раздел `"webhook"`:
+Самый простой способ интеграции. Настройка в `conf/default.json`:
 
 ```json
 {
   "webhook": {
-    "enable": false,
-    "url": "http://localhost:8080/api/v1/ocpp/parse",
+    "enable": true,
+    "url": "http://your-server/api/v1/ocpp/parse",
     "authorization": "Basic",
     "username": "ocpp",
-    "password": "ocpp",
-    "token": ""
+    "password": "ocpp"
   }
 }
 ```
 
-В этом разделе вы можете указать endpoint URL, на который Центральная система будет направлять пакеты, поступающие от зарядных станций.
+Центральная система пересылает все сообщения от зарядных станций (Authorize, BootNotification, StartTransaction, StopTransaction и т.д.) на ваш endpoint в формате JSON:
 
-В частности, это десять команд из раздела **4. Operations Initiated by Charge Point** спецификации OCPP v1.6:
-
-- 4.1. Authorize
-- 4.2. Boot Notification
-- 4.3. Data Transfer
-- 4.4. Diagnostics Status Notification
-- 4.5. Firmware Status Notification
-- 4.6. Heartbeat
-- 4.7. Meter Values
-- 4.8. Start Transaction
-- 4.9. Status Notification
-- 4.10. Stop Transaction
-
-Дополнительно можно настроить параметры авторизации на стороне вашего сервера, который будет принимать запросы от Центральной системы.
-
-Данные от Центральной системы будут в следующем JSON-формате:
-```json
-{
-  "identity": "string",
-  "uniqueId": "string",
-  "action": "string",
-  "payload": "JSON Object",
-  "account": "string"
-}
-```
-Где:
-- `identity`: Обязательный. Идентификатор зарядной станции;
-- `uniqueId`: Обязательный. Идентификатор пакета данных (запроса);
-- `action`: Обязательный. Имя действия;
-- `payload`: Обязательный. Полезная нагрузка — данные от зарядной станции;
-- `account`: Необязательный. Идентификатор учётной записи пользователя в вашей системе.
-
-###### Благодаря `account` можно связать зарядную станцию с пользователем в системе, если бизнес-логика проекта это предусматривает. Обычно в настройках зарядной станции указывается адрес для подключения к центральной системе в формате `ws://host/ocpp/EM-A0000001`. Если к идентификатору зарядной станции `EM-A0000001` добавить дополнительное значение, например: `/EM-A0000001/AC0001`, то `AC0001` это и будет идентификатор учётной записи пользователя.
-
-Центральная система будет ожидать ответ от вашей информационной системы в таком же JSON-формате. Значения полей (`identity`, `uniqueId`, `action`) должны быть заполнены значениями из входящего запроса, но в `payload` должны находиться данные ответа на `action` в формате спецификации протокола OCPP.
-
-Пример запроса:
 ```json
 {
   "identity": "EM-A0000001",
@@ -236,7 +156,8 @@ WITH_SSL OFF
 }
 ```
 
-Пример ответа:
+Ваш сервер отвечает в том же формате с OCPP-совместимым `payload`:
+
 ```json
 {
   "identity": "EM-A0000001",
@@ -250,36 +171,30 @@ WITH_SSL OFF
 }
 ```
 
+**Поля:**
+- `identity` — идентификатор зарядной станции
+- `uniqueId` — идентификатор запроса
+- `action` — имя действия OCPP
+- `payload` — данные OCPP
+- `account` — необязательный идентификатор учётной записи (извлекается из URL подключения: `ws://host/ocpp/EM-A0000001/AC0001`)
+
 ### PostgreSQL
 
-Ещё один способ интеграции Центральной системы — через прямое подключение к базе данных PostgreSQL.
+Для прямой интеграции с базой данных создайте схему `ocpp` со следующими функциями:
 
-Для интеграции через PostgreSQL вам нужно создать схему `ocpp` и несколько функций в базе данных:
-- ocpp.Parse
-- ocpp.ParseXML
-- ocpp.ChargePointList
-- ocpp.TransactionList
-- ocpp.ReservationList
-- ocpp.JSONToSOAP
-- ocpp.SOAPToJSON
+- `ocpp.Parse`, `ocpp.ParseXML`
+- `ocpp.ChargePointList`, `ocpp.TransactionList`, `ocpp.ReservationList`
+- `ocpp.JSONToSOAP`, `ocpp.SOAPToJSON`
 
-При коммуникации с зарядными станциями Центральная система будет вызывать эти функции и передавать данные от зарядных станций в JSON-формате непосредственно в базу данных. Разбор данных и реализация бизнес-логики будет выполняться в PostgreSQL на языке PL/pgSQL.
-
-#### Внимание: Версия из репозитория настроена на интеграцию с базой данных.
-
-Чтобы собрать Центральную систему без интеграции с базой данных, установите в `CMakeLists.txt`:
-```
-WITH_POSTGRESQL OFF
-```
+Центральная система вызывает эти функции при коммуникации с зарядными станциями, передавая данные в формате JSON. Вся бизнес-логика реализуется на PL/pgSQL.
 
 ## Эмулятор зарядных станций
 
-Центральная система может создавать эмуляторы зарядных станций. Очень полезно в процессе разработки.
+Встроенный эмулятор создаёт виртуальные зарядные станции для разработки и тестирования.
 
-Настройки для эмуляторов находятся в папке `conf/cp/`. Внутри `cp` находятся папки с настройками эмуляторов в виде файлов `configuration.json`, которые содержат конфигурацию зарядной станции-эмулятора.
+Настройки эмуляторов находятся в `conf/cp/` — каждая подпапка содержит `configuration.json` для одной эмулируемой станции.
 
-Включить режим эмуляции можно в файле настроек `conf/default.json`:
-
+Включение в `conf/default.json`:
 ```json
 {
   "module": {
@@ -288,8 +203,7 @@ WITH_POSTGRESQL OFF
 }
 ```
 
-Если в настройках отключить `master`-процесс, то приложение будет работать только в режиме эмулятора зарядных станций (Центральная система будет отключена).
-
+Режим «только эмулятор» (Центральная система отключена):
 ```json
 {
   "process": {
@@ -300,23 +214,17 @@ WITH_POSTGRESQL OFF
 
 ## Управление сервисом
 
-###### Если `INSTALL_AS_ROOT` установлен в `ON`.
-
-`cs` — это системная служба Linux (демон).
-
 ```shell
 sudo systemctl start  cs
 sudo systemctl stop   cs
 sudo systemctl status cs
 ```
 
-## Управление сигналами
-
-Управлять `cs` можно с помощью сигналов. Номер главного процесса по умолчанию записывается в файл `/run/cs.pid`.
+### Сигналы
 
 | Сигнал | Действие |
 |--------|----------|
 | TERM, INT | быстрое завершение |
 | QUIT | плавное завершение |
-| HUP | изменение конфигурации, запуск новых рабочих процессов с новой конфигурацией, плавное завершение старых |
+| HUP | перезагрузка конфигурации, запуск новых рабочих процессов |
 | WINCH | плавное завершение рабочих процессов |
