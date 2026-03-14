@@ -32,13 +32,28 @@ export const OCPP_PROFILES = {
   ],
 }
 
+export const OCPP_201_PROFILES = {
+  Core: [
+    { name: 'RequestStartTransaction', description: 'Start a charging session remotely' },
+    { name: 'RequestStopTransaction', description: 'Stop an active charging session' },
+    { name: 'Reset', description: 'Reboot the station (full or per-EVSE)' },
+    { name: 'ChangeAvailability', description: 'Set EVSE availability' },
+    { name: 'DataTransfer', description: 'Vendor-specific data exchange' },
+  ],
+  DeviceModel: [
+    { name: 'SetVariables', description: 'Set device model variables' },
+    { name: 'GetVariables', description: 'Read device model variables' },
+  ],
+}
+
 const schemaCache = {}
 
-export async function loadSchema(commandName) {
-  if (schemaCache[commandName]) return schemaCache[commandName]
-  const resp = await fetch(`/app/data/schema/1.6/${commandName}.json`)
-  if (!resp.ok) throw new Error(`Schema not found: ${commandName}`)
+export async function loadSchema(commandName, version = '1.6') {
+  const key = `${version}/${commandName}`
+  if (schemaCache[key]) return schemaCache[key]
+  const resp = await fetch(`/app/data/schema/${version}/${commandName}.json`)
+  if (!resp.ok) throw new Error(`Schema not found: ${commandName} (${version})`)
   const schema = await resp.json()
-  schemaCache[commandName] = schema
+  schemaCache[key] = schema
   return schema
 }

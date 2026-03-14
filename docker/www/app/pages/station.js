@@ -5,7 +5,7 @@ import { SchemaForm } from '../components/schema-form.js'
 import { CommandResponse } from '../components/command-response.js'
 import { LogViewer } from '../components/log-viewer.js'
 import { sendCommand } from '../services/api.js'
-import { OCPP_PROFILES, loadSchema } from '../data/ocpp-commands.js'
+import { OCPP_PROFILES, OCPP_201_PROFILES, loadSchema } from '../data/ocpp-commands.js'
 
 const { ref, computed, watch } = Vue
 
@@ -20,6 +20,8 @@ export const StationPage = {
       state.stations.find(s => s.identity === identity.value)
     )
 
+    const ocppVersion = computed(() => station.value?.ocppVersion || '1.6')
+
     const selectedCommand = ref(null)
     const schema = ref(null)
     const response = ref(null)
@@ -31,7 +33,7 @@ export const StationPage = {
       response.value = null
       error.value = null
       try {
-        schema.value = await loadSchema(cmd.name)
+        schema.value = await loadSchema(cmd.name, ocppVersion.value)
       } catch (e) {
         schema.value = null
         error.value = 'Failed to load schema: ' + e.message
@@ -57,7 +59,7 @@ export const StationPage = {
     )
 
     return {
-      identity, station, selectedCommand, schema, response,
+      identity, station, ocppVersion, selectedCommand, schema, response,
       sending, error, onSelectCommand, onSubmit, stationLog
     }
   },
@@ -83,7 +85,7 @@ export const StationPage = {
           </div>
           <div class="station-commands-panel">
             <div class="station-commands-sidebar">
-              <command-list :selected="selectedCommand" @select="onSelectCommand" />
+              <command-list :selected="selectedCommand" :version="ocppVersion" @select="onSelectCommand" />
             </div>
             <div class="station-commands-main">
               <div v-if="!selectedCommand" class="station-commands-empty">

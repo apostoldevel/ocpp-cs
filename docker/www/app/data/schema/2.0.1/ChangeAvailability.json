@@ -1,0 +1,20 @@
+{
+    "$schema": "http://json-schema.org/draft-04/schema#",
+    "title": "ChangeAvailabilityRequest",
+    "type": "object",
+    "properties": {
+        "operationalStatus": {
+            "type": "string",
+            "enum": ["Operative", "Inoperative"]
+        },
+        "evse": {
+            "type": "object",
+            "properties": {
+                "id": { "type": "integer" },
+                "connectorId": { "type": "integer" }
+            },
+            "required": ["id"]
+        }
+    },
+    "required": ["operationalStatus"]
+}

@@ -183,6 +183,8 @@
 .card-badge.reserved    { background: var(--blue-dim);   color: var(--blue); }
 .card-badge.suspendedev,
 .card-badge.suspendedevse { background: var(--amber-dim); color: var(--amber); }
+.card-badge.ocpp-16  { background: var(--blue-dim);  color: var(--blue); }
+.card-badge.ocpp-201 { background: rgba(57,210,192,0.15); color: var(--cyan); }
 
 .card-body {
   padding: 1rem 1.25rem;

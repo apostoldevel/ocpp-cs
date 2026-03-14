@@ -1,0 +1,27 @@
+{
+    "$schema": "http://json-schema.org/draft-04/schema#",
+    "title": "GetVariablesRequest",
+    "type": "object",
+    "properties": {
+        "getVariableData": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "component": {
+                        "type": "object",
+                        "properties": { "name": { "type": "string" } },
+                        "required": ["name"]
+                    },
+                    "variable": {
+                        "type": "object",
+                        "properties": { "name": { "type": "string" } },
+                        "required": ["name"]
+                    }
+                },
+                "required": ["component", "variable"]
+            }
+        }
+    },
+    "required": ["getVariableData"]
+}

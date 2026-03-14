@@ -25,6 +25,9 @@ export const StationTable = {
         } else if (key === 'status') {
           va = ((a.statusNotification || {}).status || '').toLowerCase()
           vb = ((b.statusNotification || {}).status || '').toLowerCase()
+        } else if (key === 'ocpp') {
+          va = a.ocppVersion || '1.6'
+          vb = b.ocppVersion || '1.6'
         } else if (key === 'protocol') {
           va = a.protocol || ''
           vb = b.protocol || ''
@@ -52,7 +55,12 @@ export const StationTable = {
       location.hash = '#/station/' + encodeURIComponent(s.identity)
     }
 
-    return { sorted, sortKey, sortAsc, toggleSort, statusCls, goStation }
+    function ocppCls(s) {
+      const v = s.ocppVersion || '1.6'
+      return v === '2.0.1' ? 'ocpp-201' : 'ocpp-16'
+    }
+
+    return { sorted, sortKey, sortAsc, toggleSort, statusCls, ocppCls, goStation }
   },
   template: `
     <div class="info-panel">
@@ -63,6 +71,7 @@ export const StationTable = {
             <th :class="{ sorted: sortKey === 'vendor' }" @click="toggleSort('vendor')">Vendor</th>
             <th :class="{ sorted: sortKey === 'model' }" @click="toggleSort('model')">Model</th>
             <th :class="{ sorted: sortKey === 'status' }" @click="toggleSort('status')">Status</th>
+            <th :class="{ sorted: sortKey === 'ocpp' }" @click="toggleSort('ocpp')">OCPP</th>
             <th :class="{ sorted: sortKey === 'protocol' }" @click="toggleSort('protocol')">Protocol</th>
             <th>Address</th>
           </tr>
@@ -75,6 +84,11 @@ export const StationTable = {
             <td>
               <span class="card-badge" :class="statusCls(s)">
                 {{ (s.statusNotification || {}).status || 'Unknown' }}
+              </span>
+            </td>
+            <td>
+              <span class="card-badge" :class="ocppCls(s)">
+                {{ s.ocppVersion || '1.6' }}
               </span>
             </td>
             <td>{{ s.protocol || '--' }}</td>

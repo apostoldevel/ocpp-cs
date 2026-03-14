@@ -1,4 +1,4 @@
-import { OCPP_PROFILES } from '../data/ocpp-commands.js'
+import { OCPP_PROFILES, OCPP_201_PROFILES } from '../data/ocpp-commands.js'
 
 const { ref, computed } = Vue
 
@@ -9,20 +9,26 @@ const PROFILE_LABELS = {
   Reservation: 'Reservation',
   LocalAuthList: 'Local Auth List',
   RemoteTrigger: 'Remote Trigger',
+  DeviceModel: 'Device Model',
 }
 
 export const CommandList = {
   props: {
-    selected: { type: Object, default: null }
+    selected: { type: Object, default: null },
+    version: { type: String, default: '1.6' }
   },
   emits: ['select'],
   setup(props, { emit }) {
     const search = ref('')
 
+    const profiles = computed(() =>
+      props.version === '2.0.1' ? OCPP_201_PROFILES : OCPP_PROFILES
+    )
+
     const filtered = computed(() => {
       const q = search.value.toLowerCase()
       const result = {}
-      for (const [profile, cmds] of Object.entries(OCPP_PROFILES)) {
+      for (const [profile, cmds] of Object.entries(profiles.value)) {
         const matching = q
           ? cmds.filter(c =>
               c.name.toLowerCase().includes(q) ||
