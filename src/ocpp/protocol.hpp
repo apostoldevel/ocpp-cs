@@ -78,27 +78,33 @@ inline ChargePointStatus string_to_charge_point_status(std::string_view s)
 }
 
 enum class ChargePointErrorCode {
-    ConnectorLockFailure, HighTemperature, Mode3Error, NoError,
-    PowerMeterFailure, PowerSwitchFailure, ReaderFailure, ResetFailure,
-    GroundFailure, OverCurrentFailure, UnderVoltage, WeakSignal, OtherError
+    ConnectorLockFailure, EVCommunicationError, GroundFailure,
+    HighTemperature, InternalError, LocalListConflict, Mode3Error,
+    NoError, OtherError, OverCurrentFailure, OverVoltage,
+    PowerMeterFailure, PowerSwitchFailure, ReaderFailure,
+    ResetFailure, UnderVoltage, WeakSignal
 };
 
 inline std::string_view charge_point_error_code_to_string(ChargePointErrorCode e)
 {
     switch (e) {
         case ChargePointErrorCode::ConnectorLockFailure: return "ConnectorLockFailure";
+        case ChargePointErrorCode::EVCommunicationError: return "EVCommunicationError";
+        case ChargePointErrorCode::GroundFailure:        return "GroundFailure";
         case ChargePointErrorCode::HighTemperature:      return "HighTemperature";
+        case ChargePointErrorCode::InternalError:        return "InternalError";
+        case ChargePointErrorCode::LocalListConflict:    return "LocalListConflict";
         case ChargePointErrorCode::Mode3Error:           return "Mode3Error";
         case ChargePointErrorCode::NoError:              return "NoError";
+        case ChargePointErrorCode::OtherError:           return "OtherError";
+        case ChargePointErrorCode::OverCurrentFailure:   return "OverCurrentFailure";
+        case ChargePointErrorCode::OverVoltage:          return "OverVoltage";
         case ChargePointErrorCode::PowerMeterFailure:    return "PowerMeterFailure";
         case ChargePointErrorCode::PowerSwitchFailure:   return "PowerSwitchFailure";
         case ChargePointErrorCode::ReaderFailure:        return "ReaderFailure";
         case ChargePointErrorCode::ResetFailure:         return "ResetFailure";
-        case ChargePointErrorCode::GroundFailure:        return "GroundFailure";
-        case ChargePointErrorCode::OverCurrentFailure:   return "OverCurrentFailure";
         case ChargePointErrorCode::UnderVoltage:         return "UnderVoltage";
         case ChargePointErrorCode::WeakSignal:           return "WeakSignal";
-        case ChargePointErrorCode::OtherError:           return "OtherError";
     }
     return "OtherError";
 }
@@ -106,15 +112,19 @@ inline std::string_view charge_point_error_code_to_string(ChargePointErrorCode e
 inline ChargePointErrorCode string_to_charge_point_error_code(std::string_view s)
 {
     if (s == "ConnectorLockFailure") return ChargePointErrorCode::ConnectorLockFailure;
+    if (s == "EVCommunicationError") return ChargePointErrorCode::EVCommunicationError;
+    if (s == "GroundFailure")        return ChargePointErrorCode::GroundFailure;
     if (s == "HighTemperature")      return ChargePointErrorCode::HighTemperature;
+    if (s == "InternalError")        return ChargePointErrorCode::InternalError;
+    if (s == "LocalListConflict")    return ChargePointErrorCode::LocalListConflict;
     if (s == "Mode3Error")           return ChargePointErrorCode::Mode3Error;
     if (s == "NoError")              return ChargePointErrorCode::NoError;
+    if (s == "OverCurrentFailure")   return ChargePointErrorCode::OverCurrentFailure;
+    if (s == "OverVoltage")          return ChargePointErrorCode::OverVoltage;
     if (s == "PowerMeterFailure")    return ChargePointErrorCode::PowerMeterFailure;
     if (s == "PowerSwitchFailure")   return ChargePointErrorCode::PowerSwitchFailure;
     if (s == "ReaderFailure")        return ChargePointErrorCode::ReaderFailure;
     if (s == "ResetFailure")         return ChargePointErrorCode::ResetFailure;
-    if (s == "GroundFailure")        return ChargePointErrorCode::GroundFailure;
-    if (s == "OverCurrentFailure")   return ChargePointErrorCode::OverCurrentFailure;
     if (s == "UnderVoltage")         return ChargePointErrorCode::UnderVoltage;
     if (s == "WeakSignal")           return ChargePointErrorCode::WeakSignal;
     return ChargePointErrorCode::OtherError;

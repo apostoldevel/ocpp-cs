@@ -19,6 +19,7 @@
 #include "ocpp/protocol.hpp"
 #include "ocpp/charging_point.hpp"
 
+#include <chrono>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -40,6 +41,14 @@ struct WebhookConfig {
     std::string username;
     std::string password;
     std::string token;
+};
+
+// ── PendingCall — correlates outbound CS→CP Call with deferred HTTP response ─
+
+struct PendingCall {
+    std::shared_ptr<HttpConnection> conn;     // deferred HTTP connection
+    std::string                     action;   // OCPP action name
+    std::chrono::steady_clock::time_point deadline;
 };
 
 // ── CSService ───────────────────────────────────────────────────────────────
@@ -77,9 +86,10 @@ private:
 #ifdef WITH_POSTGRESQL
     void do_soap(const HttpRequest& req, HttpResponse& resp);
     void parse_soap(const HttpRequest& req, HttpResponse& resp, const std::string& payload);
-    void json_to_soap(HttpResponse& resp, ocpp::CSChargingPoint* point,
+    void json_to_soap(const HttpRequest& req, HttpResponse& resp,
+                      ocpp::CSChargingPoint* point,
                       const std::string& operation, const nlohmann::json& payload);
-    void soap_to_json(HttpResponse& resp, const std::string& xml_payload);
+    void soap_to_json(std::shared_ptr<HttpConnection> conn, const std::string& xml_payload);
 #endif
 
     // ── REST API (/api/v1/ChargePoint/*) ────────────────────────────────
@@ -118,6 +128,10 @@ private:
     nlohmann::json charge_point_to_json(const ocpp::CSChargingPoint& point) const;
     nlohmann::json get_charge_point_list() const;
 
+    // ── Pending call management ─────────────────────────────────────────
+
+    void cleanup_expired_calls();
+
     // ── Members ─────────────────────────────────────────────────────────
 
     Application&                    app_;
@@ -127,12 +141,18 @@ private:
     ocpp::CSChargingPointManager    point_manager_;
     WebhookConfig                   webhook_;
     bool                            enabled_;
+    bool                            api_auth_ = false; // true = production (JWT required)
 
     // WsConnection storage: fd -> WsConnection (moved here after upgrade)
     std::unordered_map<int, WsConnection> ws_connections_;
 
     // Lazy-initialized FetchClient for webhook dispatch
     std::unique_ptr<FetchClient> fetch_client_;
+
+    // Pending outbound calls: uniqueId -> PendingCall (deferred HTTP response)
+    std::unordered_map<std::string, PendingCall> pending_calls_;
+
+    static constexpr std::chrono::seconds pending_call_timeout_{30};
 };
 
 } // namespace apostol

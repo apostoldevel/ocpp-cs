@@ -9,9 +9,14 @@
 
 #include "apostol/base64.hpp"
 #include "apostol/fetch_client.hpp"
+#include "apostol/http_utils.hpp"
+#ifdef WITH_SSL
+#include "apostol/jwt.hpp"
+#endif
 
 #include <chrono>
 #include <filesystem>
+#include <unordered_set>
 
 namespace apostol
 {
@@ -63,6 +68,11 @@ CSService::CSService(Application& app)
         webhook_.token       = wh.value("token", "");
     }
 
+    // Load API auth configuration
+    if (cfg.contains("api")) {
+        api_auth_ = cfg["api"].value("auth", false);
+    }
+
     // Environment variable overrides
     if (const char* env_url = std::getenv("WEBHOOK_URL")) {
         webhook_.url = env_url;
@@ -73,6 +83,10 @@ CSService::CSService(Application& app)
     app_.set_ws_handler([this](EventLoop& loop, WsConnection ws, const HttpRequest& req) {
         on_ws_upgrade(loop, std::move(ws), req);
     });
+
+    // Periodic cleanup of expired pending calls (every 5 seconds)
+    app_.worker_loop().add_timer(std::chrono::milliseconds(5000),
+        [this] { cleanup_expired_calls(); }, true);
 }
 
 // ── check_location ──────────────────────────────────────────────────────────
@@ -169,6 +183,19 @@ void CSService::on_ws_upgrade(EventLoop& loop, WsConnection ws, const HttpReques
     }
 
     auto& point = point_manager_.get_or_create(identity);
+
+    // Clean up stale connection if station reconnects with same identity
+    if (point.ws_connection()) {
+        int old_fd = point.ws_connection()->fd();
+        app_.logger().notice("[{}] reconnecting — closing stale fd={}", identity, old_fd);
+        loop.remove_io(old_fd);
+        ws_connections_.erase(old_fd);
+        point.set_ws_connection(nullptr);
+#ifdef WITH_POSTGRESQL
+        set_point_connected(identity, false, json::object());
+#endif
+    }
+
     point.set_protocol_type(ocpp::ProtocolType::JSON);
     point.set_address(get_host(req));
     point.set_connected_at(ocpp::CSChargingPoint::clock::now());
@@ -245,28 +272,57 @@ void CSService::on_ws_message(ocpp::CSChargingPoint& point, const std::string& p
             parse_json_standalone(point, msg);
         }
 #endif
+        return;
     }
-    // CallResult/CallError responses are handled by WsClient correlation
-    // (for outbound requests). Inbound responses to our calls are TODO.
+
+    // CallResult / CallError — correlate with pending outbound call
+    auto it = pending_calls_.find(msg.unique_id);
+    if (it == pending_calls_.end()) {
+        app_.logger().warn("[{}] received {} for unknown uniqueId={}",
+            point.identity(),
+            msg.type == ocpp::MessageType::CallResult ? "CallResult" : "CallError",
+            msg.unique_id);
+        return;
+    }
+
+    auto pending = std::move(it->second);
+    pending_calls_.erase(it);
+
+    json body;
+    if (msg.type == ocpp::MessageType::CallError) {
+        body = {
+            {"error", true},
+            {"errorCode", msg.error_code},
+            {"errorDescription", msg.error_description},
+            {"errorDetails", msg.payload}
+        };
+    } else {
+        body = msg.payload;
+    }
+
+    HttpResponse r;
+    r.set_status(HttpStatus::ok);
+    r.set_body(body.dump(), "application/json");
+    pending.conn->send_response(r);
+
+    app_.logger().debug("[{}] pending call {} ({}) resolved",
+        point.identity(), msg.unique_id, pending.action);
 }
 
 void CSService::on_ws_close(const std::string& identity)
 {
     auto* point = point_manager_.find_by_identity(identity);
-    if (!point) return;
+    if (!point || !point->ws_connection()) return;  // already cleaned up or unknown
 
-    int fd = -1;
-    if (point->ws_connection()) {
-        fd = point->ws_connection()->fd();
-    }
+    int fd = point->ws_connection()->fd();
 
     app_.logger().notice("[{}] disconnected (fd={})", identity, fd);
+
+    point->set_ws_connection(nullptr);
 
 #ifdef WITH_POSTGRESQL
     set_point_connected(identity, false, json::object());
 #endif
-
-    point->set_ws_connection(nullptr);
 
     if (fd >= 0) {
         app_.worker_loop().remove_io(fd);
@@ -341,7 +397,8 @@ void CSService::parse_soap(const HttpRequest& req, HttpResponse& resp, const std
         });
 }
 
-void CSService::json_to_soap(HttpResponse& resp, ocpp::CSChargingPoint* point,
+void CSService::json_to_soap(const HttpRequest& req, HttpResponse& resp,
+                             ocpp::CSChargingPoint* point,
                              const std::string& operation, const nlohmann::json& payload)
 {
     json data = {
@@ -356,16 +413,81 @@ void CSService::json_to_soap(HttpResponse& resp, ocpp::CSChargingPoint* point,
     auto sql = fmt::format("SELECT * FROM ocpp.jsontosoap({}::jsonb)",
         pq_quote_literal(data.dump()));
 
-    // TODO: deferred response for REST API -> SOAP conversion
-    (void)resp;
-    (void)sql;
+    auto address = point->address();
+    auto identity = point->identity();
+
+    exec_sql(pool_, req, resp, std::move(sql),
+        [this, address, identity, operation]
+        (std::shared_ptr<HttpConnection> conn, std::vector<PgResult> results) {
+            if (results.empty() || !results[0].ok() || results[0].rows() == 0) {
+                HttpResponse r;
+                reply_error(r, HttpStatus::internal_server_error, "jsontosoap() failed");
+                conn->send_response(r);
+                return;
+            }
+
+            std::string soap_xml = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
+            const char* val = results[0].value(0, 0);
+            if (val) soap_xml += val;
+
+            app_.logger().debug("[{}] SOAP -> {} ({} bytes)",
+                identity, address, soap_xml.size());
+
+            // POST SOAP XML to station's address
+            if (!fetch_client_) {
+                fetch_client_ = std::make_unique<FetchClient>(app_.worker_loop());
+            }
+
+            FetchClient::Headers headers;
+            headers.emplace_back("Content-Type", "application/soap+xml; charset=utf-8");
+            headers.emplace_back("SOAPAction", "/" + operation);
+
+            fetch_client_->post(address, soap_xml, headers,
+                [this, conn, identity](FetchResponse fetch_resp) {
+                    if (fetch_resp.status_code < 200 || fetch_resp.status_code >= 300) {
+                        HttpResponse r;
+                        reply_error(r, HttpStatus::bad_gateway,
+                            fmt::format("Station SOAP error: HTTP {}", fetch_resp.status_code));
+                        conn->send_response(r);
+                        return;
+                    }
+
+                    // Convert SOAP response back to JSON
+                    soap_to_json(conn, fetch_resp.body);
+                },
+                [conn, identity, this](std::string_view error) {
+                    app_.logger().error("[{}] SOAP fetch error: {}", identity, error);
+                    HttpResponse r;
+                    reply_error(r, HttpStatus::service_unavailable,
+                        fmt::format("Station unreachable: {}", error));
+                    conn->send_response(r);
+                });
+        });
 }
 
-void CSService::soap_to_json(HttpResponse& resp, const std::string& xml_payload)
+void CSService::soap_to_json(std::shared_ptr<HttpConnection> conn, const std::string& xml_payload)
 {
-    (void)resp;
-    (void)xml_payload;
-    // TODO: SELECT * FROM ocpp."SOAPToJSON"(...)
+    auto sql = fmt::format("SELECT * FROM ocpp.soaptojson({}::xml)",
+        pq_quote_literal(xml_payload));
+
+    pool_.execute(std::move(sql),
+        [conn](std::vector<PgResult> results) {
+            HttpResponse r;
+            if (!results.empty() && results[0].ok() && results[0].rows() > 0) {
+                const char* json_str = results[0].value(0, 0);
+                r.set_status(HttpStatus::ok);
+                r.set_body(json_str ? json_str : "{}", "application/json");
+            } else {
+                reply_error(r, HttpStatus::internal_server_error, "soaptojson() failed");
+            }
+            conn->send_response(r);
+        },
+        [conn](std::string_view error) {
+            HttpResponse r;
+            reply_error(r, HttpStatus::internal_server_error,
+                fmt::format("soaptojson() error: {}", error));
+            conn->send_response(r);
+        });
 }
 
 #endif // WITH_POSTGRESQL
@@ -399,22 +521,77 @@ void CSService::do_api(const HttpRequest& req, HttpResponse& resp)
         return;
     }
 
-    if (command == "ChargePointList") {
-        do_charge_point_list(req, resp);
+    if (api_auth_) {
+        // Production mode: all endpoints (except ping/time) require Bearer JWT
+#ifdef WITH_SSL
+        auto auth_header = req.header("Authorization");
+        auto auth = parse_authorization(auth_header);
+
+        if (auth.schema != Authorization::Schema::bearer || auth.token.empty()) {
+            resp.set_header("WWW-Authenticate", "Bearer");
+            reply_error(resp, HttpStatus::unauthorized, "Unauthorized");
+            return;
+        }
+
+        try {
+            verify_jwt(auth.token, app_.providers());
+        } catch (const JwtExpiredError& e) {
+            reply_error(resp, HttpStatus::forbidden, e.what());
+            return;
+        } catch (const JwtVerificationError& e) {
+            reply_error(resp, HttpStatus::bad_request, e.what());
+            return;
+        } catch (const std::exception& e) {
+            reply_error(resp, HttpStatus::bad_request, e.what());
+            return;
+        }
+#else
+        reply_error(resp, HttpStatus::service_unavailable, "JWT verification requires SSL support");
         return;
-    }
+#endif
+        // Authorized — full access
+#ifdef WITH_POSTGRESQL
+        if (command == "ChargePointList") {
+            do_central_system(req, resp, "chargepointlist");
+            return;
+        }
+#else
+        if (command == "ChargePointList") {
+            do_charge_point_list(req, resp);
+            return;
+        }
+#endif
 
 #ifdef WITH_POSTGRESQL
-    if (command == "CentralSystem" && parts.size() >= 4) {
-        do_central_system(req, resp, std::string(parts[3]));
-        return;
-    }
+        if (command == "CentralSystem" && parts.size() >= 4) {
+            do_central_system(req, resp, std::string(parts[3]));
+            return;
+        }
 
-    if (command == "ChargePoint" && parts.size() >= 5) {
-        do_charge_point(req, resp, std::string(parts[3]), std::string(parts[4]));
-        return;
-    }
+        if (command == "ChargePoint" && parts.size() >= 5) {
+            do_charge_point(req, resp, std::string(parts[3]), std::string(parts[4]));
+            return;
+        }
 #endif
+    } else {
+        // Demo mode: ChargePointList and ChargePoint open, CentralSystem restricted
+        if (command == "ChargePointList") {
+            do_charge_point_list(req, resp);
+            return;
+        }
+
+#ifdef WITH_POSTGRESQL
+        if (command == "CentralSystem" && parts.size() >= 4 && parts[3] == "ChargePointList") {
+            do_charge_point_list(req, resp);
+            return;
+        }
+
+        if (command == "ChargePoint" && parts.size() >= 5) {
+            do_charge_point(req, resp, std::string(parts[3]), std::string(parts[4]));
+            return;
+        }
+#endif
+    }
 
     reply_error(resp, HttpStatus::not_found, "Unknown API command");
 }
@@ -431,15 +608,29 @@ void CSService::do_charge_point_list(const HttpRequest& /*req*/, HttpResponse& r
 void CSService::do_central_system(const HttpRequest& req, HttpResponse& resp,
                                   const std::string& endpoint)
 {
-    auto body = content_to_json(req);
-
+    // Validate endpoint: must be a safe SQL identifier (lowercase alpha only)
     std::string lower_endpoint;
     lower_endpoint.reserve(endpoint.size());
-    for (char c : endpoint)
-        lower_endpoint += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+    for (char c : endpoint) {
+        auto lc = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+        if (lc < 'a' || lc > 'z') {
+            reply_error(resp, HttpStatus::bad_request,
+                fmt::format("Invalid endpoint: '{}'", endpoint));
+            return;
+        }
+        lower_endpoint += lc;
+    }
 
-    auto sql = fmt::format("SELECT * FROM ocpp.{}({}::jsonb)",
-        lower_endpoint, pq_quote_literal(body.dump()));
+    auto body = content_to_json(req);
+
+    // Extract Bearer token from Authorization header
+    std::string token;
+    auto auth = req.header("Authorization");
+    if (auth.size() > 7 && auth.substr(0, 7) == "Bearer ")
+        token = auth.substr(7);
+
+    auto sql = fmt::format("SELECT * FROM ocpp.{}({}, {}::jsonb)",
+        lower_endpoint, pq_quote_literal(token), pq_quote_literal(body.dump()));
 
     exec_sql(pool_, req, resp, std::move(sql),
         [](std::shared_ptr<HttpConnection> conn, std::vector<PgResult> results) {
@@ -452,6 +643,37 @@ void CSService::do_central_system(const HttpRequest& req, HttpResponse& resp,
 void CSService::do_charge_point(const HttpRequest& req, HttpResponse& resp,
                                const std::string& identity, const std::string& operation)
 {
+    // OCPP 1.6 CS→CP operations: name → required fields (per spec §5/§6)
+    using Fields = std::vector<std::string_view>;
+    static const std::unordered_map<std::string_view, Fields> allowed_operations = {
+        {"CancelReservation",    {"reservationId"}},
+        {"ChangeAvailability",   {"connectorId", "type"}},
+        {"ChangeConfiguration",  {"key", "value"}},
+        {"ClearCache",           {}},
+        {"ClearChargingProfile", {}},
+        {"DataTransfer",         {"vendorId"}},
+        {"GetCompositeSchedule", {"connectorId", "duration"}},
+        {"GetConfiguration",     {}},
+        {"GetDiagnostics",       {"location"}},
+        {"GetLocalListVersion",  {}},
+        {"RemoteStartTransaction", {"idTag"}},
+        {"RemoteStopTransaction",  {"transactionId"}},
+        {"ReserveNow",           {"connectorId", "expiryDate", "idTag", "reservationId"}},
+        {"Reset",                {"type"}},
+        {"SendLocalList",        {"listVersion", "updateType"}},
+        {"SetChargingProfile",   {"connectorId", "csChargingProfiles"}},
+        {"TriggerMessage",       {"requestedMessage"}},
+        {"UnlockConnector",      {"connectorId"}},
+        {"UpdateFirmware",       {"location", "retrieveDate"}},
+    };
+
+    auto op_it = allowed_operations.find(operation);
+    if (op_it == allowed_operations.end()) {
+        reply_error(resp, HttpStatus::bad_request,
+            fmt::format("Unknown operation: '{}'", operation));
+        return;
+    }
+
     auto* point = point_manager_.find_by_identity(identity);
     if (!point) {
         reply_error(resp, HttpStatus::not_found,
@@ -467,22 +689,33 @@ void CSService::do_charge_point(const HttpRequest& req, HttpResponse& resp,
 
     auto body = content_to_json(req);
 
+    // Validate required fields
+    for (auto field : op_it->second) {
+        if (!body.contains(field)) {
+            reply_error(resp, HttpStatus::bad_request,
+                fmt::format("Missing required field '{}' for {}", field, operation));
+            return;
+        }
+    }
+
     if (point->protocol_type() == ocpp::ProtocolType::JSON) {
-        // Send JSON via WebSocket
+        // Build OCPP Call and send via WebSocket
         auto msg = ocpp::make_call(operation, body);
         log_json_message(identity, msg);
         send_json_response(*point, msg);
 
-        // TODO: correlate response and reply to HTTP client
-        resp.set_status(HttpStatus::ok);
-        resp.set_body(json{{"status", "sent"}, {"uniqueId", msg.unique_id}}.dump(),
-                      "application/json");
+        // Defer HTTP response — will be resolved when station replies
+        resp.set_deferred(true);
+        auto conn = std::static_pointer_cast<HttpConnection>(req.connection_ctx);
+
+        pending_calls_.emplace(msg.unique_id, PendingCall{
+            .conn     = std::move(conn),
+            .action   = operation,
+            .deadline = std::chrono::steady_clock::now() + pending_call_timeout_
+        });
     } else {
-        // SOAP: convert JSON to SOAP and send via HTTP
-        json_to_soap(resp, point, operation, body);
-        // For now, return acknowledgment
-        resp.set_status(HttpStatus::ok);
-        resp.set_body(json{{"status", "sent"}}.dump(), "application/json");
+        // SOAP: convert JSON to SOAP, POST to station, convert response back to JSON
+        json_to_soap(req, resp, point, operation, body);
     }
 }
 
@@ -521,14 +754,18 @@ void CSService::parse_json_pg(ocpp::CSChargingPoint& point, const ocpp::OcppMess
         pq_quote_literal(account));
 
     auto identity = point.identity();
+    auto unique_id = msg.unique_id;
 
     pool_.execute(std::move(sql),
-        [this, identity](std::vector<PgResult> results) {
+        [this, identity, unique_id](std::vector<PgResult> results) {
             auto* point = point_manager_.find_by_identity(identity);
             if (!point) return;
 
             if (results.empty() || !results[0].ok() || results[0].rows() == 0) {
                 app_.logger().error("[{}] ocpp.parse() failed or returned empty", identity);
+                auto error = ocpp::make_call_error(unique_id,
+                    ocpp::error::InternalError, "Database error");
+                send_json_response(*point, error);
                 return;
             }
 
@@ -536,6 +773,9 @@ void CSService::parse_json_pg(ocpp::CSChargingPoint& point, const ocpp::OcppMess
             const char* json_str = result.value(0, 0);
             if (!json_str || json_str[0] == '\0') {
                 app_.logger().error("[{}] ocpp.parse() returned null", identity);
+                auto error = ocpp::make_call_error(unique_id,
+                    ocpp::error::InternalError, "Empty database response");
+                send_json_response(*point, error);
                 return;
             }
 
@@ -557,6 +797,15 @@ void CSService::parse_json_pg(ocpp::CSChargingPoint& point, const ocpp::OcppMess
             }
 
             send_json_response(*point, response);
+        },
+        // on_exception: PG connection error → send CallError to station
+        [this, identity, unique_id](std::string_view error) {
+            app_.logger().error("[{}] ocpp.parse() exception: {}", identity, error);
+            auto* point = point_manager_.find_by_identity(identity);
+            if (!point) return;
+            auto err = ocpp::make_call_error(unique_id,
+                ocpp::error::InternalError, "Database connection error");
+            send_json_response(*point, err);
         });
 }
 
@@ -682,6 +931,31 @@ void CSService::webhook_json(ocpp::CSChargingPoint& point, const ocpp::OcppMessa
                 ocpp::error::InternalError, "Webhook fetch error");
             send_json_response(*point, err);
         });
+}
+
+// ── Pending call cleanup ────────────────────────────────────────────────────
+
+void CSService::cleanup_expired_calls()
+{
+    if (pending_calls_.empty()) return;
+
+    auto now = std::chrono::steady_clock::now();
+    for (auto it = pending_calls_.begin(); it != pending_calls_.end(); ) {
+        if (now >= it->second.deadline) {
+            app_.logger().warn("pending call {} ({}) timed out after {}s",
+                it->first, it->second.action, pending_call_timeout_.count());
+
+            HttpResponse r;
+            reply_error(r, HttpStatus::service_unavailable,
+                fmt::format("Charge point did not respond within {}s",
+                    pending_call_timeout_.count()));
+            it->second.conn->send_response(r);
+
+            it = pending_calls_.erase(it);
+        } else {
+            ++it;
+        }
+    }
 }
 
 // ── Logging ─────────────────────────────────────────────────────────────────
