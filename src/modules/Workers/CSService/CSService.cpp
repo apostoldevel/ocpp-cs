@@ -624,10 +624,8 @@ void CSService::do_central_system(const HttpRequest& req, HttpResponse& resp,
     auto body = content_to_json(req);
 
     // Extract Bearer token from Authorization header
-    std::string token;
-    auto auth = req.header("Authorization");
-    if (auth.size() > 7 && auth.substr(0, 7) == "Bearer ")
-        token = auth.substr(7);
+    auto authorization = parse_authorization(req.header("Authorization"));
+    const auto& token = authorization.token;
 
     auto sql = fmt::format("SELECT * FROM ocpp.{}({}, {}::jsonb)",
         lower_endpoint, pq_quote_literal(token), pq_quote_literal(body.dump()));
