@@ -635,7 +635,7 @@ void CSService::do_central_system(const HttpRequest& req, HttpResponse& resp,
     exec_sql(pool_, req, resp, std::move(sql),
         [](std::shared_ptr<HttpConnection> conn, std::vector<PgResult> results) {
             HttpResponse r;
-            ApostolModule::reply_pg(r, results);
+            reply_pg(r, results);
             conn->send_response(r);
         });
 }
