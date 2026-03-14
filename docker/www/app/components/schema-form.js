@@ -172,7 +172,7 @@ export const SchemaForm = {
           <div v-for="(item, idx) in (formData[key] || [])" :key="idx"
                style="border:1px solid var(--border);border-radius:var(--radius);padding:0.5rem;margin-bottom:0.5rem;position:relative">
             <button type="button" class="btn btn-sm" @click="removeArrayItem(key, idx)"
-                    style="position:absolute;top:4px;right:4px;font-size:0.65rem;padding:2px 6px">x</button>
+                    style="position:absolute;top:4px;right:4px;font-size:0.82rem;padding:2px 8px">x</button>
             <schema-form-fields :schema="prop.items" :model="item" />
           </div>
           <button type="button" class="btn btn-sm" @click="addArrayItem(key, prop.items)">+ Add {{ key }}</button>
@@ -293,7 +293,7 @@ export const SchemaFormFields = {
         <div v-for="(item, idx) in (model[key] || [])" :key="idx"
              style="border:1px solid var(--border);border-radius:var(--radius);padding:0.5rem;margin-bottom:0.5rem;position:relative">
           <button type="button" class="btn btn-sm" @click="removeItem(key, idx)"
-                  style="position:absolute;top:4px;right:4px;font-size:0.65rem;padding:2px 6px">x</button>
+                  style="position:absolute;top:4px;right:4px;font-size:0.82rem;padding:2px 8px">x</button>
           <schema-form-fields :schema="prop.items" :model="item" />
         </div>
         <button type="button" class="btn btn-sm" @click="addItem(key, prop.items)">+ Add</button>

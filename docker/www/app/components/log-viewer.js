@@ -1,4 +1,5 @@
 import { JsonView } from './json-view.js'
+import { state } from '../state.js'
 
 const { ref, computed, watch, nextTick, onMounted } = Vue
 
@@ -11,7 +12,8 @@ export const LogViewer = {
     maxHeight: { type: String, default: null },
     title: { type: String, default: 'Log' }
   },
-  setup(props) {
+  emits: ['clear'],
+  setup(props, { emit }) {
     const filterIdentity = ref('')
     const filterAction = ref('')
     const filterDirection = ref('')
@@ -45,7 +47,7 @@ export const LogViewer = {
           JSON.stringify(e.payload || '').toLowerCase().includes(q)
         )
       }
-      return items
+      return [...items].reverse()
     })
 
     function togglePayload(entry) {
@@ -66,10 +68,39 @@ export const LogViewer = {
       return ts.replace('T', ' ').replace('Z', '').slice(11, 23)
     }
 
+    function clearLog() {
+      if (props.entries === state.logEntries) {
+        state.logEntries.splice(0)
+      }
+      emit('clear')
+    }
+
+    function exportCsv() {
+      const rows = filtered.value
+      const header = 'Timestamp,Identity,Direction,MessageType,Action,Payload'
+      const lines = rows.map(e => {
+        const ts = (e.ts || '').replace(/"/g, '""')
+        const id = (e.identity || '').replace(/"/g, '""')
+        const dir = e.direction === 'in' ? 'CP→CS' : 'CS→CP'
+        const type = (e.messageType || '').replace(/"/g, '""')
+        const action = (e.action || '').replace(/"/g, '""')
+        const payload = JSON.stringify(e.payload || {}).replace(/"/g, '""')
+        return `"${ts}","${id}","${dir}","${type}","${action}","${payload}"`
+      })
+      const csv = header + '\n' + lines.join('\n')
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `ocpp-log-${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.csv`
+      a.click()
+      URL.revokeObjectURL(url)
+    }
+
     watch(() => props.entries.length, () => {
       if (autoScroll.value && listEl.value) {
         nextTick(() => {
-          listEl.value.scrollTop = listEl.value.scrollHeight
+          listEl.value.scrollTop = 0
         })
       }
     })
@@ -77,13 +108,13 @@ export const LogViewer = {
     return {
       filterIdentity, filterAction, filterDirection, searchText,
       autoScroll, expandedIds, listEl, identities, actions, filtered,
-      togglePayload, isExpanded, formatTs
+      togglePayload, isExpanded, formatTs, clearLog, exportCsv
     }
   },
   template: `
     <div class="log-viewer">
       <div class="log-toolbar">
-        <span style="font-family:var(--mono);font-size:0.7rem;color:var(--text-dim);letter-spacing:1px;text-transform:uppercase">
+        <span style="font-size:0.82rem;color:var(--text-dim);letter-spacing:1px;text-transform:uppercase;font-weight:600">
           {{ title }}
         </span>
         <template v-if="showFilters">
@@ -102,12 +133,22 @@ export const LogViewer = {
           </select>
           <input class="log-filter" v-model="searchText" placeholder="Search..." style="width:120px">
         </template>
-        <label class="auto-scroll-toggle" style="margin-left:auto">
-          <input type="checkbox" v-model="autoScroll"> Auto-scroll
-        </label>
-        <span style="font-family:var(--mono);font-size:0.65rem;color:var(--text-dim)">
-          {{ filtered.length }} entries
-        </span>
+        <div style="margin-left:auto;display:flex;align-items:center;gap:0.5rem">
+          <button class="btn btn-sm" @click="exportCsv" title="Export to CSV">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            CSV
+          </button>
+          <button class="btn btn-sm" @click="clearLog" title="Clear log">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+            Clear
+          </button>
+          <label class="auto-scroll-toggle">
+            <input type="checkbox" v-model="autoScroll"> Auto-scroll
+          </label>
+          <span style="font-size:0.82rem;color:var(--text-muted)">
+            {{ filtered.length }} entries
+          </span>
+        </div>
       </div>
       <div class="log-entries" :class="{ 'full-page': fullPage }" ref="listEl"
            :style="maxHeight ? { maxHeight: maxHeight } : {}">

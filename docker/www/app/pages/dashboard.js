@@ -8,10 +8,24 @@ const { computed, ref, onMounted, onUnmounted } = Vue
 export const DashboardPage = {
   components: { StatsBar, StationCard, StationTable },
   setup() {
+    const search = ref('')
+
     const sorted = computed(() => {
-      return [...state.stations].sort((a, b) =>
+      let list = [...state.stations].sort((a, b) =>
         (a.identity || '').localeCompare(b.identity || '')
       )
+      const q = search.value.trim().toLowerCase()
+      if (q) {
+        list = list.filter(s => {
+          const id = (s.identity || '').toLowerCase()
+          const vendor = ((s.bootNotification || {}).chargePointVendor || '').toLowerCase()
+          const model = ((s.bootNotification || {}).chargePointModel || '').toLowerCase()
+          const serial = ((s.bootNotification || {}).chargePointSerialNumber || '').toLowerCase()
+          const status = (((s.statusNotification || {}).status) || '').toLowerCase()
+          return id.includes(q) || vendor.includes(q) || model.includes(q) || serial.includes(q) || status.includes(q)
+        })
+      }
+      return list
     })
 
     const refreshPct = ref(0)
@@ -28,7 +42,7 @@ export const DashboardPage = {
     onMounted(() => { rafId = requestAnimationFrame(animateBar) })
     onUnmounted(() => cancelAnimationFrame(rafId))
 
-    return { state, sorted, refreshPct }
+    return { state, sorted, search, refreshPct }
   },
   template: `
     <stats-bar />
@@ -36,6 +50,13 @@ export const DashboardPage = {
       <div class="section-header">
         <div class="section-title">Charge Points</div>
         <div class="section-actions">
+          <input
+            v-model="search"
+            type="text"
+            class="search-input"
+            placeholder="Search stations..."
+            style="width: 240px"
+          />
           <div class="view-toggle">
             <button :class="{ active: state.viewMode === 'grid' }" @click="state.viewMode = 'grid'" title="Grid view">
               <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
@@ -53,10 +74,16 @@ export const DashboardPage = {
         </div>
       </div>
 
-      <div v-if="sorted.length === 0" class="empty">
+      <div v-if="state.stations.length === 0" class="empty">
         <div class="empty-icon">&#9889;</div>
         <div class="empty-title">No stations connected</div>
         <div class="empty-text">Waiting for charge points to connect via WebSocket on <code>/ocpp/{identity}</code></div>
+      </div>
+
+      <div v-else-if="sorted.length === 0" class="empty">
+        <div class="empty-icon">&#128269;</div>
+        <div class="empty-title">No matches</div>
+        <div class="empty-text">No stations match "{{ search }}"</div>
       </div>
 
       <div v-else-if="state.viewMode === 'grid'" class="station-grid">

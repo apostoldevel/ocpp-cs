@@ -2,7 +2,7 @@
 .log-viewer {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: 8px;
+  border-radius: var(--radius);
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -19,13 +19,14 @@
 
 .log-filter {
   font-family: var(--mono);
-  font-size: 0.7rem;
+  font-size: 0.85rem;
   color: var(--text);
   background: var(--bg);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  padding: 5px 10px;
   outline: none;
+  transition: border-color 0.15s;
 }
 
 .log-filter:focus { border-color: var(--accent); }
@@ -36,7 +37,7 @@
   min-height: 200px;
   max-height: 70vh;
   font-family: var(--mono);
-  font-size: 0.75rem;
+  font-size: 0.85rem;
 }
 
 .log-entries.full-page {
@@ -47,8 +48,8 @@
 .log-entry {
   display: flex;
   align-items: flex-start;
-  padding: 4px 0.75rem;
-  border-bottom: 1px solid rgba(30,34,48,0.5);
+  padding: 6px 0.75rem;
+  border-bottom: 1px solid var(--border);
   transition: background 0.1s;
   gap: 0.5rem;
 }
@@ -56,15 +57,15 @@
 .log-entry:hover { background: var(--surface-2); }
 
 .log-ts {
-  color: var(--text-dim);
+  color: var(--text-muted);
   flex-shrink: 0;
-  font-size: 0.7rem;
+  font-size: 0.82rem;
 }
 
 .log-identity {
   color: var(--cyan);
   flex-shrink: 0;
-  min-width: 110px;
+  min-width: 120px;
 }
 
 .log-dir {
@@ -78,32 +79,33 @@
 .log-dir.out { color: var(--amber); }
 
 .log-action {
-  color: var(--text-bright);
+  color: var(--text);
   flex-shrink: 0;
-  min-width: 160px;
+  min-width: 170px;
 }
 
 .log-type {
-  font-size: 0.65rem;
-  padding: 1px 5px;
-  border-radius: 3px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 1px 7px;
+  border-radius: var(--radius-sm);
   flex-shrink: 0;
 }
 
-.log-type.Call       { background: var(--blue-dim);  color: var(--blue); }
-.log-type.CallResult { background: var(--green-dim); color: var(--green); }
-.log-type.CallError  { background: var(--red-dim);   color: var(--red); }
+.log-type.Call       { background: var(--accent-dim); color: var(--accent); }
+.log-type.CallResult { background: var(--green-dim);  color: var(--green); }
+.log-type.CallError  { background: var(--red-dim);    color: var(--red); }
 
 .log-payload-toggle {
   background: none;
   border: none;
-  color: var(--text-dim);
+  color: var(--text-muted);
   cursor: pointer;
   font-family: var(--mono);
-  font-size: 0.65rem;
-  padding: 1px 5px;
-  border-radius: 3px;
-  transition: all 0.15s;
+  font-size: 0.82rem;
+  padding: 1px 7px;
+  border-radius: var(--radius-sm);
+  transition: all 0.1s;
 }
 
 .log-payload-toggle:hover {
@@ -112,7 +114,7 @@
 }
 
 .log-payload {
-  padding: 4px 0.75rem 8px 0.75rem;
+  padding: 6px 0.75rem 10px 0.75rem;
   background: var(--bg);
   border-bottom: 1px solid var(--border);
 }
@@ -120,26 +122,26 @@
 /* ── JSON syntax highlighting ── */
 .json-view {
   font-family: var(--mono);
-  font-size: 0.75rem;
+  font-size: 0.85rem;
   line-height: 1.5;
   white-space: pre-wrap;
   word-break: break-all;
 }
 
-.json-key    { color: var(--text-bright); }
+.json-key    { color: var(--text); }
 .json-string { color: var(--green); }
 .json-number { color: var(--cyan); }
 .json-bool   { color: var(--purple); }
-.json-null   { color: var(--text-dim); }
-.json-brace  { color: var(--text-dim); }
+.json-null   { color: var(--text-muted); }
+.json-brace  { color: var(--text-muted); }
 
 .json-toggle {
   background: none;
   border: none;
-  color: var(--text-dim);
+  color: var(--text-muted);
   cursor: pointer;
   font-family: var(--mono);
-  font-size: 0.75rem;
+  font-size: 0.85rem;
   padding: 0;
 }
 
@@ -149,10 +151,10 @@
 .auto-scroll-toggle {
   display: flex;
   align-items: center;
-  gap: 4px;
-  font-family: var(--mono);
-  font-size: 0.65rem;
-  color: var(--text-dim);
+  gap: 5px;
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--text-muted);
   cursor: pointer;
   user-select: none;
 }
@@ -164,6 +166,5 @@
   text-align: center;
   padding: 3rem 2rem;
   color: var(--text-dim);
-  font-family: var(--mono);
-  font-size: 0.8rem;
+  font-size: 0.9rem;
 }

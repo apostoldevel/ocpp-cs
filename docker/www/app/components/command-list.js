@@ -44,7 +44,7 @@ export const CommandList = {
     <div>
       <div style="padding:8px">
         <input class="form-input" v-model="search" placeholder="Search commands..."
-               style="font-size:0.7rem;padding:5px 8px">
+               style="font-size:0.85rem;padding:6px 10px">
       </div>
       <div v-for="(cmds, profile) in filtered" :key="profile" class="command-group">
         <div class="command-group-title">{{ PROFILE_LABELS[profile] || profile }}</div>

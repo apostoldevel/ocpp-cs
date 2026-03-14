@@ -18,7 +18,8 @@ export const StatsBar = {
     return { stats }
   },
   template: `
-    <div class="stats-bar">
+    <div class="stats-bar-wrap">
+     <div class="stats-bar">
       <div class="stat-card">
         <div class="stat-icon total">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v3"/></svg>
@@ -55,5 +56,6 @@ export const StatsBar = {
           <div class="stat-label">Faulted</div>
         </div>
       </div>
+     </div>
     </div>`
 }

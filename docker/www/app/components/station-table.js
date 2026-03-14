@@ -78,7 +78,7 @@ export const StationTable = {
               </span>
             </td>
             <td>{{ s.protocol || '--' }}</td>
-            <td style="font-size:0.75rem;color:var(--text-dim)">{{ s.address || '--' }}</td>
+            <td>{{ s.address || '--' }}</td>
           </tr>
         </tbody>
       </table>

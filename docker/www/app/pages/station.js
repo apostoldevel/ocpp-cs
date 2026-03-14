@@ -63,8 +63,8 @@ export const StationPage = {
   },
   template: `
     <div class="main-content">
-      <div style="margin-bottom:1rem">
-        <a href="#/" style="font-family:var(--mono);font-size:0.75rem;color:var(--text-dim)">&larr; All Stations</a>
+      <div style="margin-bottom:0.75rem">
+        <a href="#/" style="font-size:0.85rem;color:var(--text-muted)">&larr; All Stations</a>
       </div>
 
       <div v-if="!station" class="empty">
@@ -72,43 +72,38 @@ export const StationPage = {
         <div class="empty-text">Station "{{ identity }}" is not connected.</div>
       </div>
 
-      <div v-else class="two-col">
-        <div>
-          <station-info :station="station" />
-          <div style="margin-top:1rem">
-            <log-viewer :entries="stationLog" :show-filters="false" :max-height="'300px'" title="Station Log" />
+      <template v-else>
+        <!-- Station Info Bar -->
+        <station-info :station="station" style="margin-bottom:0.75rem" />
+
+        <!-- OCPP Commands (main block) -->
+        <div class="info-panel" style="margin-bottom:0.75rem">
+          <div class="info-panel-header">
+            <div class="info-panel-title">OCPP Commands</div>
           </div>
-        </div>
-        <div>
-          <div class="info-panel" style="margin-bottom:1rem">
-            <div class="info-panel-header">
-              <div class="info-panel-title">OCPP Commands</div>
+          <div class="station-commands-panel">
+            <div class="station-commands-sidebar">
+              <command-list :selected="selectedCommand" @select="onSelectCommand" />
             </div>
-            <div style="display:grid;grid-template-columns:200px 1fr;min-height:400px">
-              <div style="border-right:1px solid var(--border);overflow-y:auto;max-height:500px">
-                <command-list :selected="selectedCommand" @select="onSelectCommand" />
+            <div class="station-commands-main">
+              <div v-if="!selectedCommand" class="station-commands-empty">
+                Select a command from the list
               </div>
-              <div style="padding:1rem">
-                <div v-if="!selectedCommand" style="color:var(--text-dim);font-family:var(--mono);font-size:0.8rem;padding:2rem;text-align:center">
-                  Select a command from the list
+              <template v-else>
+                <div class="station-command-title">{{ selectedCommand.name }}</div>
+                <div class="station-command-desc">{{ selectedCommand.description }}</div>
+                <schema-form v-if="schema" :schema="schema" :sending="sending" @submit="onSubmit" />
+                <div v-if="error" style="color:var(--red);font-family:var(--mono);font-size:0.85rem;margin-top:0.5rem">
+                  {{ error }}
                 </div>
-                <template v-else>
-                  <h3 style="font-family:var(--mono);font-size:0.9rem;color:var(--text-bright);margin-bottom:0.75rem">
-                    {{ selectedCommand.name }}
-                  </h3>
-                  <p style="font-size:0.75rem;color:var(--text-dim);margin-bottom:1rem">
-                    {{ selectedCommand.description }}
-                  </p>
-                  <schema-form v-if="schema" :schema="schema" :sending="sending" @submit="onSubmit" />
-                  <div v-if="error" style="color:var(--red);font-family:var(--mono);font-size:0.75rem;margin-top:0.5rem">
-                    {{ error }}
-                  </div>
-                  <command-response v-if="response" :response="response" />
-                </template>
-              </div>
+                <command-response v-if="response" :response="response" />
+              </template>
             </div>
           </div>
         </div>
-      </div>
+
+        <!-- Station Log -->
+        <log-viewer :entries="stationLog" :show-filters="false" :max-height="'350px'" title="Station Log" />
+      </template>
     </div>`
 }

@@ -30,6 +30,7 @@ export const AppHeader = {
   },
   template: `
     <header class="header">
+     <div class="header-inner">
       <div class="header-left">
         <a href="#/" style="display:flex;align-items:center;gap:0.75rem;text-decoration:none">
           <div class="logo-mark">CS</div>
@@ -50,5 +51,6 @@ export const AppHeader = {
         </div>
         <a href="/docs/" class="nav-link-btn" target="_blank">API Docs</a>
       </div>
+     </div>
     </header>`
 }
