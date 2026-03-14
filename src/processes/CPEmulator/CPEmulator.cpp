@@ -48,11 +48,32 @@ void CPEmulator::heartbeat(std::chrono::system_clock::time_point now)
             if (station->boot_status == BootStatus::not_sent ||
                 (station->next_boot_retry != std::chrono::system_clock::time_point{} &&
                  now >= station->next_boot_retry)) {
-                send_boot_notification(*station);
+                if (station->ocpp_version == "2.0.1")
+                    send_boot_notification_201(*station);
+                else
+                    send_boot_notification(*station);
                 station->boot_status = BootStatus::pending;
                 station->next_boot_retry = {};  // will be set by response handler
             }
-            continue;  // no heartbeat until boot Accepted (OCPP 1.6 §4.2)
+            continue;  // no heartbeat until boot Accepted
+        }
+
+        // ── OCPP 2.0.1: per-EVSE logic ─────────────────────────────────
+
+        if (station->ocpp_version == "2.0.1") {
+            // 2.0.1: per-EVSE meter increment
+            for (auto& evse : station->evses) {
+                if (!evse.transaction_id.empty() && evse.status == "Occupied")
+                    evse.meter_value += kMeterIncrementWh;
+            }
+
+            // Heartbeat
+            if (now >= station->next_heartbeat) {
+                send_heartbeat_201(*station);
+                station->next_heartbeat = now +
+                    std::chrono::seconds(station->heartbeat_interval);
+            }
+            continue;  // skip 1.6 logic below
         }
 
         // ── Per-connector logic (v1 parity) ───────────────────────────────
@@ -327,7 +348,7 @@ void CPEmulator::register_action_handlers(Station& station)
 
 void CPEmulator::on_ws_connect(Station& station)
 {
-    app_->logger().info("[{}] connected", station.identity);
+    app_->logger().info("[{}] connected (OCPP {})", station.identity, station.ocpp_version);
     station.boot_status = BootStatus::not_sent;
     station.next_boot_retry = {};
 }
@@ -339,9 +360,13 @@ void CPEmulator::on_ws_close(Station& station, uint16_t code, std::string_view r
     station.next_boot_retry = {};
     station.next_meter_values = {};
 
-    // Reset all connectors on disconnect
+    // Reset all connectors on disconnect (1.6)
     for (auto& conn : station.connector_states)
         conn.reset();
+
+    // Reset all EVSEs on disconnect (2.0.1)
+    for (auto& evse : station.evses)
+        evse.reset();
 }
 
 // ── Sending helper ───────────────────────────────────────────────────────────
@@ -434,6 +459,108 @@ void CPEmulator::send_status_notification(Station& station, int connector_id)
 void CPEmulator::send_heartbeat(Station& station)
 {
     send_request(station, "Heartbeat", nlohmann::json::object());
+}
+
+// ── OCPP 2.0.1 Boot sequence ────────────────────────────────────────────────
+
+void CPEmulator::send_boot_notification_201(Station& station)
+{
+    auto get_key = [&](const char* k) -> std::string {
+        auto it = station.config_keys.find(k);
+        if (it != station.config_keys.end() && !it->second.value.empty())
+            return it->second.value;
+        return station.config.value(k, "");
+    };
+
+    nlohmann::json charging_station = {
+        {"vendorName", get_key("ChargePointVendor")},
+        {"model", get_key("ChargePointModel")}
+    };
+
+    auto serial = get_key("ChargePointSerialNumber");
+    if (!serial.empty()) charging_station["serialNumber"] = serial;
+
+    auto firmware = get_key("ChargePointSoftwareVersion");
+    if (!firmware.empty()) charging_station["firmwareVersion"] = firmware;
+
+    app_->logger().info("[{}] sending BootNotification (2.0.1)", station.identity);
+
+    send_request(station, "BootNotification", {
+        {"reason", "PowerUp"},
+        {"chargingStation", charging_station}
+    }, [this, &station](const WsMessage& resp) {
+        if (resp.type == WsMessage::Type::Error) {
+            app_->logger().warn("[{}] BootNotification error: {} - {}",
+                station.identity, resp.error_code, resp.error_description);
+            return;
+        }
+
+        auto status = resp.payload.value("status", "Rejected");
+        auto interval = resp.payload.value("interval", 60);
+        auto now = std::chrono::system_clock::now();
+
+        app_->logger().info("[{}] BootNotification: status={} interval={}",
+                            station.identity, status, interval);
+        station.heartbeat_interval = interval;
+
+        if (status == "Accepted") {
+            station.boot_status = BootStatus::accepted;
+            station.next_heartbeat = now + std::chrono::seconds(interval);
+
+            // Send StatusNotification for each EVSE+Connector
+            for (auto& evse : station.evses) {
+                for (auto& conn : evse.connectors) {
+                    send_status_notification_201(station, evse.evse_id, conn.connector_id);
+                }
+            }
+        } else {
+            station.boot_status = (status == "Pending")
+                ? BootStatus::pending : BootStatus::rejected;
+            station.next_boot_retry = now + std::chrono::seconds(interval);
+        }
+    });
+}
+
+void CPEmulator::send_status_notification_201(Station& station, int evse_id, int connector_id)
+{
+    std::string status = "Available";
+    auto* evse = find_evse(station, evse_id);
+    if (evse)
+        status = evse->status;
+
+    send_request(station, "StatusNotification", {
+        {"timestamp", ocpp::iso_time_now()},
+        {"connectorStatus", status},
+        {"evseId", evse_id},
+        {"connectorId", connector_id}
+    });
+}
+
+void CPEmulator::send_heartbeat_201(Station& station)
+{
+    send_request(station, "Heartbeat", nlohmann::json::object());
+}
+
+// ── OCPP 2.0.1 Helpers ──────────────────────────────────────────────────────
+
+CPEmulator::EvseState* CPEmulator::find_evse(Station& station, int evse_id)
+{
+    for (auto& evse : station.evses)
+        if (evse.evse_id == evse_id) return &evse;
+    return nullptr;
+}
+
+std::string CPEmulator::generate_transaction_id()
+{
+    static thread_local std::mt19937_64 gen{std::random_device{}()};
+    std::uniform_int_distribution<uint64_t> dist;
+    auto a = dist(gen), b = dist(gen);
+    return fmt::format("{:08x}-{:04x}-4{:03x}-{:04x}-{:012x}",
+        (a >> 32) & 0xFFFFFFFF,
+        (a >> 16) & 0xFFFF,
+        a & 0xFFF,
+        0x8000 | ((b >> 48) & 0x3FFF),
+        b & 0xFFFFFFFFFFFF);
 }
 
 // ── Response file loading ────────────────────────────────────────────────────
