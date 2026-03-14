@@ -1,45 +1,58 @@
 FROM debian:bookworm-slim AS builder
 
-LABEL project="cs"
+ARG PROJECT_NAME=cs
+ARG BUILD_MODE=release
+ARG WITH_POSTGRESQL=OFF
 
-ENV PROJECT_NAME=cs
-ENV BUILD_MODE=release
+LABEL project="${PROJECT_NAME}"
 
 RUN set -eux; \
-    apt update && apt install -y --no-install-recommends \
-    apt-utils bash build-essential cmake cmake-data g++ gcc \
-    libcurl4-openssl-dev libssl-dev make pkg-config lsb-release curl ca-certificates git && \
-    apt-get clean && rm -rf /var/lib/apt/lists/*;
+    apt-get update && apt-get install -y --no-install-recommends \
+        bash build-essential cmake g++ \
+        libssl-dev zlib1g-dev \
+        pkg-config ca-certificates git curl lsb-release && \
+    rm -rf /var/lib/apt/lists/*
 
-WORKDIR /opt/$PROJECT_NAME
+RUN set -eux; \
+    if [ "${WITH_POSTGRESQL}" = "ON" ]; then \
+        install -d /usr/share/postgresql-common/pgdg && \
+        curl -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc --fail \
+            https://www.postgresql.org/media/keys/ACCC4CF8.asc && \
+        sh -c 'echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list' && \
+        apt-get update && apt-get install -y --no-install-recommends libpq-dev && \
+        rm -rf /var/lib/apt/lists/*; \
+    fi
 
+WORKDIR /opt/${PROJECT_NAME}
 COPY . .
 
 RUN set -eux; \
-    cp -r docker/CMakeLists.txt .; \
-    cp -r docker/conf .; \
-    cp -r docker/www .; \
-    ./configure --not-pull-self --$BUILD_MODE; \
-    cd cmake-build-$BUILD_MODE; \
-    make install; \
-    cd ..; \
-    rm -rf cmake-build-$BUILD_MODE; \
-    rm -rf src;
+    cp -r docker/conf . && \
+    cp -r docker/www . && \
+    ./configure --${BUILD_MODE}; \
+    cmake -B cmake-build-${BUILD_MODE} -DWITH_POSTGRESQL=${WITH_POSTGRESQL}; \
+    cmake --build cmake-build-${BUILD_MODE} --parallel $(nproc); \
+    cmake --install cmake-build-${BUILD_MODE}; \
+    rm -rf cmake-build-${BUILD_MODE} src
 
-FROM debian:bookworm-slim AS cs
+# ─────────────────────────────────────────────────────────────────────────────
 
-ENV PROJECT_NAME=cs
+FROM debian:bookworm-slim AS app
+
+ARG PROJECT_NAME=cs
+
+ENV PROJECT_NAME="${PROJECT_NAME}"
 
 RUN set -eux; \
-    apt update && apt install -y --no-install-recommends \
-    apt-utils bash ca-certificates && \
-    apt-get clean && rm -rf /var/lib/apt/lists/*;
+    apt-get update && apt-get install -y --no-install-recommends \
+        bash ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
 
-RUN mkdir -p /var/log/$PROJECT_NAME
+RUN mkdir -p /var/log/${PROJECT_NAME}
 
-COPY --from=builder /usr/sbin/$PROJECT_NAME /usr/sbin/$PROJECT_NAME
-COPY --from=builder /etc/$PROJECT_NAME /etc/$PROJECT_NAME
-COPY --from=builder /opt/$PROJECT_NAME/www /opt/$PROJECT_NAME/www
+COPY --from=builder /usr/sbin/${PROJECT_NAME}    /usr/sbin/${PROJECT_NAME}
+COPY --from=builder /etc/${PROJECT_NAME}         /etc/${PROJECT_NAME}
+COPY --from=builder /opt/${PROJECT_NAME}/www     /opt/${PROJECT_NAME}/www
 
 EXPOSE 9220
 
