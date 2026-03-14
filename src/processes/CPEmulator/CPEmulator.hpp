@@ -51,6 +51,7 @@ private:
         int reservation_id = -1;      // -1 = no reservation
         int meter_value = 0;          // Wh, incremented during Charging
         std::string status = "Available";
+        std::string error_code = "NoError";  // ChargePointErrorCode (OCPP 1.6 §7.3)
         std::string id_tag;           // idTag of current transaction
         std::string reservation_id_tag;
         std::chrono::system_clock::time_point status_updated{};
@@ -61,6 +62,7 @@ private:
             reservation_id = -1;
             meter_value = 0;
             status = "Available";
+            error_code = "NoError";
             id_tag.clear();
             reservation_id_tag.clear();
             status_updated = {};
@@ -113,7 +115,8 @@ private:
 
     void send_boot_notification(Station& station);
     void send_status_notification(Station& station, int connector_id);
-    void send_status_notification(Station& station, int connector_id, const std::string& status);
+    void send_status_notification(Station& station, int connector_id,
+                                  const std::string& status, const std::string& error_code = "NoError");
     void send_heartbeat(Station& station);
 
     // ── Charging session helpers (v1 parity) ──────────────────────────

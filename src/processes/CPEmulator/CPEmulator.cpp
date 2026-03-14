@@ -12,6 +12,7 @@
 #include <filesystem>
 #include <fstream>
 #include <chrono>
+#include <unordered_set>
 
 namespace apostol
 {
@@ -378,13 +379,15 @@ void CPEmulator::send_boot_notification(Station& station)
 
 void CPEmulator::send_status_notification(Station& station, int connector_id)
 {
-    // Determine actual status from connector state
     std::string status = "Available";
+    std::string error_code = "NoError";
     auto* conn = find_connector(station, connector_id);
-    if (conn)
+    if (conn) {
         status = conn->status;
+        error_code = conn->error_code;
+    }
 
-    send_status_notification(station, connector_id, status);
+    send_status_notification(station, connector_id, status, error_code);
 }
 
 void CPEmulator::send_heartbeat(Station& station)
@@ -495,11 +498,12 @@ void CPEmulator::update_auth_cache(Station& station, const std::string& id_tag, 
     }
 }
 
-void CPEmulator::send_status_notification(Station& station, int connector_id, const std::string& status)
+void CPEmulator::send_status_notification(Station& station, int connector_id,
+                                          const std::string& status, const std::string& error_code)
 {
     send_request(station, "StatusNotification", {
         {"connectorId", connector_id},
-        {"errorCode", "NoError"},
+        {"errorCode", error_code},
         {"status", status},
         {"timestamp", iso_time_now()}
     });
@@ -543,21 +547,29 @@ void CPEmulator::send_start_transaction(Station& station, ConnectorState& conn)
 
             auto now = std::chrono::system_clock::now();
 
-            // Parse idTagInfo if present
+            // transactionId is required per OCPP 1.6 §6.46
+            if (!resp.payload.contains("transactionId")) {
+                app_->logger().error("[{}] StartTransaction.conf missing transactionId",
+                    station.identity);
+                return;
+            }
+            conn->transaction_id = resp.payload["transactionId"].get<int>();
+
+            // idTagInfo is required per OCPP 1.6 §6.46
             IdTagInfo info;
-            bool has_id_tag_info = resp.payload.contains("idTagInfo");
-            if (has_id_tag_info) {
+            if (!resp.payload.contains("idTagInfo")) {
+                app_->logger().warn("[{}] StartTransaction.conf missing idTagInfo — assuming Accepted",
+                    station.identity);
+                info.status = "Accepted";
+            } else {
                 info = parse_id_tag_info(resp.payload);
                 update_auth_cache(station, id_tag, info);
             }
 
-            // Save transactionId
-            conn->transaction_id = resp.payload.value("transactionId", -1);
+            app_->logger().info("[{}] StartTransaction: transactionId={} connector={} auth={}",
+                station.identity, conn->transaction_id, conn->connector_id, info.status);
 
-            app_->logger().info("[{}] StartTransaction: transactionId={} connector={}",
-                station.identity, conn->transaction_id, conn->connector_id);
-
-            if (!has_id_tag_info || info.status == "Accepted") {
+            if (info.status == "Accepted") {
                 // Determine charging status from config or default "Charging"
                 std::string charge_status = "Charging";
                 auto cfg_it = station.config_keys.find("StartTransactionStatus");
@@ -576,6 +588,17 @@ void CPEmulator::send_start_transaction(Station& station, ConnectorState& conn)
         });
 }
 
+// Valid Reason enum values per OCPP 1.6 §7.33
+static bool is_valid_stop_reason(const std::string& reason)
+{
+    static const std::unordered_set<std::string> valid = {
+        "DeAuthorized", "EmergencyStop", "EVDisconnected", "HardReset",
+        "Local", "Other", "PowerLoss", "Reboot", "Remote",
+        "SoftReset", "UnlockCommand"
+    };
+    return valid.count(reason) > 0;
+}
+
 void CPEmulator::local_stop_transaction(Station& station, ConnectorState& conn, const std::string& reason)
 {
     nlohmann::json payload = {
@@ -585,8 +608,10 @@ void CPEmulator::local_stop_transaction(Station& station, ConnectorState& conn, 
         {"transactionId", conn.transaction_id}
     };
 
-    if (!reason.empty())
-        payload["reason"] = reason;
+    if (!reason.empty()) {
+        // Map to valid OCPP reason or fall back to "Other"
+        payload["reason"] = is_valid_stop_reason(reason) ? reason : "Other";
+    }
 
     int cid = conn.connector_id;
     std::string id_tag = conn.id_tag;
@@ -668,8 +693,43 @@ nlohmann::json CPEmulator::on_cancel_reservation(Station& station, const nlohman
 
 nlohmann::json CPEmulator::on_change_availability(Station& station, const nlohmann::json& payload)
 {
-    auto file = load_response_file(station.prefix, "ChangeAvailability");
-    return file.is_null() ? nlohmann::json{{"status", "Accepted"}} : file;
+    if (!payload.contains("connectorId") || !payload.contains("type"))
+        throw std::invalid_argument("missing connectorId or type");
+
+    int connector_id = payload["connectorId"].get<int>();
+    auto type = payload["type"].get<std::string>();
+
+    // Determine target status from type (OCPP 1.6 §5.2)
+    std::string target_status = (type == "Inoperative") ? "Unavailable" : "Available";
+    auto now = std::chrono::system_clock::now();
+    bool scheduled = false;
+
+    auto apply = [&](ConnectorState& conn) {
+        if (conn.transaction_id >= 0) {
+            // Transaction in progress — schedule change for after completion
+            scheduled = true;
+            return;
+        }
+        if (conn.status != target_status) {
+            conn.status = target_status;
+            conn.error_code = "NoError";
+            conn.status_updated = now;
+            send_status_notification(station, conn.connector_id, target_status);
+        }
+    };
+
+    if (connector_id == 0) {
+        // Apply to all connectors
+        for (auto& conn : station.connector_states)
+            apply(conn);
+    } else {
+        auto* conn = find_connector(station, connector_id);
+        if (!conn)
+            throw std::invalid_argument(fmt::format("invalid connectorId: {}", connector_id));
+        apply(*conn);
+    }
+
+    return {{"status", scheduled ? "Scheduled" : "Accepted"}};
 }
 
 nlohmann::json CPEmulator::on_change_configuration(Station& station, const nlohmann::json& payload)
@@ -681,16 +741,27 @@ nlohmann::json CPEmulator::on_change_configuration(Station& station, const nlohm
     auto value = payload["value"].get<std::string>();
 
     auto it = station.config_keys.find(key);
-    if (it != station.config_keys.end() && it->second.readonly)
+    if (it == station.config_keys.end())
+        return {{"status", "NotSupported"}};
+
+    if (it->second.readonly)
         return {{"status", "Rejected"}};
 
-    station.config_keys[key] = {value, false};
+    it->second.value = value;
+
+    if (key == "CentralSystemURL" || key == "HeartbeatInterval")
+        return {{"status", "RebootRequired"}};
 
     return {{"status", "Accepted"}};
 }
 
-nlohmann::json CPEmulator::on_clear_cache(Station& /*station*/, const nlohmann::json& /*payload*/)
+nlohmann::json CPEmulator::on_clear_cache(Station& station, const nlohmann::json& /*payload*/)
 {
+    auto it = station.config_keys.find("AuthorizationCacheEnabled");
+    if (it == station.config_keys.end() || it->second.value != "true")
+        return {{"status", "Rejected"}};
+
+    station.auth_cache.clear();
     return {{"status", "Accepted"}};
 }
 
@@ -702,7 +773,11 @@ nlohmann::json CPEmulator::on_clear_charging_profile(Station& station, const nlo
 
 nlohmann::json CPEmulator::on_data_transfer(Station& station, const nlohmann::json& payload)
 {
-    // Handle vendor-specific messageId dispatching (v1 parity)
+    // vendorId is required per OCPP 1.6 §5.6
+    if (!payload.contains("vendorId"))
+        throw std::invalid_argument("missing vendorId");
+
+    // Handle vendor-specific messageId dispatching
     if (payload.contains("messageId")) {
         auto message_id = payload.value("messageId", "");
 
@@ -711,12 +786,18 @@ nlohmann::json CPEmulator::on_data_transfer(Station& station, const nlohmann::js
                 auto data = nlohmann::json::parse(payload["data"].get<std::string>());
                 if (data.contains("connectorId") && data.contains("status")) {
                     int connector_id = data["connectorId"].get<int>();
-                    auto status = data["status"].get<std::string>();
-                    send_request(station, "StatusNotification", {
-                        {"connectorId", connector_id},
-                        {"errorCode", "NoError"},
-                        {"status", status}
-                    });
+                    auto new_status = data["status"].get<std::string>();
+                    auto now = std::chrono::system_clock::now();
+
+                    // Update internal state for matching connectors
+                    for (auto& conn : station.connector_states) {
+                        if (connector_id == 0 || conn.connector_id == connector_id) {
+                            conn.status = new_status;
+                            conn.status_updated = now;
+                        }
+                    }
+
+                    send_status_notification(station, connector_id, new_status);
                     return {{"status", "Accepted"}};
                 }
             } catch (...) {}
@@ -740,11 +821,27 @@ nlohmann::json CPEmulator::on_get_composite_schedule(Station& station, const nlo
 
 nlohmann::json CPEmulator::on_get_configuration(Station& station, const nlohmann::json& payload)
 {
-    nlohmann::json keys = nlohmann::json::array();
-    for (const auto& [k, cv] : station.config_keys)
-        keys.push_back({{"key", k}, {"value", cv.value}, {"readonly", cv.readonly}});
+    nlohmann::json config_keys = nlohmann::json::array();
+    nlohmann::json unknown_keys = nlohmann::json::array();
 
-    return {{"configurationKey", keys}};
+    if (payload.contains("key") && payload["key"].is_array() && !payload["key"].empty()) {
+        for (const auto& requested : payload["key"]) {
+            auto k = requested.get<std::string>();
+            auto it = station.config_keys.find(k);
+            if (it != station.config_keys.end())
+                config_keys.push_back({{"key", k}, {"value", it->second.value}, {"readonly", it->second.readonly}});
+            else
+                unknown_keys.push_back(k);
+        }
+    } else {
+        for (const auto& [k, cv] : station.config_keys)
+            config_keys.push_back({{"key", k}, {"value", cv.value}, {"readonly", cv.readonly}});
+    }
+
+    nlohmann::json result = {{"configurationKey", config_keys}};
+    if (!unknown_keys.empty())
+        result["unknownKey"] = unknown_keys;
+    return result;
 }
 
 nlohmann::json CPEmulator::on_get_diagnostics(Station& station, const nlohmann::json& payload)
@@ -879,9 +976,19 @@ nlohmann::json CPEmulator::on_reserve_now(Station& station, const nlohmann::json
     auto id_tag = payload["idTag"].get<std::string>();
     auto expiry = parse_iso_time(payload["expiryDate"].get<std::string>());
 
-    auto* conn = find_connector(station, connector_id);
+    ConnectorState* conn = nullptr;
+    if (connector_id == 0) {
+        auto it = station.config_keys.find("ReserveConnectorZeroSupported");
+        if (it == station.config_keys.end() || it->second.value != "true")
+            return {{"status", "Rejected"}};
+        // Use first connector as station-level reservation target
+        if (!station.connector_states.empty())
+            conn = &station.connector_states.front();
+    } else {
+        conn = find_connector(station, connector_id);
+    }
     if (!conn)
-        throw std::invalid_argument(fmt::format("invalid connectorId: {}", connector_id));
+        return {{"status", "Rejected"}};
 
     if (reservation_id <= 0 || conn->status == "Faulted")
         return {{"status", "Faulted"}};
@@ -912,8 +1019,34 @@ nlohmann::json CPEmulator::on_reset(Station& station, const nlohmann::json& payl
     if (!payload.contains("type"))
         throw std::invalid_argument("missing type");
 
-    app_->logger().info("[{}] Reset requested: {}", station.identity,
-                        payload["type"].get<std::string>());
+    auto type = payload["type"].get<std::string>();
+    app_->logger().info("[{}] Reset requested: {}", station.identity, type);
+
+    // Stop active transactions on all connectors before reset
+    for (auto& conn : station.connector_states) {
+        if (conn.transaction_id >= 0)
+            local_stop_transaction(station, conn, "Reboot");
+    }
+
+    // Schedule reconnect after response is sent (simulates reboot)
+    // One-shot timer lets the CallResult be sent first
+    auto* st = &station;
+    loop_->add_timer(std::chrono::milliseconds(500), [this, st]() {
+        app_->logger().info("[{}] rebooting (closing connection)", st->identity);
+
+        // Reset all connector states
+        for (auto& conn : st->connector_states)
+            conn.reset();
+
+        st->boot_status = BootStatus::not_sent;
+        st->next_boot_retry = {};
+        st->next_meter_values = {};
+
+        // Force reconnect — triggers full boot sequence (BootNotification + StatusNotification)
+        if (st->ws)
+            st->ws->reconnect();
+    }, false);
+
     return {{"status", "Accepted"}};
 }
 
@@ -943,30 +1076,38 @@ nlohmann::json CPEmulator::on_trigger_message(Station& station, const nlohmann::
     } else if (requested == "Heartbeat") {
         send_heartbeat(station);
     } else if (requested == "StatusNotification") {
-        send_status_notification(station, connector_id);
+        if (payload.contains("connectorId")) {
+            // Specific connector (or connector 0 = station itself)
+            send_status_notification(station, connector_id);
+        } else {
+            // No connectorId → send for station (0) + each connector (per OCPP 1.6 §5.17)
+            send_status_notification(station, 0);
+            for (auto& conn : station.connector_states)
+                send_status_notification(station, conn.connector_id, conn.status);
+        }
     } else if (requested == "DiagnosticsStatusNotification") {
         send_request(station, "DiagnosticsStatusNotification", {{"status", "Idle"}});
     } else if (requested == "FirmwareStatusNotification") {
         send_request(station, "FirmwareStatusNotification", {{"status", "Idle"}});
     } else if (requested == "MeterValues") {
-        // Send real MeterValues for specified connector or first charging one
-        ConnectorState* target = nullptr;
-        if (connector_id > 0)
-            target = find_connector(station, connector_id);
-        else {
+        if (payload.contains("connectorId") && connector_id > 0) {
+            // Specific connector
+            auto* target = find_connector(station, connector_id);
+            if (!target)
+                return {{"status", "Rejected"}};
+            send_meter_values(station, *target);
+        } else {
+            // No connectorId → send for all connectors with active charging (per OCPP 1.6 §5.17)
+            bool sent = false;
             for (auto& cs : station.connector_states) {
                 if (cs.status == "Charging" || cs.status == "SuspendedEVSE" || cs.status == "SuspendedEV") {
-                    target = &cs;
-                    break;
+                    send_meter_values(station, cs);
+                    sent = true;
                 }
             }
-            if (!target && !station.connector_states.empty())
-                target = &station.connector_states[0];
+            if (!sent)
+                return {{"status", "Rejected"}};
         }
-        if (target)
-            send_meter_values(station, *target);
-        else
-            return {{"status", "Rejected"}};
     } else {
         return {{"status", "NotImplemented"}};
     }
