@@ -77,6 +77,25 @@ CSService::CSService(Application& app)
         api_auth_ = cfg["api"].value("auth", false);
     }
 
+    // Load OCPP JSON schemas for message validation
+    auto schema_base = app.settings().prefix + "schemas/";
+
+    try {
+        schema_registry_.load("1.6", schema_base + "1.6");
+        auto count_16 = schema_registry_.schema_count();
+        app.logger().notice("Loaded {} OCPP 1.6 schemas", count_16);
+    } catch (const std::exception& e) {
+        app.logger().warn("OCPP 1.6 schemas not loaded: {}", e.what());
+    }
+
+    try {
+        auto count_before = schema_registry_.schema_count();
+        schema_registry_.load("2.0.1", schema_base + "2.0.1");
+        app.logger().notice("Loaded {} OCPP 2.0.1 schemas", schema_registry_.schema_count() - count_before);
+    } catch (const std::exception& e) {
+        app.logger().warn("OCPP 2.0.1 schemas not loaded: {}", e.what());
+    }
+
     // Environment variable overrides
     if (const char* env_url = std::getenv("WEBHOOK_URL")) {
         webhook_.url = env_url;
@@ -305,6 +324,17 @@ void CSService::on_ws_message(ocpp::CSChargingPoint& point, const std::string& p
     log_json_message(point.identity(), msg);
 
     if (msg.type == ocpp::MessageType::Call) {
+        // Validate against JSON schema
+        auto err = schema_registry_.validate("1.6", msg.action, "Request", msg.payload);
+        if (err) {
+            app_.logger().warn("[{}] Schema validation failed for {}: {}",
+                               point.identity(), msg.action, *err);
+            auto error = ocpp::make_call_error(msg.unique_id,
+                ocpp::error::FormationViolation, *err);
+            send_json_response(point, error);
+            return;
+        }
+
         // Broadcast to log subscribers
         broadcast_log({{"ts", ocpp::iso_time_now()}, {"identity", point.identity()},
                        {"direction", "in"}, {"messageType", "Call"},

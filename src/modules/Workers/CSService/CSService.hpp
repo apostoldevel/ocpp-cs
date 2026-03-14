@@ -18,6 +18,7 @@
 
 #include "ocpp/protocol.hpp"
 #include "ocpp/charging_point.hpp"
+#include "ocpp/schema_registry.hpp"
 
 #include <chrono>
 #include <memory>
@@ -157,6 +158,9 @@ private:
 
     // Pending outbound calls: uniqueId -> PendingCall (deferred HTTP response)
     std::unordered_map<std::string, PendingCall> pending_calls_;
+
+    // OCPP JSON schema validator
+    ocpp::SchemaRegistry schema_registry_;
 
     static constexpr std::chrono::seconds pending_call_timeout_{30};
 };
