@@ -60,6 +60,7 @@ public:
     ~CSService() override;
 
     std::string_view name() const override { return "CSService"; }
+    std::string_view title() const override { return "ocpp central system service"; }
     bool enabled() const override { return enabled_; }
     bool check_location(const HttpRequest& req) const override;
 

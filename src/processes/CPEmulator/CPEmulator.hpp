@@ -26,6 +26,7 @@ class CPEmulator final : public CustomProcess
 {
 public:
     std::string_view name() const override { return "ChargePoint"; }
+    std::string_view title() const override { return "charging point emulator"; }
 
     void on_start(EventLoop& loop, Application& app) override;
     void heartbeat(std::chrono::system_clock::time_point now) override;
