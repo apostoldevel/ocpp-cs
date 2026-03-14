@@ -1,0 +1,48 @@
+{
+  "prefix": "/etc/cs/",
+  "locale": "en_US.UTF-8",
+  "log": {
+    "level": "notice",
+    "file": "/var/log/cs/error.log",
+    "access": "/var/log/cs/access.log",
+    "stream": "/var/log/cs/stream.log"
+  },
+  "daemon": {
+    "enabled": false,
+    "pid": "/run/cs.pid"
+  },
+  "process": {
+    "master": true,
+    "helper": false,
+    "user": "",
+    "group": ""
+  },
+  "workers": 1,
+  "server": {
+    "listen": "0.0.0.0",
+    "port": 9220,
+    "root": "www"
+  },
+  "module": {
+    "CSService": {
+      "enable": true
+    },
+    "ChargePoint": {
+      "enable": true
+    }
+  },
+  "webhook": {
+    "enable": true,
+    "url": "http://backend:4977/api/v1/ocpp/parse",
+    "authorization": "Basic",
+    "username": "ocpp",
+    "password": "ocpp",
+    "token": ""
+  },
+  "api": {
+    "auth": false
+  },
+  "postgres": {
+    "connect": false
+  }
+}
