@@ -722,6 +722,88 @@ void CSService::do_charge_point_list(const HttpRequest& /*req*/, HttpResponse& r
 void CSService::do_charge_point(const HttpRequest& req, HttpResponse& resp,
                                const std::string& identity, const std::string& operation)
 {
+    auto* point = point_manager_.find_by_identity(identity);
+    if (!point) {
+        reply_error(resp, HttpStatus::not_found,
+            fmt::format("Charge point '{}' not found", identity));
+        return;
+    }
+
+    if (!point->connected()) {
+        reply_error(resp, HttpStatus::service_unavailable,
+            fmt::format("Charge point '{}' is not connected", identity));
+        return;
+    }
+
+    // For 2.0.1 stations: translate and validate 2.0.1 operations
+    if (point->ocpp_version() == "2.0.1") {
+        // Translation map: 1.6 name → 2.0.1 name
+        static const std::unordered_map<std::string_view, std::string_view> translate_16_to_201 = {
+            {"RemoteStartTransaction", "RequestStartTransaction"},
+            {"RemoteStopTransaction",  "RequestStopTransaction"},
+        };
+
+        // 2.0.1 operations with required fields
+        using Fields = std::vector<std::string_view>;
+        static const std::unordered_map<std::string_view, Fields> operations_201 = {
+            {"RequestStartTransaction", {"idToken"}},
+            {"RequestStopTransaction",  {"transactionId"}},
+            {"Reset",                   {"type"}},
+            {"SetVariables",            {"setVariableData"}},
+            {"GetVariables",            {"getVariableData"}},
+            {"ChangeAvailability",      {"operationalStatus"}},
+            {"DataTransfer",            {"vendorId"}},
+        };
+
+        // Translate 1.6 name if needed
+        std::string actual_op = operation;
+        auto tr_it = translate_16_to_201.find(operation);
+        if (tr_it != translate_16_to_201.end())
+            actual_op = std::string(tr_it->second);
+
+        auto op_it = operations_201.find(actual_op);
+        if (op_it == operations_201.end()) {
+            reply_error(resp, HttpStatus::bad_request,
+                fmt::format("Unknown 2.0.1 operation: '{}' (station {} uses OCPP 2.0.1)",
+                            operation, identity));
+            return;
+        }
+
+        auto body = content_to_json(req);
+
+        // Validate required fields
+        for (auto field : op_it->second) {
+            if (!body.contains(field)) {
+                reply_error(resp, HttpStatus::bad_request,
+                    fmt::format("Missing required field '{}' for {}", field, actual_op));
+                return;
+            }
+        }
+
+        // Send via WebSocket
+        auto msg = ocpp::make_call(actual_op, body);
+        log_json_message(identity, msg);
+
+        broadcast_log({{"ts", ocpp::iso_time_now()}, {"identity", identity},
+                       {"direction", "out"}, {"messageType", "Call"},
+                       {"uniqueId", msg.unique_id}, {"action", actual_op},
+                       {"payload", body}});
+
+        send_json_response(*point, msg);
+
+        // Defer HTTP response
+        resp.set_deferred(true);
+        auto conn = std::static_pointer_cast<HttpConnection>(req.connection_ctx);
+
+        pending_calls_.emplace(msg.unique_id, PendingCall{
+            .conn     = std::move(conn),
+            .action   = actual_op,
+            .deadline = std::chrono::steady_clock::now() + pending_call_timeout_
+        });
+
+        return;
+    }
+
     // OCPP 1.6 CS→CP operations: name → required fields (per spec §5/§6)
     using Fields = std::vector<std::string_view>;
     static const std::unordered_map<std::string_view, Fields> allowed_operations = {
@@ -750,19 +832,6 @@ void CSService::do_charge_point(const HttpRequest& req, HttpResponse& resp,
     if (op_it == allowed_operations.end()) {
         reply_error(resp, HttpStatus::bad_request,
             fmt::format("Unknown operation: '{}'", operation));
-        return;
-    }
-
-    auto* point = point_manager_.find_by_identity(identity);
-    if (!point) {
-        reply_error(resp, HttpStatus::not_found,
-            fmt::format("Charge point '{}' not found", identity));
-        return;
-    }
-
-    if (!point->connected()) {
-        reply_error(resp, HttpStatus::service_unavailable,
-            fmt::format("Charge point '{}' is not connected", identity));
         return;
     }
 
