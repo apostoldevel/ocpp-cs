@@ -99,6 +99,26 @@ git clone --recursive https://github.com/apostoldevel/ocpp-cs.git && cd ocpp-cs
 docker compose up
 ```
 
+### Переменные окружения
+
+| Переменная | Описание |
+|------------|----------|
+| `WEBHOOK_URL` | URL webhook-эндпоинта (включает режим webhook) |
+| `WEBHOOK_AUTH` | Схема авторизации: `Basic`, `Bearer` или `Off` (по умолчанию) |
+| `WEBHOOK_USERNAME` | Имя пользователя для Basic auth |
+| `WEBHOOK_PASSWORD` | Пароль для Basic auth |
+| `WEBHOOK_TOKEN` | Токен для Bearer auth |
+
+Пример с webhook:
+```shell
+docker run -p 9220:9220 --rm --name cs \
+  -e WEBHOOK_URL=http://your-server/api/v1/ocpp/parse \
+  -e WEBHOOK_AUTH=Basic \
+  -e WEBHOOK_USERNAME=ocpp \
+  -e WEBHOOK_PASSWORD=ocpp \
+  apostoldevel/cs
+```
+
 ### Пользовательская настройка
 
 Перед сборкой можно отредактировать:

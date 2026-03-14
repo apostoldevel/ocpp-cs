@@ -101,6 +101,10 @@ CSService::CSService(Application& app)
         webhook_.url = env_url;
         webhook_.enabled = true;
     }
+    if (const char* v = std::getenv("WEBHOOK_AUTH"))     webhook_.auth_scheme = v;
+    if (const char* v = std::getenv("WEBHOOK_USERNAME")) webhook_.username = v;
+    if (const char* v = std::getenv("WEBHOOK_PASSWORD")) webhook_.password = v;
+    if (const char* v = std::getenv("WEBHOOK_TOKEN"))    webhook_.token = v;
 
     // Register WS handler
     app_.set_ws_handler([this](EventLoop& loop, WsConnection ws, const HttpRequest& req) {

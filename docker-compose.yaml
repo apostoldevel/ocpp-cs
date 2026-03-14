@@ -10,3 +10,6 @@ services:
     network_mode: "host"
     #environment:
     #  WEBHOOK_URL: https://api.ocpp-css.com/api/v1/ocpp/parse
+    #  WEBHOOK_AUTH: Basic
+    #  WEBHOOK_USERNAME: ocpp
+    #  WEBHOOK_PASSWORD: ocpp
