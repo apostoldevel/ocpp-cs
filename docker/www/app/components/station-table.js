@@ -1,3 +1,5 @@
+import { getVendor, getModel, getStatus, getStatusClass } from '../services/station-utils.js'
+
 const { ref, computed } = Vue
 
 export const StationTable = {
@@ -17,14 +19,14 @@ export const StationTable = {
           va = a.identity || ''
           vb = b.identity || ''
         } else if (key === 'vendor') {
-          va = (a.bootNotification || {}).chargePointVendor || ''
-          vb = (b.bootNotification || {}).chargePointVendor || ''
+          va = getVendor(a)
+          vb = getVendor(b)
         } else if (key === 'model') {
-          va = (a.bootNotification || {}).chargePointModel || ''
-          vb = (b.bootNotification || {}).chargePointModel || ''
+          va = getModel(a)
+          vb = getModel(b)
         } else if (key === 'status') {
-          va = ((a.statusNotification || {}).status || '').toLowerCase()
-          vb = ((b.statusNotification || {}).status || '').toLowerCase()
+          va = getStatus(a).toLowerCase()
+          vb = getStatus(b).toLowerCase()
         } else if (key === 'ocpp') {
           va = a.ocppVersion || '1.6'
           vb = b.ocppVersion || '1.6'
@@ -47,10 +49,6 @@ export const StationTable = {
       }
     }
 
-    function statusCls(s) {
-      return ((s.statusNotification || {}).status || '').toLowerCase().replace(/\s+/g, '')
-    }
-
     function goStation(s) {
       location.hash = '#/station/' + encodeURIComponent(s.identity)
     }
@@ -60,7 +58,7 @@ export const StationTable = {
       return v === '2.0.1' ? 'ocpp-201' : 'ocpp-16'
     }
 
-    return { sorted, sortKey, sortAsc, toggleSort, statusCls, ocppCls, goStation }
+    return { sorted, sortKey, sortAsc, toggleSort, getVendor, getModel, getStatus, getStatusClass, ocppCls, goStation }
   },
   template: `
     <div class="info-panel">
@@ -79,11 +77,11 @@ export const StationTable = {
         <tbody>
           <tr v-for="s in sorted" :key="s.identity" @click="goStation(s)">
             <td>{{ s.identity }}</td>
-            <td>{{ (s.bootNotification || {}).chargePointVendor || '--' }}</td>
-            <td>{{ (s.bootNotification || {}).chargePointModel || '--' }}</td>
+            <td>{{ getVendor(s) || '--' }}</td>
+            <td>{{ getModel(s) || '--' }}</td>
             <td>
-              <span class="card-badge" :class="statusCls(s)">
-                {{ (s.statusNotification || {}).status || 'Unknown' }}
+              <span class="card-badge" :class="getStatusClass(s)">
+                {{ getStatus(s) }}
               </span>
             </td>
             <td>

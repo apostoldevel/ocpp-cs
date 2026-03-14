@@ -1,4 +1,5 @@
 import { state } from '../state.js'
+import { getStatus } from '../services/station-utils.js'
 
 const { computed } = Vue
 
@@ -8,9 +9,9 @@ export const StatsBar = {
       const s = state.stations
       let available = 0, charging = 0, faulted = 0
       for (const p of s) {
-        const st = ((p.statusNotification || {}).status || '').toLowerCase()
+        const st = getStatus(p).toLowerCase()
         if (st === 'available') available++
-        else if (st === 'charging') charging++
+        else if (st === 'charging' || st === 'occupied') charging++
         else if (st === 'faulted') faulted++
       }
       return { total: s.length, available, charging, faulted }

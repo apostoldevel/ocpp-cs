@@ -1,0 +1,39 @@
+{
+  "OcppVersion": "2.0.1",
+  "ChargePointVendor": "Emulator",
+  "ChargePointModel": "QuadAC-201",
+  "ChargePointSerialNumber": "EM-201-005",
+  "ChargePointSoftwareVersion": "2.0.0",
+  "CentralSystemURL": "ws://localhost:9220/ocpp/",
+  "Evses": [
+    {
+      "evseId": 1,
+      "connectors": [
+        {"connectorId": 1, "type": "sType2"}
+      ]
+    },
+    {
+      "evseId": 2,
+      "connectors": [
+        {"connectorId": 1, "type": "sType2"}
+      ]
+    },
+    {
+      "evseId": 3,
+      "connectors": [
+        {"connectorId": 1, "type": "sType1"}
+      ]
+    },
+    {
+      "evseId": 4,
+      "connectors": [
+        {"connectorId": 1, "type": "sType1"}
+      ]
+    }
+  ],
+  "ConfigurationKeys": {
+    "HeartbeatInterval": {"value": "90", "readonly": false},
+    "MeterValueSampleInterval": {"value": "60", "readonly": false},
+    "AuthorizeRemoteTxRequests": {"value": "true", "readonly": false}
+  }
+}

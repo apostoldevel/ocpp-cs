@@ -156,6 +156,7 @@
 .card-dot.preparing   { background: var(--cyan); }
 .card-dot.finishing   { background: var(--purple); }
 .card-dot.reserved    { background: var(--blue); }
+.card-dot.occupied    { background: var(--amber); }
 .card-dot.suspendedev,
 .card-dot.suspendedevse { background: var(--amber); }
 
@@ -181,6 +182,7 @@
 .card-badge.preparing   { background: rgba(57,210,192,0.15); color: var(--cyan); }
 .card-badge.finishing   { background: rgba(188,140,255,0.15); color: var(--purple); }
 .card-badge.reserved    { background: var(--blue-dim);   color: var(--blue); }
+.card-badge.occupied    { background: var(--amber-dim);  color: var(--amber); }
 .card-badge.suspendedev,
 .card-badge.suspendedevse { background: var(--amber-dim); color: var(--amber); }
 .card-badge.ocpp-16  { background: var(--blue-dim);  color: var(--blue); }

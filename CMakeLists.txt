@@ -198,7 +198,7 @@ install(DIRECTORY DESTINATION ${INSTALL_PATH}/cache)
 
 install(DIRECTORY conf/sites/ DESTINATION ${INSTALL_PATH}/sites)
 install(DIRECTORY conf/cp/    DESTINATION ${INSTALL_PATH}/cp)
-install(DIRECTORY www/        DESTINATION ${INSTALL_PATH}/www)
+install(DIRECTORY docker/www/ DESTINATION ${INSTALL_PATH}/www)
 install(DIRECTORY conf/schemas/ DESTINATION ${INSTALL_PATH}/schemas)
 
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/conf/default.json")

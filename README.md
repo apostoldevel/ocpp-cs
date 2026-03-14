@@ -62,7 +62,7 @@ Key differences from OCPP 1.6:
 - **Device Model** — SetVariables/GetVariables replace ChangeConfiguration/GetConfiguration
 - **Schema validation** — all messages validated against official OCPP 2.0.1 JSON Schemas
 
-The built-in emulator includes 4 OCPP 2.0.1 stations with different configurations:
+The built-in emulator includes 5 OCPP 2.0.1 stations with different configurations:
 
 | Station | Model | EVSEs | Connectors |
 |---------|-------|-------|------------|
@@ -70,6 +70,7 @@ The built-in emulator includes 4 OCPP 2.0.1 stations with different configuratio
 | CP202 | SingleDC-201 | 1 | CCS1 |
 | CP203 | TripleDC-201 | 3 | CCS2, CCS1, ChaoJi |
 | CP204 | DualCable-201 | 2 | 2 per EVSE (CCS2+CCS1, CCS2+ChaoJi) |
+| CP205 | QuadAC-201 | 4 | Type2, Type2, Type1, Type1 |
 
 ## Live Demo
 

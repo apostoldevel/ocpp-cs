@@ -1,4 +1,5 @@
 import { state } from '../state.js'
+import { searchableText } from '../services/station-utils.js'
 import { StatsBar } from '../components/stats-bar.js'
 import { StationCard } from '../components/station-card.js'
 import { StationTable } from '../components/station-table.js'
@@ -16,14 +17,7 @@ export const DashboardPage = {
       )
       const q = search.value.trim().toLowerCase()
       if (q) {
-        list = list.filter(s => {
-          const id = (s.identity || '').toLowerCase()
-          const vendor = ((s.bootNotification || {}).chargePointVendor || '').toLowerCase()
-          const model = ((s.bootNotification || {}).chargePointModel || '').toLowerCase()
-          const serial = ((s.bootNotification || {}).chargePointSerialNumber || '').toLowerCase()
-          const status = (((s.statusNotification || {}).status) || '').toLowerCase()
-          return id.includes(q) || vendor.includes(q) || model.includes(q) || serial.includes(q) || status.includes(q)
-        })
+        list = list.filter(s => searchableText(s).includes(q))
       }
       return list
     })

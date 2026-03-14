@@ -62,7 +62,7 @@ ws://IP_ВАШЕГО_СЕРВЕРА:9220/ocpp/ID_ВАШЕЙ_СТАНЦИИ
 - **Device Model** — SetVariables/GetVariables заменяют ChangeConfiguration/GetConfiguration
 - **Валидация по схемам** — все сообщения проверяются по официальным OCPP 2.0.1 JSON Schema
 
-Встроенный эмулятор включает 4 станции OCPP 2.0.1 с разными конфигурациями:
+Встроенный эмулятор включает 5 станций OCPP 2.0.1 с разными конфигурациями:
 
 | Станция | Модель | EVSE | Коннекторы |
 |---------|--------|------|------------|
@@ -70,6 +70,7 @@ ws://IP_ВАШЕГО_СЕРВЕРА:9220/ocpp/ID_ВАШЕЙ_СТАНЦИИ
 | CP202 | SingleDC-201 | 1 | CCS1 |
 | CP203 | TripleDC-201 | 3 | CCS2, CCS1, ChaoJi |
 | CP204 | DualCable-201 | 2 | по 2 на EVSE (CCS2+CCS1, CCS2+ChaoJi) |
+| CP205 | QuadAC-201 | 4 | Type2, Type2, Type1, Type1 |
 
 ## Демонстрация
 
