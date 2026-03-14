@@ -183,6 +183,21 @@ void CPEmulator::create_station(const std::string& dir_name)
         }
     }
 
+    // Parse 2.0.1 style configuration keys (object format)
+    if (config.contains("ConfigurationKeys") && config["ConfigurationKeys"].is_object()) {
+        for (auto& [key, val] : config["ConfigurationKeys"].items()) {
+            if (val.is_object() && val.contains("value"))
+                config_keys[key] = {val["value"].get<std::string>(), val.value("readonly", false)};
+        }
+    }
+
+    // Top-level CentralSystemURL (used by 2.0.1 configs)
+    if (config.contains("CentralSystemURL") && !config["CentralSystemURL"].is_null()) {
+        auto url = config["CentralSystemURL"].get<std::string>();
+        if (!url.empty())
+            config_keys["CentralSystemURL"] = {url, true};
+    }
+
     auto url_it = config_keys.find("CentralSystemURL");
     if (url_it == config_keys.end() || url_it->second.value.empty())
         throw std::runtime_error(fmt::format("[{}] CentralSystemURL not found in configuration", dir_name));
@@ -200,9 +215,31 @@ void CPEmulator::create_station(const std::string& dir_name)
     station->connector_ids = connector_ids;  // keep a copy before move
     station->config_keys  = std::move(config_keys);
 
-    // Initialize per-connector state
-    for (int cid : connector_ids)
-        station->connector_states.push_back(ConnectorState{.connector_id = cid});
+    // Detect OCPP version
+    station->ocpp_version = station->config.value("OcppVersion", "1.6");
+
+    if (station->ocpp_version == "2.0.1") {
+        // Parse EVSE/Connector hierarchy from config
+        if (station->config.contains("Evses")) {
+            for (const auto& evse_json : station->config["Evses"]) {
+                EvseState evse;
+                evse.evse_id = evse_json["evseId"].get<int>();
+                if (evse_json.contains("connectors")) {
+                    for (const auto& conn_json : evse_json["connectors"]) {
+                        ConnectorState201 conn;
+                        conn.connector_id = conn_json["connectorId"].get<int>();
+                        conn.connector_type = conn_json.value("type", "cType2");
+                        evse.connectors.push_back(std::move(conn));
+                    }
+                }
+                station->evses.push_back(std::move(evse));
+            }
+        }
+    } else {
+        // Initialize per-connector state (1.6)
+        for (int cid : connector_ids)
+            station->connector_states.push_back(ConnectorState{.connector_id = cid});
+    }
 
     // Create WsClient with OcppCodec
     station->ws = std::make_unique<WsClient>(*loop_);
@@ -234,8 +271,12 @@ void CPEmulator::create_station(const std::string& dir_name)
         ws_url += '/';
     ws_url += url_encode(identity);
 
-    app_->logger().info("[{}] connecting to {}", identity, ws_url);
-    station->ws->connect(ws_url, {"ocpp1.6"});
+    app_->logger().info("[{}] connecting to {} (OCPP {})", identity, ws_url, station->ocpp_version);
+
+    if (station->ocpp_version == "2.0.1")
+        station->ws->connect(ws_url, {"ocpp2.0.1"});
+    else
+        station->ws->connect(ws_url, {"ocpp1.6"});
 
     stations_.push_back(std::move(station));
 }
