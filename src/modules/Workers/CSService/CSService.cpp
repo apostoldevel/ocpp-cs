@@ -95,10 +95,7 @@ CSService::CSService(Application& app)
 
 bool CSService::check_location(const HttpRequest& req) const
 {
-    const auto& path = req.path;
-    return path.starts_with("/ocpp/")
-        || path.starts_with("/Ocpp/")
-        || path.starts_with("/api/");
+    return true;
 }
 
 // ── init_methods ────────────────────────────────────────────────────────────
@@ -128,7 +125,10 @@ void CSService::do_get(const HttpRequest& req, HttpResponse& resp)
     }
 
     // Serve static files from www/
-    auto file_path = app_.settings().doc_root / path.substr(1);
+    auto rel = path.substr(1);
+    auto file_path = rel.empty()
+        ? app_.settings().doc_root / "index.html"
+        : app_.settings().doc_root / rel;
     if (!serve_file(file_path, resp, false)) {
         auto index = app_.settings().doc_root / "index.html";
         if (!serve_file(index, resp, false)) {
