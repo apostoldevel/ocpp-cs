@@ -10,10 +10,10 @@
         "idToken": {
             "type": "object",
             "properties": {
-                "idTag": { "type": "string", "maxLength": 36 },
+                "idToken": { "type": "string", "maxLength": 36 },
                 "type": { "type": "string", "enum": ["Central", "eMAID", "ISO14443", "ISO15693", "KeyCode", "Local", "MacAddress", "NoAuthorization"] }
             },
-            "required": ["idTag", "type"]
+            "required": ["idToken", "type"]
         }
     },
     "required": ["idToken"]

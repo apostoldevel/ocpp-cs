@@ -588,7 +588,7 @@ void CPEmulator::send_transaction_event(Station& station, EvseState& evse,
     // Add idToken for Started
     if (event_type == "Started" && !evse.id_token.empty()) {
         payload["idToken"] = {
-            {"idTag", evse.id_token},
+            {"idToken", evse.id_token},
             {"type", evse.id_token_type}
         };
     }
@@ -640,7 +640,7 @@ void CPEmulator::send_authorize_201(Station& station, EvseState& evse)
 {
     send_request(station, "Authorize", {
         {"idToken", {
-            {"idTag", evse.id_token},
+            {"idToken", evse.id_token},
             {"type", evse.id_token_type}
         }}
     }, [this, &station, &evse](const WsMessage& resp) {
@@ -1419,7 +1419,7 @@ nlohmann::json CPEmulator::on_request_start_transaction(Station& station, const 
 {
     int evse_id = payload.value("evseId", 0);
     auto id_token = payload.value("idToken", nlohmann::json::object());
-    auto id_tag = id_token.value("idTag", "");
+    auto id_tag = id_token.value("idToken", "");
     auto id_type = id_token.value("type", "ISO14443");
 
     EvseState* evse = nullptr;
@@ -1491,10 +1491,10 @@ nlohmann::json CPEmulator::on_reset_201(Station& station, const nlohmann::json& 
         }
     }
 
-    // Schedule reconnect
+    // Schedule reconnect (one-shot)
     loop_->add_timer(std::chrono::seconds(2), [this, &station] {
         station.ws->reconnect();
-    });
+    }, false);
 
     return {{"status", "Accepted"}};
 }
