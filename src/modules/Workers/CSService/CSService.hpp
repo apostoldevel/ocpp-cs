@@ -119,6 +119,8 @@ private:
                            const std::string& account = {});
     void parse_json_standalone(ocpp::CSChargingPoint& point, const ocpp::OcppMessage& msg);
 
+    void handle_action_201(ocpp::CSChargingPoint& point, const ocpp::OcppMessage& msg);
+
     // ── Webhook ─────────────────────────────────────────────────────────
 
     void webhook_json(ocpp::CSChargingPoint& point, const ocpp::OcppMessage& msg,

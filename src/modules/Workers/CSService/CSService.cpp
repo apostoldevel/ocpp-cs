@@ -354,15 +354,20 @@ void CSService::on_ws_message(ocpp::CSChargingPoint& point, const std::string& p
         // Store last request
         point.store_request(msg.action, msg.payload);
 
-#ifdef WITH_POSTGRESQL
-        if (pool_) {
-            parse_json_pg(point, msg);
-        } else
-#endif
-        if (webhook_.enabled) {
-            parse_json_webhook(point, msg);
+        if (point.ocpp_version() == "2.0.1") {
+            // 2.0.1: standalone handler (PG integration will come later)
+            handle_action_201(point, msg);
         } else {
-            parse_json_standalone(point, msg);
+#ifdef WITH_POSTGRESQL
+            if (pool_) {
+                parse_json_pg(point, msg);
+            } else
+#endif
+            if (webhook_.enabled) {
+                parse_json_webhook(point, msg);
+            } else {
+                parse_json_standalone(point, msg);
+            }
         }
         return;
     }
@@ -932,6 +937,46 @@ void CSService::parse_json_pg(ocpp::CSChargingPoint& point, const ocpp::OcppMess
 }
 
 #endif // WITH_POSTGRESQL
+
+void CSService::handle_action_201(ocpp::CSChargingPoint& point, const ocpp::OcppMessage& msg)
+{
+    // OCPP 2.0.1 CP->CSMS message handler (standalone mode)
+    nlohmann::json response;
+
+    if (msg.action == "BootNotification") {
+        response = {
+            {"currentTime", ocpp::iso_time_now()},
+            {"interval", 60},
+            {"status", "Accepted"}
+        };
+    } else if (msg.action == "Heartbeat") {
+        response = {{"currentTime", ocpp::iso_time_now()}};
+    } else if (msg.action == "StatusNotification") {
+        response = json::object();  // empty per spec
+    } else if (msg.action == "Authorize") {
+        response = {{"idTokenInfo", {{"status", "Accepted"}}}};
+    } else if (msg.action == "TransactionEvent") {
+        // Minimal response — optionally include idTokenInfo for Started events
+        auto event_type = msg.payload.value("eventType", "");
+        if (event_type == "Started") {
+            response = {{"idTokenInfo", {{"status", "Accepted"}}}};
+        } else {
+            response = json::object();
+        }
+    } else if (msg.action == "MeterValues") {
+        response = json::object();
+    } else if (msg.action == "DataTransfer") {
+        response = {{"status", "Accepted"}};
+    } else {
+        auto error = ocpp::make_call_error(msg.unique_id, ocpp::error::NotImplemented,
+            fmt::format("Action '{}' not implemented for OCPP 2.0.1", msg.action));
+        send_json_response(point, error);
+        return;
+    }
+
+    auto resp = ocpp::make_call_result(msg.unique_id, response);
+    send_json_response(point, resp);
+}
 
 void CSService::parse_json_webhook(ocpp::CSChargingPoint& point, const ocpp::OcppMessage& msg,
                                    const std::string& account)
