@@ -10,6 +10,12 @@ Built on [A-POST-OL](https://github.com/apostoldevel/libapostol) — a high-perf
 
 ## Quick Start
 
+**One command:**
+```shell
+curl -fsSL https://raw.githubusercontent.com/apostoldevel/ocpp-cs/master/install.sh | bash
+```
+
+Or manually:
 ```shell
 git clone --recursive https://github.com/apostoldevel/ocpp-cs.git
 cd ocpp-cs
@@ -19,6 +25,12 @@ docker compose up
 Open in your browser:
 - **http://localhost:9220** — Web UI (no login required)
 - **http://localhost:9220/docs/** — Swagger UI (REST API)
+
+**Connect your charging station** — set the Central System URL in your station's configuration:
+```
+ws://YOUR_SERVER_IP:9220/ocpp/YOUR_STATION_ID
+```
+The station will appear in the Web UI automatically after it connects.
 
 That's it. The container runs a fully functional Central System with a built-in charge point emulator — no database, no external services, no configuration needed.
 
