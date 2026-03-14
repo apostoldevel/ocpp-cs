@@ -14,6 +14,8 @@
 #include "apostol/jwt.hpp"
 #endif
 
+#include "ocpp/time_utils.hpp"
+
 #include <chrono>
 #include <filesystem>
 #include <unordered_set>
@@ -159,9 +161,53 @@ void CSService::do_post(const HttpRequest& req, HttpResponse& resp)
 
 // ── WebSocket Upgrade (OCPP 1.6 JSON) ───────────────────────────────────────
 
+void CSService::broadcast_log(const nlohmann::json& entry)
+{
+    if (log_subscribers_.empty()) return;
+    auto msg = entry.dump();
+    std::vector<int> fds;
+    fds.reserve(log_subscribers_.size());
+    for (auto& [fd, _] : log_subscribers_) fds.push_back(fd);
+    for (int fd : fds) {
+        auto it = log_subscribers_.find(fd);
+        if (it != log_subscribers_.end()) {
+            it->second.send_text(msg);
+        }
+    }
+}
+
 void CSService::on_ws_upgrade(EventLoop& loop, WsConnection ws, const HttpRequest& req)
 {
     const auto parts = split_path(req.path);
+
+    // Browser log subscriber: /ws/log
+    if (parts.size() >= 2 && parts[0] == "ws" && parts[1] == "log") {
+        int fd = ws.fd();
+        log_subscribers_.emplace(fd, std::move(ws));
+
+        app_.logger().notice("[ws/log] subscriber connected (fd={})", fd);
+
+        loop.remove_io(fd);
+        loop.add_io(fd, EPOLLIN, [this, fd](uint32_t) {
+            auto ws_it = log_subscribers_.find(fd);
+            if (ws_it == log_subscribers_.end()) return;
+
+            bool alive = ws_it->second.on_readable(
+                [](uint8_t, const std::string&) { /* ignore incoming messages */ },
+                [this, fd]() {
+                    app_.logger().notice("[ws/log] subscriber disconnected (fd={})", fd);
+                    app_.worker_loop().remove_io(fd);
+                    log_subscribers_.erase(fd);
+                }
+            );
+            if (!alive) {
+                app_.logger().notice("[ws/log] subscriber disconnected (fd={})", fd);
+                app_.worker_loop().remove_io(fd);
+                log_subscribers_.erase(fd);
+            }
+        });
+        return;
+    }
 
     // Extract identity from path: /ocpp/{identity} or /ocpp/{account}/{identity}
     if (parts.size() < 2 || parts[0] != "ocpp") {
@@ -259,6 +305,12 @@ void CSService::on_ws_message(ocpp::CSChargingPoint& point, const std::string& p
     log_json_message(point.identity(), msg);
 
     if (msg.type == ocpp::MessageType::Call) {
+        // Broadcast to log subscribers
+        broadcast_log({{"ts", ocpp::iso_time_now()}, {"identity", point.identity()},
+                       {"direction", "in"}, {"messageType", "Call"},
+                       {"uniqueId", msg.unique_id}, {"action", msg.action},
+                       {"payload", msg.payload}});
+
         // Store last request
         point.store_request(msg.action, msg.payload);
 
@@ -287,6 +339,13 @@ void CSService::on_ws_message(ocpp::CSChargingPoint& point, const std::string& p
 
     auto pending = std::move(it->second);
     pending_calls_.erase(it);
+
+    // Broadcast to log subscribers
+    broadcast_log({{"ts", ocpp::iso_time_now()}, {"identity", point.identity()},
+                   {"direction", "in"},
+                   {"messageType", msg.type == ocpp::MessageType::CallResult ? "CallResult" : "CallError"},
+                   {"uniqueId", msg.unique_id}, {"action", pending.action},
+                   {"payload", msg.payload}});
 
     json body;
     if (msg.type == ocpp::MessageType::CallError) {
@@ -334,6 +393,14 @@ void CSService::on_ws_close(const std::string& identity)
 void CSService::send_json_response(ocpp::CSChargingPoint& point, const ocpp::OcppMessage& response)
 {
     log_json_message(point.identity(), response);
+
+    broadcast_log({{"ts", ocpp::iso_time_now()}, {"identity", point.identity()},
+                   {"direction", "out"},
+                   {"messageType", response.type == ocpp::MessageType::Call ? "Call" :
+                                   response.type == ocpp::MessageType::CallResult ? "CallResult" : "CallError"},
+                   {"uniqueId", response.unique_id}, {"action", response.action},
+                   {"payload", response.payload}});
+
     point.send_json(response);
 }
 
@@ -551,6 +618,11 @@ void CSService::do_api(const HttpRequest& req, HttpResponse& resp)
         return;
 #endif
         // Authorized — full access
+        if (command == "ChargePoint" && parts.size() >= 5) {
+            do_charge_point(req, resp, std::string(parts[3]), std::string(parts[4]));
+            return;
+        }
+
 #ifdef WITH_POSTGRESQL
         if (pool_) {
             if (command == "ChargePointList") {
@@ -560,11 +632,6 @@ void CSService::do_api(const HttpRequest& req, HttpResponse& resp)
 
             if (command == "CentralSystem" && parts.size() >= 4) {
                 do_central_system(req, resp, std::string(parts[3]));
-                return;
-            }
-
-            if (command == "ChargePoint" && parts.size() >= 5) {
-                do_charge_point(req, resp, std::string(parts[3]), std::string(parts[4]));
                 return;
             }
         } else
@@ -582,15 +649,15 @@ void CSService::do_api(const HttpRequest& req, HttpResponse& resp)
             return;
         }
 
+        if (command == "ChargePoint" && parts.size() >= 5) {
+            do_charge_point(req, resp, std::string(parts[3]), std::string(parts[4]));
+            return;
+        }
+
 #ifdef WITH_POSTGRESQL
         if (pool_) {
             if (command == "CentralSystem" && parts.size() >= 4 && parts[3] == "ChargePointList") {
                 do_charge_point_list(req, resp);
-                return;
-            }
-
-            if (command == "ChargePoint" && parts.size() >= 5) {
-                do_charge_point(req, resp, std::string(parts[3]), std::string(parts[4]));
                 return;
             }
         }
@@ -605,41 +672,6 @@ void CSService::do_charge_point_list(const HttpRequest& /*req*/, HttpResponse& r
     auto list = get_charge_point_list();
     resp.set_status(HttpStatus::ok);
     resp.set_body(list.dump(), "application/json");
-}
-
-#ifdef WITH_POSTGRESQL
-
-void CSService::do_central_system(const HttpRequest& req, HttpResponse& resp,
-                                  const std::string& endpoint)
-{
-    // Validate endpoint: must be a safe SQL identifier (lowercase alpha only)
-    std::string lower_endpoint;
-    lower_endpoint.reserve(endpoint.size());
-    for (char c : endpoint) {
-        auto lc = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-        if (lc < 'a' || lc > 'z') {
-            reply_error(resp, HttpStatus::bad_request,
-                fmt::format("Invalid endpoint: '{}'", endpoint));
-            return;
-        }
-        lower_endpoint += lc;
-    }
-
-    auto body = content_to_json(req);
-
-    // Extract Bearer token from Authorization header
-    auto authorization = parse_authorization(req.header("Authorization"));
-    const auto& token = authorization.token;
-
-    auto sql = fmt::format("SELECT * FROM ocpp.{}({}, {}::jsonb)",
-        lower_endpoint, pq_quote_literal(token), pq_quote_literal(body.dump()));
-
-    exec_sql(*pool_, req, resp, std::move(sql),
-        [](std::shared_ptr<HttpConnection> conn, std::vector<PgResult> results) {
-            HttpResponse r;
-            reply_pg(r, results);
-            conn->send_response(r);
-        });
 }
 
 void CSService::do_charge_point(const HttpRequest& req, HttpResponse& resp,
@@ -704,6 +736,12 @@ void CSService::do_charge_point(const HttpRequest& req, HttpResponse& resp,
         // Build OCPP Call and send via WebSocket
         auto msg = ocpp::make_call(operation, body);
         log_json_message(identity, msg);
+
+        broadcast_log({{"ts", ocpp::iso_time_now()}, {"identity", identity},
+                       {"direction", "out"}, {"messageType", "Call"},
+                       {"uniqueId", msg.unique_id}, {"action", operation},
+                       {"payload", body}});
+
         send_json_response(*point, msg);
 
         // Defer HTTP response — will be resolved when station replies
@@ -715,10 +753,52 @@ void CSService::do_charge_point(const HttpRequest& req, HttpResponse& resp,
             .action   = operation,
             .deadline = std::chrono::steady_clock::now() + pending_call_timeout_
         });
-    } else {
+    }
+#ifdef WITH_POSTGRESQL
+    else if (pool_) {
         // SOAP: convert JSON to SOAP, POST to station, convert response back to JSON
         json_to_soap(req, resp, point, operation, body);
     }
+#endif
+    else {
+        reply_error(resp, HttpStatus::service_unavailable,
+            "SOAP requires PostgreSQL");
+    }
+}
+
+#ifdef WITH_POSTGRESQL
+
+void CSService::do_central_system(const HttpRequest& req, HttpResponse& resp,
+                                  const std::string& endpoint)
+{
+    // Validate endpoint: must be a safe SQL identifier (lowercase alpha only)
+    std::string lower_endpoint;
+    lower_endpoint.reserve(endpoint.size());
+    for (char c : endpoint) {
+        auto lc = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+        if (lc < 'a' || lc > 'z') {
+            reply_error(resp, HttpStatus::bad_request,
+                fmt::format("Invalid endpoint: '{}'", endpoint));
+            return;
+        }
+        lower_endpoint += lc;
+    }
+
+    auto body = content_to_json(req);
+
+    // Extract Bearer token from Authorization header
+    auto authorization = parse_authorization(req.header("Authorization"));
+    const auto& token = authorization.token;
+
+    auto sql = fmt::format("SELECT * FROM ocpp.{}({}, {}::jsonb)",
+        lower_endpoint, pq_quote_literal(token), pq_quote_literal(body.dump()));
+
+    exec_sql(*pool_, req, resp, std::move(sql),
+        [](std::shared_ptr<HttpConnection> conn, std::vector<PgResult> results) {
+            HttpResponse r;
+            reply_pg(r, results);
+            conn->send_response(r);
+        });
 }
 
 void CSService::set_point_connected(const std::string& identity, bool value,

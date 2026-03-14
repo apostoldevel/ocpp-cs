@@ -1,0 +1,25 @@
+:root {
+  --bg:         #0a0c10;
+  --surface:    #12151c;
+  --surface-2:  #1a1e28;
+  --border:     #1e2230;
+  --border-hi:  #2a2f40;
+  --text:       #c8cdd8;
+  --text-dim:   #5a6070;
+  --text-bright:#eef0f5;
+  --accent:     #3b82f6;
+  --green:      #22c55e;
+  --green-dim:  #16532e;
+  --amber:      #f59e0b;
+  --amber-dim:  #5c3d08;
+  --red:        #ef4444;
+  --red-dim:    #5c1a1a;
+  --blue:       #3b82f6;
+  --blue-dim:   #1a3358;
+  --cyan:       #06b6d4;
+  --purple:     #a855f7;
+  --mono:       'JetBrains Mono', 'Cascadia Code', 'Fira Code', monospace;
+  --sans:       'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  --radius:     6px;
+  --glow:       0 0 20px rgba(59,130,246,0.15);
+}

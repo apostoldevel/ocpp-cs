@@ -97,11 +97,12 @@ private:
     void do_api(const HttpRequest& req, HttpResponse& resp);
     void do_charge_point_list(const HttpRequest& req, HttpResponse& resp);
 
+    void do_charge_point(const HttpRequest& req, HttpResponse& resp,
+                        const std::string& identity, const std::string& operation);
+
 #ifdef WITH_POSTGRESQL
     void do_central_system(const HttpRequest& req, HttpResponse& resp,
                           const std::string& endpoint);
-    void do_charge_point(const HttpRequest& req, HttpResponse& resp,
-                        const std::string& identity, const std::string& operation);
     void set_point_connected(const std::string& identity, bool value,
                             const nlohmann::json& metadata);
 #endif
@@ -145,6 +146,10 @@ private:
 
     // WsConnection storage: fd -> WsConnection (moved here after upgrade)
     std::unordered_map<int, WsConnection> ws_connections_;
+
+    // Browser WebSocket log subscribers: fd -> WsConnection
+    std::unordered_map<int, WsConnection> log_subscribers_;
+    void broadcast_log(const nlohmann::json& entry);
 
     // Lazy-initialized FetchClient for webhook dispatch
     std::unique_ptr<FetchClient> fetch_client_;

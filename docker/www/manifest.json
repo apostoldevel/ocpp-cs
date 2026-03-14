@@ -1,0 +1,16 @@
+{
+  "name": "OCPP Central System",
+  "short_name": "OCPP CS",
+  "description": "OCPP 1.6 Central System — Station Management",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0c10",
+  "theme_color": "#3b82f6",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
