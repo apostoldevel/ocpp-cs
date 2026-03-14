@@ -1,4 +1,5 @@
 #include "ocpp/charging_point.hpp"
+#include "ocpp/time_utils.hpp"
 #include "apostol/websocket.hpp"
 #include <fmt/format.h>
 #include <chrono>
@@ -11,27 +12,8 @@ namespace ocpp
 
 namespace
 {
-
-std::string get_iso_time(int delta_seconds = 0)
-{
-    auto now = std::chrono::system_clock::now();
-    if (delta_seconds != 0)
-        now += std::chrono::seconds(delta_seconds);
-
-    auto tt = std::chrono::system_clock::to_time_t(now);
-    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-        now.time_since_epoch()) % 1000;
-
-    std::tm utc{};
-    gmtime_r(&tt, &utc);
-
-    return fmt::format("{:04d}-{:02d}-{:02d}T{:02d}:{:02d}:{:02d}.{:03d}Z",
-        utc.tm_year + 1900, utc.tm_mon + 1, utc.tm_mday,
-        utc.tm_hour, utc.tm_min, utc.tm_sec, static_cast<int>(ms.count()));
-}
-
 std::atomic<int> s_transaction_id{0};
-
+constexpr int kDefaultExpirySec = 5 * 60; // 5 min default for idTagInfo/reservation expiry
 } // namespace
 
 // ── CSChargingPoint ─────────────────────────────────────────────────────────
@@ -77,7 +59,7 @@ OcppMessage CSChargingPoint::default_authorize_response(const OcppMessage& reque
     return make_call_result(request.unique_id, {
         {"idTagInfo", {
             {"status", "Accepted"},
-            {"expiryDate", get_iso_time(5 * 60)}
+            {"expiryDate", iso_time_now(kDefaultExpirySec)}
         }}
     });
 }
@@ -86,7 +68,7 @@ OcppMessage CSChargingPoint::default_boot_notification_response(const OcppMessag
 {
     return make_call_result(request.unique_id, {
         {"status", "Accepted"},
-        {"currentTime", get_iso_time()},
+        {"currentTime", iso_time_now()},
         {"interval", 60}
     });
 }
@@ -96,7 +78,7 @@ OcppMessage CSChargingPoint::default_start_transaction_response(const OcppMessag
     return make_call_result(request.unique_id, {
         {"idTagInfo", {
             {"status", "Accepted"},
-            {"expiryDate", get_iso_time(5 * 60)}
+            {"expiryDate", iso_time_now(kDefaultExpirySec)}
         }},
         {"transactionId", ++s_transaction_id}
     });
@@ -107,7 +89,7 @@ OcppMessage CSChargingPoint::default_stop_transaction_response(const OcppMessage
     return make_call_result(request.unique_id, {
         {"idTagInfo", {
             {"status", "Accepted"},
-            {"expiryDate", get_iso_time(5 * 60)}
+            {"expiryDate", iso_time_now(kDefaultExpirySec)}
         }}
     });
 }
@@ -115,7 +97,7 @@ OcppMessage CSChargingPoint::default_stop_transaction_response(const OcppMessage
 OcppMessage CSChargingPoint::default_heartbeat_response(const OcppMessage& request)
 {
     return make_call_result(request.unique_id, {
-        {"currentTime", get_iso_time()}
+        {"currentTime", iso_time_now()}
     });
 }
 

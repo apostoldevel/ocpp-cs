@@ -16,4 +16,4 @@ endif()
 
 configure_file("${VERSION_IN}" "${VERSION_OUT}" @ONLY)
 
-message(STATUS "apostol version: ${PROJECT_VERSION}+${GIT_HASH}")
+message(STATUS "${APP_NAME} version: ${PROJECT_VERSION}+${GIT_HASH}")

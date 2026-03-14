@@ -23,6 +23,8 @@ namespace apostol
 
 using json = nlohmann::json;
 
+static constexpr auto kCleanupInterval = std::chrono::milliseconds(5000);
+
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
 namespace
@@ -85,7 +87,7 @@ CSService::CSService(Application& app)
     });
 
     // Periodic cleanup of expired pending calls (every 5 seconds)
-    app_.worker_loop().add_timer(std::chrono::milliseconds(5000),
+    app_.worker_loop().add_timer(kCleanupInterval,
         [this] { cleanup_expired_calls(); }, true);
 }
 

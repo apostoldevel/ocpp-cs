@@ -4,6 +4,7 @@
 #include "apostol/application.hpp"
 #include "apostol/http_utils.hpp"
 #include "ocpp/ocpp_codec.hpp"
+#include "ocpp/time_utils.hpp"
 #include "apostol/logger.hpp"
 
 #include <fmt/format.h>
@@ -16,6 +17,10 @@ namespace apostol
 {
 
 namespace fs = std::filesystem;
+
+static constexpr int    kMeterIncrementWh  = 10;   // simulated meter increment per tick
+static constexpr auto   kReconnectDelay    = std::chrono::seconds(30);
+static constexpr auto   kPingInterval      = std::chrono::seconds(30);
 
 // ── Lifecycle ────────────────────────────────────────────────────────────────
 
@@ -53,7 +58,7 @@ void CPEmulator::heartbeat(std::chrono::system_clock::time_point now)
 
         for (auto& conn : station->connector_states) {
             if (conn.status == "Charging") {
-                conn.meter_value += 10;  // +10 Wh per tick
+                conn.meter_value += kMeterIncrementWh;
             } else if (conn.status == "Finishing") {
                 // Finishing → Available after timeout
                 auto cfg_it = station->config_keys.find("FinishingTimeout");
@@ -202,8 +207,8 @@ void CPEmulator::create_station(const std::string& dir_name)
     station->ws = std::make_unique<WsClient>(*loop_);
     station->ws->set_codec(std::make_unique<ocpp::OcppCodec>());
     station->ws->auto_reconnect(true);
-    station->ws->set_reconnect_max_delay(std::chrono::seconds(30));
-    station->ws->set_ping_interval(std::chrono::seconds(30));
+    station->ws->set_reconnect_max_delay(kReconnectDelay);
+    station->ws->set_ping_interval(kPingInterval);
 
     auto* st = station.get();
 
@@ -403,31 +408,8 @@ nlohmann::json CPEmulator::load_response_file(const std::string& prefix, std::st
 
 // ── Charging session helpers (v1 parity) ─────────────────────────────────────
 
-namespace
-{
-
-std::string iso_time_now()
-{
-    auto now = std::chrono::system_clock::now();
-    auto tt = std::chrono::system_clock::to_time_t(now);
-    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(
-        now.time_since_epoch()) % 1000;
-    std::tm utc{};
-    gmtime_r(&tt, &utc);
-    char buf[32];
-    std::strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%S", &utc);
-    return fmt::format("{}.{:03d}Z", buf, ms.count());
-}
-
-std::chrono::system_clock::time_point parse_iso_time(const std::string& s)
-{
-    std::tm tm{};
-    if (strptime(s.c_str(), "%Y-%m-%dT%H:%M:%S", &tm))
-        return std::chrono::system_clock::from_time_t(timegm(&tm));
-    return {};
-}
-
-} // namespace
+using ocpp::iso_time_now;
+using ocpp::parse_iso_time;
 
 int CPEmulator::status_order(const std::string& s)
 {
