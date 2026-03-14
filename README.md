@@ -40,8 +40,9 @@ That's it. The container runs a fully functional Central System with a built-in 
 |---------|---------|
 | Central System | Full OCPP 1.5 (SOAP/HTTP) and 1.6 (JSON/WebSocket) support |
 | Charge Point Emulator | Built-in, auto-connects to the Central System on startup |
-| Web UI | Monitor stations, start/stop charging, view transactions |
+| Web UI | Dashboard, station management, 19 OCPP commands, live message log |
 | REST API | OpenAPI spec + Swagger UI at `/docs/` |
+| One-command install | `curl \| bash` — Docker setup in 30 seconds |
 | Integration | Webhook or PostgreSQL — your choice |
 
 ## Live Demo
