@@ -32,11 +32,11 @@
     }
   },
   "webhook": {
-    "enable": true,
-    "url": "http://backend:4977/api/v1/ocpp/parse",
-    "authorization": "Basic",
-    "username": "ocpp",
-    "password": "ocpp",
+    "enable": false,
+    "url": "",
+    "authorization": "Off",
+    "username": "",
+    "password": "",
     "token": ""
   },
   "api": {

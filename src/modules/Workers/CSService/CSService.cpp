@@ -54,7 +54,7 @@ CSService::~CSService() = default;
 CSService::CSService(Application& app)
     : app_(app)
 #ifdef WITH_POSTGRESQL
-    , pool_(app.db_pool())
+    , pool_(app.settings().pg_connect ? &app.db_pool() : nullptr)
 #endif
     , enabled_(app.module_enabled("CSService"))
 {
@@ -145,6 +145,10 @@ void CSService::do_post(const HttpRequest& req, HttpResponse& resp)
 
 #ifdef WITH_POSTGRESQL
     if (parts[0] == "Ocpp") {
+        if (!pool_) {
+            reply_error(resp, HttpStatus::service_unavailable, "SOAP requires PostgreSQL");
+            return;
+        }
         do_soap(req, resp);
         return;
     }
@@ -185,7 +189,8 @@ void CSService::on_ws_upgrade(EventLoop& loop, WsConnection ws, const HttpReques
         ws_connections_.erase(old_fd);
         point.set_ws_connection(nullptr);
 #ifdef WITH_POSTGRESQL
-        set_point_connected(identity, false, json::object());
+        if (pool_)
+            set_point_connected(identity, false, json::object());
 #endif
     }
 
@@ -206,7 +211,8 @@ void CSService::on_ws_upgrade(EventLoop& loop, WsConnection ws, const HttpReques
 
 #ifdef WITH_POSTGRESQL
     // Notify database
-    set_point_connected(identity, true, charge_point_to_json(point));
+    if (pool_)
+        set_point_connected(identity, true, charge_point_to_json(point));
 #endif
 
     // Remove HTTP epoll registration before adding WS handler
@@ -257,14 +263,15 @@ void CSService::on_ws_message(ocpp::CSChargingPoint& point, const std::string& p
         point.store_request(msg.action, msg.payload);
 
 #ifdef WITH_POSTGRESQL
-        parse_json_pg(point, msg);
-#else
+        if (pool_) {
+            parse_json_pg(point, msg);
+        } else
+#endif
         if (webhook_.enabled) {
             parse_json_webhook(point, msg);
         } else {
             parse_json_standalone(point, msg);
         }
-#endif
         return;
     }
 
@@ -314,7 +321,8 @@ void CSService::on_ws_close(const std::string& identity)
     point->set_ws_connection(nullptr);
 
 #ifdef WITH_POSTGRESQL
-    set_point_connected(identity, false, json::object());
+    if (pool_)
+        set_point_connected(identity, false, json::object());
 #endif
 
     if (fd >= 0) {
@@ -348,7 +356,7 @@ void CSService::parse_soap(const HttpRequest& req, HttpResponse& resp, const std
     auto sql = fmt::format("SELECT * FROM ocpp.parsexml({}::xml)",
         pq_quote_literal(payload));
 
-    exec_sql(pool_, req, resp, std::move(sql),
+    exec_sql(*pool_, req, resp, std::move(sql),
         [this](std::shared_ptr<HttpConnection> conn, std::vector<PgResult> results) {
             if (results.empty() || !results[0].ok()) {
                 HttpResponse r;
@@ -409,7 +417,7 @@ void CSService::json_to_soap(const HttpRequest& req, HttpResponse& resp,
     auto address = point->address();
     auto identity = point->identity();
 
-    exec_sql(pool_, req, resp, std::move(sql),
+    exec_sql(*pool_, req, resp, std::move(sql),
         [this, address, identity, operation]
         (std::shared_ptr<HttpConnection> conn, std::vector<PgResult> results) {
             if (results.empty() || !results[0].ok() || results[0].rows() == 0) {
@@ -463,7 +471,7 @@ void CSService::soap_to_json(std::shared_ptr<HttpConnection> conn, const std::st
     auto sql = fmt::format("SELECT * FROM ocpp.soaptojson({}::xml)",
         pq_quote_literal(xml_payload));
 
-    pool_.execute(std::move(sql),
+    pool_->execute(std::move(sql),
         [conn](std::vector<PgResult> results) {
             HttpResponse r;
             if (!results.empty() && results[0].ok() && results[0].rows() > 0) {
@@ -544,28 +552,29 @@ void CSService::do_api(const HttpRequest& req, HttpResponse& resp)
 #endif
         // Authorized — full access
 #ifdef WITH_POSTGRESQL
-        if (command == "ChargePointList") {
-            do_central_system(req, resp, "chargepointlist");
-            return;
-        }
-#else
-        if (command == "ChargePointList") {
-            do_charge_point_list(req, resp);
-            return;
-        }
-#endif
+        if (pool_) {
+            if (command == "ChargePointList") {
+                do_central_system(req, resp, "chargepointlist");
+                return;
+            }
 
-#ifdef WITH_POSTGRESQL
-        if (command == "CentralSystem" && parts.size() >= 4) {
-            do_central_system(req, resp, std::string(parts[3]));
-            return;
-        }
+            if (command == "CentralSystem" && parts.size() >= 4) {
+                do_central_system(req, resp, std::string(parts[3]));
+                return;
+            }
 
-        if (command == "ChargePoint" && parts.size() >= 5) {
-            do_charge_point(req, resp, std::string(parts[3]), std::string(parts[4]));
-            return;
-        }
+            if (command == "ChargePoint" && parts.size() >= 5) {
+                do_charge_point(req, resp, std::string(parts[3]), std::string(parts[4]));
+                return;
+            }
+        } else
 #endif
+        {
+            if (command == "ChargePointList") {
+                do_charge_point_list(req, resp);
+                return;
+            }
+        }
     } else {
         // Demo mode: ChargePointList and ChargePoint open, CentralSystem restricted
         if (command == "ChargePointList") {
@@ -574,14 +583,16 @@ void CSService::do_api(const HttpRequest& req, HttpResponse& resp)
         }
 
 #ifdef WITH_POSTGRESQL
-        if (command == "CentralSystem" && parts.size() >= 4 && parts[3] == "ChargePointList") {
-            do_charge_point_list(req, resp);
-            return;
-        }
+        if (pool_) {
+            if (command == "CentralSystem" && parts.size() >= 4 && parts[3] == "ChargePointList") {
+                do_charge_point_list(req, resp);
+                return;
+            }
 
-        if (command == "ChargePoint" && parts.size() >= 5) {
-            do_charge_point(req, resp, std::string(parts[3]), std::string(parts[4]));
-            return;
+            if (command == "ChargePoint" && parts.size() >= 5) {
+                do_charge_point(req, resp, std::string(parts[3]), std::string(parts[4]));
+                return;
+            }
         }
 #endif
     }
@@ -623,7 +634,7 @@ void CSService::do_central_system(const HttpRequest& req, HttpResponse& resp,
     auto sql = fmt::format("SELECT * FROM ocpp.{}({}, {}::jsonb)",
         lower_endpoint, pq_quote_literal(token), pq_quote_literal(body.dump()));
 
-    exec_sql(pool_, req, resp, std::move(sql),
+    exec_sql(*pool_, req, resp, std::move(sql),
         [](std::shared_ptr<HttpConnection> conn, std::vector<PgResult> results) {
             HttpResponse r;
             reply_pg(r, results);
@@ -719,7 +730,7 @@ void CSService::set_point_connected(const std::string& identity, bool value,
         value ? "true" : "false",
         pq_quote_literal(metadata.dump()));
 
-    pool_.execute(std::move(sql),
+    pool_->execute(std::move(sql),
         [this, identity](std::vector<PgResult> results) {
             if (results.empty() || !results[0].ok()) {
                 app_.logger().error("[{}] SetChargePointConnected failed", identity);
@@ -747,7 +758,7 @@ void CSService::parse_json_pg(ocpp::CSChargingPoint& point, const ocpp::OcppMess
     auto identity = point.identity();
     auto unique_id = msg.unique_id;
 
-    pool_.execute(std::move(sql),
+    pool_->execute(std::move(sql),
         [this, identity, unique_id](std::vector<PgResult> results) {
             auto* point = point_manager_.find_by_identity(identity);
             if (!point) return;

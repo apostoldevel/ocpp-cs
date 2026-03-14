@@ -136,7 +136,7 @@ private:
 
     Application&                    app_;
 #ifdef WITH_POSTGRESQL
-    PgPool&                         pool_;
+    PgPool*                         pool_ {nullptr};
 #endif
     ocpp::CSChargingPointManager    point_manager_;
     WebhookConfig                   webhook_;

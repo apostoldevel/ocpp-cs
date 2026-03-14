@@ -2,7 +2,7 @@ FROM debian:bookworm-slim AS builder
 
 ARG PROJECT_NAME=cs
 ARG BUILD_MODE=release
-ARG WITH_POSTGRESQL=OFF
+ARG WITH_POSTGRESQL=ON
 
 LABEL project="${PROJECT_NAME}"
 
@@ -46,7 +46,7 @@ ENV PROJECT_NAME="${PROJECT_NAME}"
 
 RUN set -eux; \
     apt-get update && apt-get install -y --no-install-recommends \
-        bash ca-certificates locales && \
+        bash ca-certificates locales libpq5 && \
     sed -i 's/# en_US.UTF-8/en_US.UTF-8/' /etc/locale.gen && \
     locale-gen && \
     rm -rf /var/lib/apt/lists/*

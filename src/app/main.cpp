@@ -25,11 +25,13 @@ protected:
     void on_worker_start(EventLoop& loop) override
     {
 #ifdef WITH_POSTGRESQL
-        const auto& conninfo = settings().pg_conninfo_worker;
-        if (!conninfo.empty()) {
-            setup_db(loop, conninfo,
-                static_cast<std::size_t>(settings().pg_pool_min),
-                static_cast<std::size_t>(settings().pg_pool_max));
+        if (settings().pg_connect) {
+            const auto& conninfo = settings().pg_conninfo_worker;
+            if (!conninfo.empty()) {
+                setup_db(loop, conninfo,
+                    static_cast<std::size_t>(settings().pg_pool_min),
+                    static_cast<std::size_t>(settings().pg_pool_max));
+            }
         }
 #endif
         create_workers(*this);
