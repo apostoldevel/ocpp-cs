@@ -41,6 +41,15 @@ endif()
 
 add_subdirectory(src/lib/libapostol)
 
+# ─── JSON Schema Validator ──────────────────────────────────────────────────
+include(FetchContent)
+FetchContent_Declare(
+    nlohmann_json_schema_validator
+    GIT_REPOSITORY https://github.com/pboettch/json-schema-validator.git
+    GIT_TAG        2.3.0
+)
+FetchContent_MakeAvailable(nlohmann_json_schema_validator)
+
 target_compile_definitions(apostol PUBLIC
     APP_NAME="${APP_NAME}"
     APP_DESCRIPTION="${APP_DESCRIPTION}"
@@ -124,7 +133,7 @@ target_include_directories(apostol_modules
         ${CMAKE_BINARY_DIR}/include
 )
 
-target_link_libraries(apostol_modules ${MOD_SCOPE} apostol)
+target_link_libraries(apostol_modules ${MOD_SCOPE} apostol nlohmann_json_schema_validator)
 
 if(all_module_sources)
     add_dependencies(apostol_modules apostol_version)
@@ -190,6 +199,7 @@ install(DIRECTORY DESTINATION ${INSTALL_PATH}/cache)
 install(DIRECTORY conf/sites/ DESTINATION ${INSTALL_PATH}/sites)
 install(DIRECTORY conf/cp/    DESTINATION ${INSTALL_PATH}/cp)
 install(DIRECTORY www/        DESTINATION ${INSTALL_PATH}/www)
+install(DIRECTORY conf/schemas/ DESTINATION ${INSTALL_PATH}/schemas)
 
 if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/conf/default.json")
     install(FILES conf/default.json DESTINATION ${INSTALL_PATH} RENAME ${APP_NAME}.json)
