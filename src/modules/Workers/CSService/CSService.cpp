@@ -260,6 +260,15 @@ void CSService::on_ws_upgrade(EventLoop& loop, WsConnection ws, const HttpReques
     }
 
     point.set_protocol_type(ocpp::ProtocolType::JSON);
+
+    // Negotiate OCPP subprotocol
+    auto requested = req.header("Sec-WebSocket-Protocol");
+    std::string ocpp_version = "1.6";
+    if (!requested.empty() && requested.find("ocpp2.0.1") != std::string::npos) {
+        ocpp_version = "2.0.1";
+    }
+    point.set_ocpp_version(ocpp_version);
+
     point.set_address(get_host(req));
     point.set_connected_at(ocpp::CSChargingPoint::clock::now());
     point.touch();
@@ -272,7 +281,8 @@ void CSService::on_ws_upgrade(EventLoop& loop, WsConnection ws, const HttpReques
 
     point.set_ws_connection(ws_ptr);
 
-    app_.logger().notice("[{}] connected (fd={}, address={})", identity, fd, point.address());
+    app_.logger().notice("[{}] connected (fd={}, address={}, OCPP {})",
+        identity, fd, point.address(), point.ocpp_version());
 
 #ifdef WITH_POSTGRESQL
     // Notify database
@@ -325,7 +335,7 @@ void CSService::on_ws_message(ocpp::CSChargingPoint& point, const std::string& p
 
     if (msg.type == ocpp::MessageType::Call) {
         // Validate against JSON schema
-        auto err = schema_registry_.validate("1.6", msg.action, "Request", msg.payload);
+        auto err = schema_registry_.validate(point.ocpp_version(), msg.action, "Request", msg.payload);
         if (err) {
             app_.logger().warn("[{}] Schema validation failed for {}: {}",
                                point.identity(), msg.action, *err);
@@ -1098,7 +1108,8 @@ nlohmann::json CSService::charge_point_to_json(const ocpp::CSChargingPoint& poin
     json result = {
         {"identity", point.identity()},
         {"address",  point.address()},
-        {"protocol", point.protocol_type() == ocpp::ProtocolType::JSON ? "JSON" : "SOAP"}
+        {"protocol", point.protocol_type() == ocpp::ProtocolType::JSON ? "JSON" : "SOAP"},
+        {"ocppVersion", point.ocpp_version()}
     };
 
     if (point.connected() && point.ws_connection()) {
