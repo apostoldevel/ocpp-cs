@@ -4,7 +4,6 @@
 
 #include "apostol/custom_process.hpp"
 #include "apostol/ws_client.hpp"
-#include "ocpp/protocol.hpp"
 
 #include <memory>
 #include <string>
@@ -81,15 +80,6 @@ private:
         };
         std::unordered_map<std::string, ConfigValue> config_keys; // key→{value,readonly}
 
-        // Track pending outbound calls (uniqueId → action + deadline)
-        struct PendingCall {
-            std::string action;
-            std::chrono::system_clock::time_point deadline;
-            int connector_id = 0;   // for StartTransaction/StopTransaction/Authorize correlation
-            std::string id_tag;     // for Authorize/StartTransaction — needed in CallResult handler
-        };
-        std::unordered_map<std::string, PendingCall> pending_calls;
-
         // Per-connector state (parallel to connector_ids)
         std::vector<ConnectorState> connector_states;
 
@@ -103,32 +93,21 @@ private:
         std::chrono::system_clock::time_point next_meter_values{};
     };
 
-    // ── Action handler type ──────────────────────────────────────────────
-
-    using ActionHandler = std::function<nlohmann::json(
-        Station& station, const nlohmann::json& payload)>;
-
     // ── Setup ────────────────────────────────────────────────────────────
 
     void load_stations();
     void create_station(const std::string& dir_name);
-    void init_handlers();
+    void register_action_handlers(Station& station);
 
-    // ── OCPP message handling ────────────────────────────────────────────
+    // ── WebSocket callbacks ──────────────────────────────────────────────
 
     void on_ws_connect(Station& station);
-    void on_ws_message(Station& station, uint8_t opcode, std::string payload);
     void on_ws_close(Station& station, uint16_t code, std::string_view reason);
 
-    void send_call(Station& station, std::string_view action, nlohmann::json payload,
-                   int connector_id = 0, const std::string& id_tag = {});
-    void send_call_result(Station& station, std::string_view unique_id, nlohmann::json payload);
-    void send_call_error(Station& station, std::string_view unique_id,
-                         std::string_view code, std::string_view description);
+    // ── Helpers ──────────────────────────────────────────────────────────
 
-    void handle_call(Station& station, const ocpp::OcppMessage& msg);
-    void handle_call_result(Station& station, const ocpp::OcppMessage& msg);
-    void handle_call_error(Station& station, const ocpp::OcppMessage& msg);
+    void send_request(Station& station, std::string_view action, nlohmann::json payload,
+                      WsClient::ResponseHandler on_response = {});
 
     // ── Boot sequence ────────────────────────────────────────────────────
 
@@ -186,7 +165,6 @@ private:
     std::string  prefix_;  // resolved config prefix (e.g. /etc/cs/)
 
     std::vector<std::unique_ptr<Station>> stations_;
-    std::unordered_map<std::string, ActionHandler> handlers_;
 };
 
 } // namespace apostol

@@ -28,7 +28,6 @@ void CPEmulator::on_start(EventLoop& loop, Application& app)
     if (!prefix_.empty() && prefix_.back() != '/')
         prefix_ += '/';
 
-    init_handlers();
     load_stations();
 }
 
@@ -105,18 +104,6 @@ void CPEmulator::heartbeat(std::chrono::system_clock::time_point now)
             send_heartbeat(*station);
             station->next_heartbeat = now +
                 std::chrono::seconds(station->heartbeat_interval);
-        }
-
-        // ── Cleanup expired pending calls (30s timeout) ───────────────────
-
-        for (auto it = station->pending_calls.begin(); it != station->pending_calls.end(); ) {
-            if (now >= it->second.deadline) {
-                app_->logger().warn("[{}] pending call {} ({}) timed out",
-                    station->identity, it->first, it->second.action);
-                it = station->pending_calls.erase(it);
-            } else {
-                ++it;
-            }
         }
     }
 }
@@ -224,10 +211,6 @@ void CPEmulator::create_station(const std::string& dir_name)
         on_ws_connect(*st);
     });
 
-    station->ws->on_message([this, st](uint8_t opcode, std::string payload) {
-        on_ws_message(*st, opcode, std::move(payload));
-    });
-
     station->ws->on_close([this, st](uint16_t code, std::string_view reason) {
         on_ws_close(*st, code, reason);
     });
@@ -235,6 +218,9 @@ void CPEmulator::create_station(const std::string& dir_name)
     station->ws->on_error([this, st](std::string_view err) {
         app_->logger().error("[{}] WS error: {}", st->identity, err);
     });
+
+    // Register OCPP action handlers (CS→CP) via WsClient RPC layer
+    register_action_handlers(*station);
 
     // Build URL: ws://host/path/identity
     auto ws_url = url_it->second.value;
@@ -248,29 +234,46 @@ void CPEmulator::create_station(const std::string& dir_name)
     stations_.push_back(std::move(station));
 }
 
-// ── Handler initialization ───────────────────────────────────────────────────
+// ── Action handler registration (CS→CP) ─────────────────────────────────────
 
-void CPEmulator::init_handlers()
+void CPEmulator::register_action_handlers(Station& station)
 {
-    handlers_["CancelReservation"]      = [this](auto& s, auto& p) { return on_cancel_reservation(s, p); };
-    handlers_["ChangeAvailability"]     = [this](auto& s, auto& p) { return on_change_availability(s, p); };
-    handlers_["ChangeConfiguration"]    = [this](auto& s, auto& p) { return on_change_configuration(s, p); };
-    handlers_["ClearCache"]             = [this](auto& s, auto& p) { return on_clear_cache(s, p); };
-    handlers_["ClearChargingProfile"]   = [this](auto& s, auto& p) { return on_clear_charging_profile(s, p); };
-    handlers_["DataTransfer"]           = [this](auto& s, auto& p) { return on_data_transfer(s, p); };
-    handlers_["GetCompositeSchedule"]   = [this](auto& s, auto& p) { return on_get_composite_schedule(s, p); };
-    handlers_["GetConfiguration"]       = [this](auto& s, auto& p) { return on_get_configuration(s, p); };
-    handlers_["GetDiagnostics"]         = [this](auto& s, auto& p) { return on_get_diagnostics(s, p); };
-    handlers_["GetLocalListVersion"]    = [this](auto& s, auto& p) { return on_get_local_list_version(s, p); };
-    handlers_["RemoteStartTransaction"] = [this](auto& s, auto& p) { return on_remote_start_transaction(s, p); };
-    handlers_["RemoteStopTransaction"]  = [this](auto& s, auto& p) { return on_remote_stop_transaction(s, p); };
-    handlers_["ReserveNow"]             = [this](auto& s, auto& p) { return on_reserve_now(s, p); };
-    handlers_["Reset"]                  = [this](auto& s, auto& p) { return on_reset(s, p); };
-    handlers_["SendLocalList"]          = [this](auto& s, auto& p) { return on_send_local_list(s, p); };
-    handlers_["SetChargingProfile"]     = [this](auto& s, auto& p) { return on_set_charging_profile(s, p); };
-    handlers_["TriggerMessage"]         = [this](auto& s, auto& p) { return on_trigger_message(s, p); };
-    handlers_["UnlockConnector"]        = [this](auto& s, auto& p) { return on_unlock_connector(s, p); };
-    handlers_["UpdateFirmware"]         = [this](auto& s, auto& p) { return on_update_firmware(s, p); };
+    // Helper: wraps an on_* method into WsClient::ActionHandler.
+    // Catches exceptions and converts them to CallError responses.
+    auto reg = [this, &station](std::string_view action,
+                                nlohmann::json(CPEmulator::*fn)(Station&, const nlohmann::json&)) {
+        station.ws->on_action(action,
+            [this, &station, fn](WsClient&, const WsMessage& req, WsMessage& resp) {
+                try {
+                    resp.type = WsMessage::Type::Response;
+                    resp.payload = (this->*fn)(station, req.payload);
+                } catch (const std::exception& e) {
+                    resp.type = WsMessage::Type::Error;
+                    resp.error_code = "InternalError";
+                    resp.error_description = e.what();
+                }
+            });
+    };
+
+    reg("CancelReservation",      &CPEmulator::on_cancel_reservation);
+    reg("ChangeAvailability",     &CPEmulator::on_change_availability);
+    reg("ChangeConfiguration",    &CPEmulator::on_change_configuration);
+    reg("ClearCache",             &CPEmulator::on_clear_cache);
+    reg("ClearChargingProfile",   &CPEmulator::on_clear_charging_profile);
+    reg("DataTransfer",           &CPEmulator::on_data_transfer);
+    reg("GetCompositeSchedule",   &CPEmulator::on_get_composite_schedule);
+    reg("GetConfiguration",       &CPEmulator::on_get_configuration);
+    reg("GetDiagnostics",         &CPEmulator::on_get_diagnostics);
+    reg("GetLocalListVersion",    &CPEmulator::on_get_local_list_version);
+    reg("RemoteStartTransaction", &CPEmulator::on_remote_start_transaction);
+    reg("RemoteStopTransaction",  &CPEmulator::on_remote_stop_transaction);
+    reg("ReserveNow",             &CPEmulator::on_reserve_now);
+    reg("Reset",                  &CPEmulator::on_reset);
+    reg("SendLocalList",          &CPEmulator::on_send_local_list);
+    reg("SetChargingProfile",     &CPEmulator::on_set_charging_profile);
+    reg("TriggerMessage",         &CPEmulator::on_trigger_message);
+    reg("UnlockConnector",        &CPEmulator::on_unlock_connector);
+    reg("UpdateFirmware",         &CPEmulator::on_update_firmware);
 }
 
 // ── WebSocket callbacks ──────────────────────────────────────────────────────
@@ -282,219 +285,29 @@ void CPEmulator::on_ws_connect(Station& station)
     station.next_boot_retry = {};
 }
 
-void CPEmulator::on_ws_message(Station& station, uint8_t opcode, std::string payload)
-{
-    if (opcode != 0x01) // text only
-        return;
-
-    try {
-        auto msg = ocpp::parse_ocpp_json(payload);
-
-        app_->logger().debug("[{}] [{}] [{}] {}",
-            station.identity, msg.unique_id,
-            msg.action.empty() ? "Response" : msg.action,
-            msg.payload.dump());
-
-        switch (msg.type) {
-        case ocpp::MessageType::Call:
-            handle_call(station, msg);
-            break;
-        case ocpp::MessageType::CallResult:
-            handle_call_result(station, msg);
-            break;
-        case ocpp::MessageType::CallError:
-            handle_call_error(station, msg);
-            break;
-        }
-    } catch (const std::exception& e) {
-        app_->logger().error("[{}] parse error: {}", station.identity, e.what());
-    }
-}
-
 void CPEmulator::on_ws_close(Station& station, uint16_t code, std::string_view reason)
 {
     app_->logger().info("[{}] disconnected: {} {}", station.identity, code, reason);
     station.boot_status = BootStatus::not_sent;
     station.next_boot_retry = {};
     station.next_meter_values = {};
-    station.pending_calls.clear();
 
     // Reset all connectors on disconnect
     for (auto& conn : station.connector_states)
         conn.reset();
 }
 
-// ── OCPP message dispatch ────────────────────────────────────────────────────
+// ── Sending helper ───────────────────────────────────────────────────────────
 
-void CPEmulator::handle_call(Station& station, const ocpp::OcppMessage& msg)
+void CPEmulator::send_request(Station& station, std::string_view action,
+                               nlohmann::json payload, WsClient::ResponseHandler on_response)
 {
-    auto it = handlers_.find(msg.action);
-    if (it == handlers_.end()) {
-        send_call_error(station, msg.unique_id, ocpp::error::NotImplemented,
-                        fmt::format("Action '{}' not supported", msg.action));
-        return;
-    }
+    WsMessage msg;
+    msg.type    = WsMessage::Type::Request;
+    msg.action  = std::string(action);
+    msg.payload = std::move(payload);
 
-    try {
-        auto response_payload = it->second(station, msg.payload);
-        send_call_result(station, msg.unique_id, std::move(response_payload));
-    } catch (const std::exception& e) {
-        send_call_error(station, msg.unique_id, ocpp::error::InternalError, e.what());
-    }
-}
-
-void CPEmulator::handle_call_result(Station& station, const ocpp::OcppMessage& msg)
-{
-    auto it = station.pending_calls.find(msg.unique_id);
-    if (it == station.pending_calls.end()) {
-        app_->logger().warn("[{}] unexpected CallResult for id={}", station.identity, msg.unique_id);
-        return;
-    }
-
-    auto pending = std::move(it->second);
-    station.pending_calls.erase(it);
-
-    auto now = std::chrono::system_clock::now();
-
-    // ── BootNotification (OCPP 1.6 §4.2) ─────────────────────────────────
-    if (pending.action == "BootNotification") {
-        auto status = msg.payload.value("status", "Rejected");
-        auto interval = msg.payload.value("interval", 60);
-        app_->logger().info("[{}] BootNotification: status={} interval={}",
-                            station.identity, status, interval);
-        station.heartbeat_interval = interval;
-
-        if (status == "Accepted") {
-            station.boot_status = BootStatus::accepted;
-            station.next_heartbeat = now + std::chrono::seconds(interval);
-            // Send initial StatusNotification for whole CP (connectorId=0), then each connector
-            send_status_notification(station, 0);
-            for (auto& conn : station.connector_states)
-                send_status_notification(station, conn.connector_id, conn.status);
-        } else {
-            station.boot_status = (status == "Pending")
-                ? BootStatus::pending : BootStatus::rejected;
-            station.next_boot_retry = now + std::chrono::seconds(interval);
-            app_->logger().info("[{}] will retry BootNotification in {}s",
-                                station.identity, interval);
-        }
-        return;
-    }
-
-    // ── Authorize ─────────────────────────────────────────────────────────
-    if (pending.action == "Authorize") {
-        auto info = parse_id_tag_info(msg.payload);
-        update_auth_cache(station, pending.id_tag, info);
-
-        auto* conn = find_connector(station, pending.connector_id);
-        if (!conn) return;
-
-        if (info.status == "Accepted") {
-            continue_remote_start(station, *conn);
-        } else {
-            app_->logger().warn("[{}] Authorize rejected for {} on connector {}",
-                station.identity, pending.id_tag, conn->connector_id);
-            conn->status = "Faulted";
-            conn->status_updated = now;
-            send_status_notification(station, conn->connector_id, "Faulted");
-        }
-        return;
-    }
-
-    // ── StartTransaction ──────────────────────────────────────────────────
-    if (pending.action == "StartTransaction") {
-        auto* conn = find_connector(station, pending.connector_id);
-        if (!conn) return;
-
-        // Parse idTagInfo if present
-        IdTagInfo info;
-        bool has_id_tag_info = msg.payload.contains("idTagInfo");
-        if (has_id_tag_info) {
-            info = parse_id_tag_info(msg.payload);
-            update_auth_cache(station, pending.id_tag, info);
-        }
-
-        // Save transactionId
-        conn->transaction_id = msg.payload.value("transactionId", -1);
-
-        app_->logger().info("[{}] StartTransaction: transactionId={} connector={}",
-            station.identity, conn->transaction_id, conn->connector_id);
-
-        if (!has_id_tag_info || info.status == "Accepted") {
-            // Determine charging status from config or default "Charging"
-            std::string charge_status = "Charging";
-            auto cfg_it = station.config_keys.find("StartTransactionStatus");
-            if (cfg_it != station.config_keys.end() && !cfg_it->second.value.empty())
-                charge_status = cfg_it->second.value;
-
-            conn->status = charge_status;
-            conn->status_updated = now;
-            send_status_notification(station, conn->connector_id, charge_status);
-        } else {
-            // Authorization rejected — stop transaction immediately
-            app_->logger().warn("[{}] StartTransaction auth rejected: {}",
-                station.identity, info.status);
-            local_stop_transaction(station, *conn, info.status);
-        }
-        return;
-    }
-
-    // ── StopTransaction ───────────────────────────────────────────────────
-    if (pending.action == "StopTransaction") {
-        auto* conn = find_connector(station, pending.connector_id);
-        if (!conn) return;
-
-        if (msg.payload.contains("idTagInfo")) {
-            auto info = parse_id_tag_info(msg.payload);
-            update_auth_cache(station, pending.id_tag, info);
-        }
-
-        conn->status = "Finishing";
-        conn->status_updated = now;
-        send_status_notification(station, conn->connector_id, "Finishing");
-        return;
-    }
-}
-
-void CPEmulator::handle_call_error(Station& station, const ocpp::OcppMessage& msg)
-{
-    auto it = station.pending_calls.find(msg.unique_id);
-    std::string action = "unknown";
-    if (it != station.pending_calls.end()) {
-        action = std::move(it->second.action);
-        station.pending_calls.erase(it);
-    }
-
-    app_->logger().warn("[{}] CallError for {}: {} - {}",
-        station.identity, action, msg.error_code, msg.error_description);
-}
-
-// ── Sending helpers ──────────────────────────────────────────────────────────
-
-void CPEmulator::send_call(Station& station, std::string_view action, nlohmann::json payload,
-                            int connector_id, const std::string& id_tag)
-{
-    auto msg = ocpp::make_call(action, std::move(payload));
-    station.pending_calls[msg.unique_id] = Station::PendingCall{
-        .action       = std::string(action),
-        .deadline     = std::chrono::system_clock::now() + std::chrono::seconds(30),
-        .connector_id = connector_id,
-        .id_tag       = id_tag
-    };
-    station.ws->send_text(ocpp::serialize_ocpp_json(msg));
-}
-
-void CPEmulator::send_call_result(Station& station, std::string_view unique_id, nlohmann::json payload)
-{
-    auto msg = ocpp::make_call_result(unique_id, std::move(payload));
-    station.ws->send_text(ocpp::serialize_ocpp_json(msg));
-}
-
-void CPEmulator::send_call_error(Station& station, std::string_view unique_id,
-                                  std::string_view code, std::string_view description)
-{
-    auto msg = ocpp::make_call_error(unique_id, code, description);
-    station.ws->send_text(ocpp::serialize_ocpp_json(msg));
+    station.ws->send(msg, std::move(on_response));
 }
 
 // ── Boot sequence ────────────────────────────────────────────────────────────
@@ -524,7 +337,38 @@ void CPEmulator::send_boot_notification(Station& station)
     }
 
     app_->logger().info("[{}] sending BootNotification", station.identity);
-    send_call(station, "BootNotification", std::move(payload));
+
+    send_request(station, "BootNotification", std::move(payload),
+        [this, &station](const WsMessage& resp) {
+            if (resp.type == WsMessage::Type::Error) {
+                app_->logger().warn("[{}] BootNotification error: {} - {}",
+                    station.identity, resp.error_code, resp.error_description);
+                return;
+            }
+
+            auto status = resp.payload.value("status", "Rejected");
+            auto interval = resp.payload.value("interval", 60);
+            auto now = std::chrono::system_clock::now();
+
+            app_->logger().info("[{}] BootNotification: status={} interval={}",
+                                station.identity, status, interval);
+            station.heartbeat_interval = interval;
+
+            if (status == "Accepted") {
+                station.boot_status = BootStatus::accepted;
+                station.next_heartbeat = now + std::chrono::seconds(interval);
+                // Send initial StatusNotification for whole CP (connectorId=0), then each connector
+                send_status_notification(station, 0);
+                for (auto& conn : station.connector_states)
+                    send_status_notification(station, conn.connector_id, conn.status);
+            } else {
+                station.boot_status = (status == "Pending")
+                    ? BootStatus::pending : BootStatus::rejected;
+                station.next_boot_retry = now + std::chrono::seconds(interval);
+                app_->logger().info("[{}] will retry BootNotification in {}s",
+                                    station.identity, interval);
+            }
+        });
 }
 
 void CPEmulator::send_status_notification(Station& station, int connector_id)
@@ -540,7 +384,7 @@ void CPEmulator::send_status_notification(Station& station, int connector_id)
 
 void CPEmulator::send_heartbeat(Station& station)
 {
-    send_call(station, "Heartbeat", nlohmann::json::object());
+    send_request(station, "Heartbeat", nlohmann::json::object());
 }
 
 // ── Response file loading ────────────────────────────────────────────────────
@@ -671,7 +515,7 @@ void CPEmulator::update_auth_cache(Station& station, const std::string& id_tag, 
 
 void CPEmulator::send_status_notification(Station& station, int connector_id, const std::string& status)
 {
-    send_call(station, "StatusNotification", {
+    send_request(station, "StatusNotification", {
         {"connectorId", connector_id},
         {"errorCode", "NoError"},
         {"status", status},
@@ -701,8 +545,53 @@ void CPEmulator::send_start_transaction(Station& station, ConnectorState& conn)
     if (conn.reservation_id >= 0)
         payload["reservationId"] = conn.reservation_id;
 
-    send_call(station, "StartTransaction", std::move(payload),
-              conn.connector_id, conn.id_tag);
+    int cid = conn.connector_id;
+    std::string id_tag = conn.id_tag;
+
+    send_request(station, "StartTransaction", std::move(payload),
+        [this, &station, cid, id_tag](const WsMessage& resp) {
+            if (resp.type == WsMessage::Type::Error) {
+                app_->logger().warn("[{}] StartTransaction error: {} - {}",
+                    station.identity, resp.error_code, resp.error_description);
+                return;
+            }
+
+            auto* conn = find_connector(station, cid);
+            if (!conn) return;
+
+            auto now = std::chrono::system_clock::now();
+
+            // Parse idTagInfo if present
+            IdTagInfo info;
+            bool has_id_tag_info = resp.payload.contains("idTagInfo");
+            if (has_id_tag_info) {
+                info = parse_id_tag_info(resp.payload);
+                update_auth_cache(station, id_tag, info);
+            }
+
+            // Save transactionId
+            conn->transaction_id = resp.payload.value("transactionId", -1);
+
+            app_->logger().info("[{}] StartTransaction: transactionId={} connector={}",
+                station.identity, conn->transaction_id, conn->connector_id);
+
+            if (!has_id_tag_info || info.status == "Accepted") {
+                // Determine charging status from config or default "Charging"
+                std::string charge_status = "Charging";
+                auto cfg_it = station.config_keys.find("StartTransactionStatus");
+                if (cfg_it != station.config_keys.end() && !cfg_it->second.value.empty())
+                    charge_status = cfg_it->second.value;
+
+                conn->status = charge_status;
+                conn->status_updated = now;
+                send_status_notification(station, conn->connector_id, charge_status);
+            } else {
+                // Authorization rejected — stop transaction immediately
+                app_->logger().warn("[{}] StartTransaction auth rejected: {}",
+                    station.identity, info.status);
+                local_stop_transaction(station, *conn, info.status);
+            }
+        });
 }
 
 void CPEmulator::local_stop_transaction(Station& station, ConnectorState& conn, const std::string& reason)
@@ -717,8 +606,29 @@ void CPEmulator::local_stop_transaction(Station& station, ConnectorState& conn, 
     if (!reason.empty())
         payload["reason"] = reason;
 
-    send_call(station, "StopTransaction", std::move(payload),
-              conn.connector_id, conn.id_tag);
+    int cid = conn.connector_id;
+    std::string id_tag = conn.id_tag;
+
+    send_request(station, "StopTransaction", std::move(payload),
+        [this, &station, cid, id_tag](const WsMessage& resp) {
+            if (resp.type == WsMessage::Type::Error) {
+                app_->logger().warn("[{}] StopTransaction error: {} - {}",
+                    station.identity, resp.error_code, resp.error_description);
+                return;
+            }
+
+            auto* conn = find_connector(station, cid);
+            if (!conn) return;
+
+            if (resp.payload.contains("idTagInfo")) {
+                auto info = parse_id_tag_info(resp.payload);
+                update_auth_cache(station, id_tag, info);
+            }
+
+            conn->status = "Finishing";
+            conn->status_updated = std::chrono::system_clock::now();
+            send_status_notification(station, conn->connector_id, "Finishing");
+        });
 
     conn.transaction_id = -1;
 }
@@ -740,7 +650,7 @@ void CPEmulator::send_meter_values(Station& station, ConnectorState& conn)
     if (conn.transaction_id > 0)
         payload["transactionId"] = conn.transaction_id;
 
-    send_call(station, "MeterValues", std::move(payload));
+    send_request(station, "MeterValues", std::move(payload));
 }
 
 // ── CS→CP Action handlers ────────────────────────────────────────────────────
@@ -820,7 +730,7 @@ nlohmann::json CPEmulator::on_data_transfer(Station& station, const nlohmann::js
                 if (data.contains("connectorId") && data.contains("status")) {
                     int connector_id = data["connectorId"].get<int>();
                     auto status = data["status"].get<std::string>();
-                    send_call(station, "StatusNotification", {
+                    send_request(station, "StatusNotification", {
                         {"connectorId", connector_id},
                         {"errorCode", "NoError"},
                         {"status", status}
@@ -915,8 +825,33 @@ nlohmann::json CPEmulator::on_remote_start_transaction(Station& station, const n
         continue_remote_start(station, *conn);
     } else if (info.status == "Invalid") {
         // Not in cache, need to ask CS
-        send_call(station, "Authorize", {{"idTag", id_tag}},
-                  conn->connector_id, id_tag);
+        int cid = conn->connector_id;
+
+        send_request(station, "Authorize", {{"idTag", id_tag}},
+            [this, &station, cid, id_tag](const WsMessage& resp) {
+                if (resp.type == WsMessage::Type::Error) {
+                    app_->logger().warn("[{}] Authorize error: {} - {}",
+                        station.identity, resp.error_code, resp.error_description);
+                    return;
+                }
+
+                auto info = parse_id_tag_info(resp.payload);
+                update_auth_cache(station, id_tag, info);
+
+                auto* conn = find_connector(station, cid);
+                if (!conn) return;
+
+                if (info.status == "Accepted") {
+                    continue_remote_start(station, *conn);
+                } else {
+                    auto now = std::chrono::system_clock::now();
+                    app_->logger().warn("[{}] Authorize rejected for {} on connector {}",
+                        station.identity, id_tag, conn->connector_id);
+                    conn->status = "Faulted";
+                    conn->status_updated = now;
+                    send_status_notification(station, conn->connector_id, "Faulted");
+                }
+            });
     } else {
         // Blocked/Expired/ConcurrentTx — reject
         return {{"status", "Rejected"}};
@@ -1028,9 +963,9 @@ nlohmann::json CPEmulator::on_trigger_message(Station& station, const nlohmann::
     } else if (requested == "StatusNotification") {
         send_status_notification(station, connector_id);
     } else if (requested == "DiagnosticsStatusNotification") {
-        send_call(station, "DiagnosticsStatusNotification", {{"status", "Idle"}});
+        send_request(station, "DiagnosticsStatusNotification", {{"status", "Idle"}});
     } else if (requested == "FirmwareStatusNotification") {
-        send_call(station, "FirmwareStatusNotification", {{"status", "Idle"}});
+        send_request(station, "FirmwareStatusNotification", {{"status", "Idle"}});
     } else if (requested == "MeterValues") {
         // Send real MeterValues for specified connector or first charging one
         ConnectorState* target = nullptr;
