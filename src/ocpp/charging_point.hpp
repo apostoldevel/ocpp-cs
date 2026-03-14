@@ -42,6 +42,9 @@ public:
     const std::string& address() const { return address_; }
     void set_address(std::string addr) { address_ = std::move(addr); }
 
+    const std::string& ocpp_version() const { return ocpp_version_; }
+    void set_ocpp_version(std::string version) { ocpp_version_ = std::move(version); }
+
     // ── Connection state ────────────────────────────────────────────────
 
     ProtocolType protocol_type() const { return protocol_type_; }
@@ -91,6 +94,7 @@ public:
 private:
     std::string identity_;
     std::string address_;
+    std::string ocpp_version_ = "1.6";
     ProtocolType protocol_type_ = ProtocolType::JSON;
 
     apostol::WsConnection* ws_conn_ = nullptr;
