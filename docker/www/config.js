@@ -23,9 +23,9 @@ var appConfig = {
   ocppApiPath: "/api/v1",
   ocppApiClientId: "web-ocpp-css.com",
 
-  apiTokenUrl: "/oauth2/token",
-  apiDomain: "http://localhost:4977",
-  wsDomain: "ws://localhost:4977",
+  apiTokenUrl: "",
+  apiDomain: "http://localhost:9220",
+  wsDomain: "ws://localhost:9220",
   apiPath: "/api/v1",
   apiClientId: "web-ocpp-css.com",
 
