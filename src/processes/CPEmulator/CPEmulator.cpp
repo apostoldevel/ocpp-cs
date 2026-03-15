@@ -1828,19 +1828,19 @@ nlohmann::json CPEmulator::on_clear_cache_201(Station& station, const nlohmann::
 
 nlohmann::json CPEmulator::on_get_transaction_status(Station& station, const nlohmann::json& payload)
 {
-    bool in_progress = false;
+    nlohmann::json result = {{"messagesInQueue", false}};
 
     if (payload.contains("transactionId")) {
         auto tx_id = payload["transactionId"].get<std::string>();
         for (auto& evse : station.evses) {
             if (evse.transaction_id == tx_id) {
-                in_progress = true;
+                result["ongoingIndicator"] = true;
                 break;
             }
         }
     }
 
-    return {{"messagesInQueue", in_progress}};
+    return result;
 }
 
 // ── OCPP 2.0.1 Phase 2 — Local Auth List ───────────────────────────────────
