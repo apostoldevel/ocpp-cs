@@ -1759,9 +1759,20 @@ void CPEmulator::send_notify_report(Station& station, int request_id,
 nlohmann::json CPEmulator::on_unlock_connector_201(Station& station, const nlohmann::json& payload)
 {
     int evse_id = payload.value("evseId", 0);
+    int connector_id = payload.value("connectorId", 0);
 
     auto* evse = find_evse(station, evse_id);
     if (!evse)
+        return {{"status", "UnknownConnector"}};
+
+    bool connector_found = false;
+    for (auto& c : evse->connectors) {
+        if (c.connector_id == connector_id) {
+            connector_found = true;
+            break;
+        }
+    }
+    if (!connector_found)
         return {{"status", "UnknownConnector"}};
 
     if (!evse->transaction_id.empty()) {
