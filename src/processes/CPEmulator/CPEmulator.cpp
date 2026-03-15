@@ -643,8 +643,15 @@ void CPEmulator::send_transaction_event(Station& station, EvseState& evse,
 
     // Add stoppedReason for Ended
     if (event_type == "Ended") {
-        payload["transactionInfo"]["stoppedReason"] =
-            (trigger_reason == "RemoteStop") ? "Remote" : "Local";
+        auto stopped_reason = [&trigger_reason]() -> std::string {
+            if (trigger_reason == "RemoteStop")    return "Remote";
+            if (trigger_reason == "ResetCommand")  return "ImmediateReset";
+            if (trigger_reason == "UnlockCommand") return "EVDisconnected";
+            if (trigger_reason == "DeAuthorized")  return "DeAuthorized";
+            if (trigger_reason == "Local")         return "Local";
+            return "Other";
+        }();
+        payload["transactionInfo"]["stoppedReason"] = stopped_reason;
     }
 
     WsClient::ResponseHandler handler;
