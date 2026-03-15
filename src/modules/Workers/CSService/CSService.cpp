@@ -792,16 +792,14 @@ void CSService::do_charge_point(const HttpRequest& req, HttpResponse& resp,
             {"RemoteStopTransaction",  "RequestStopTransaction"},
         };
 
-        // 2.0.1 operations with required fields
-        using Fields = std::vector<std::string_view>;
-        static const std::unordered_map<std::string_view, Fields> operations_201 = {
-            {"RequestStartTransaction", {"idToken"}},
-            {"RequestStopTransaction",  {"transactionId"}},
-            {"Reset",                   {"type"}},
-            {"SetVariables",            {"setVariableData"}},
-            {"GetVariables",            {"getVariableData"}},
-            {"ChangeAvailability",      {"operationalStatus"}},
-            {"DataTransfer",            {"vendorId"}},
+        // Supported 2.0.1 operations
+        static const std::unordered_set<std::string_view> operations_201 = {
+            "RequestStartTransaction", "RequestStopTransaction",
+            "Reset", "SetVariables", "GetVariables",
+            "ChangeAvailability", "DataTransfer",
+            "GetBaseReport", "GetReport", "UnlockConnector",
+            "TriggerMessage", "ClearCache", "GetTransactionStatus",
+            "SendLocalList", "GetLocalListVersion",
         };
 
         // Translate 1.6 name if needed
@@ -810,8 +808,7 @@ void CSService::do_charge_point(const HttpRequest& req, HttpResponse& resp,
         if (tr_it != translate_16_to_201.end())
             actual_op = std::string(tr_it->second);
 
-        auto op_it = operations_201.find(actual_op);
-        if (op_it == operations_201.end()) {
+        if (!operations_201.contains(actual_op)) {
             reply_error(resp, HttpStatus::bad_request,
                 fmt::format("Unknown 2.0.1 operation: '{}' (station {} uses OCPP 2.0.1)",
                             operation, identity));
@@ -820,13 +817,13 @@ void CSService::do_charge_point(const HttpRequest& req, HttpResponse& resp,
 
         auto body = content_to_json(req);
 
-        // Validate required fields
-        for (auto field : op_it->second) {
-            if (!body.contains(field)) {
-                reply_error(resp, HttpStatus::bad_request,
-                    fmt::format("Missing required field '{}' for {}", field, actual_op));
-                return;
-            }
+        // Translate payload fields for cross-version compatibility
+        body = translate_payload(actual_op, body, "2.0.1");
+
+        // Schema validation (best-effort: passes through if no schema found)
+        if (auto err = schema_registry_.validate("2.0.1", actual_op, "Request", body)) {
+            reply_error(resp, HttpStatus::bad_request, *err);
+            return;
         }
 
         // Send via WebSocket
@@ -853,32 +850,17 @@ void CSService::do_charge_point(const HttpRequest& req, HttpResponse& resp,
         return;
     }
 
-    // OCPP 1.6 CS→CP operations: name → required fields (per spec §5/§6)
-    using Fields = std::vector<std::string_view>;
-    static const std::unordered_map<std::string_view, Fields> allowed_operations = {
-        {"CancelReservation",    {"reservationId"}},
-        {"ChangeAvailability",   {"connectorId", "type"}},
-        {"ChangeConfiguration",  {"key", "value"}},
-        {"ClearCache",           {}},
-        {"ClearChargingProfile", {}},
-        {"DataTransfer",         {"vendorId"}},
-        {"GetCompositeSchedule", {"connectorId", "duration"}},
-        {"GetConfiguration",     {}},
-        {"GetDiagnostics",       {"location"}},
-        {"GetLocalListVersion",  {}},
-        {"RemoteStartTransaction", {"idTag"}},
-        {"RemoteStopTransaction",  {"transactionId"}},
-        {"ReserveNow",           {"connectorId", "expiryDate", "idTag", "reservationId"}},
-        {"Reset",                {"type"}},
-        {"SendLocalList",        {"listVersion", "updateType"}},
-        {"SetChargingProfile",   {"connectorId", "csChargingProfiles"}},
-        {"TriggerMessage",       {"requestedMessage"}},
-        {"UnlockConnector",      {"connectorId"}},
-        {"UpdateFirmware",       {"location", "retrieveDate"}},
+    // OCPP 1.6 CS→CP allowed operations (whitelist)
+    static const std::unordered_set<std::string_view> allowed_operations = {
+        "CancelReservation", "ChangeAvailability", "ChangeConfiguration",
+        "ClearCache", "ClearChargingProfile", "DataTransfer",
+        "GetCompositeSchedule", "GetConfiguration", "GetDiagnostics",
+        "GetLocalListVersion", "RemoteStartTransaction", "RemoteStopTransaction",
+        "ReserveNow", "Reset", "SendLocalList", "SetChargingProfile",
+        "TriggerMessage", "UnlockConnector", "UpdateFirmware",
     };
 
-    auto op_it = allowed_operations.find(operation);
-    if (op_it == allowed_operations.end()) {
+    if (!allowed_operations.contains(operation)) {
         reply_error(resp, HttpStatus::bad_request,
             fmt::format("Unknown operation: '{}'", operation));
         return;
@@ -886,13 +868,13 @@ void CSService::do_charge_point(const HttpRequest& req, HttpResponse& resp,
 
     auto body = content_to_json(req);
 
-    // Validate required fields
-    for (auto field : op_it->second) {
-        if (!body.contains(field)) {
-            reply_error(resp, HttpStatus::bad_request,
-                fmt::format("Missing required field '{}' for {}", field, operation));
-            return;
-        }
+    // Translate payload fields for cross-version compatibility
+    body = translate_payload(operation, body, "1.6");
+
+    // Schema validation (best-effort: passes through if no schema found)
+    if (auto err = schema_registry_.validate("1.6", operation, "Request", body)) {
+        reply_error(resp, HttpStatus::bad_request, *err);
+        return;
     }
 
     if (point->protocol_type() == ocpp::ProtocolType::JSON) {
