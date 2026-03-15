@@ -1566,22 +1566,28 @@ nlohmann::json CPEmulator::on_set_variables(Station& station, const nlohmann::js
         for (const auto& item : payload["setVariableData"]) {
             auto component = item.value("component", nlohmann::json::object());
             auto variable = item.value("variable", nlohmann::json::object());
-            auto value = item.value("attributeValue", "");
+            auto comp_name = component.value("name", "");
             auto var_name = variable.value("name", "");
+            int evse_id = 0;
+            if (component.contains("evse"))
+                evse_id = component["evse"].value("id", 0);
 
-            auto it = station.config_keys.find(var_name);
-            if (it != station.config_keys.end()) {
-                if (it->second.readonly) {
-                    results.push_back({{"attributeStatus", "Rejected"},
-                                       {"component", component}, {"variable", variable}});
-                } else {
-                    it->second.value = value;
-                    results.push_back({{"attributeStatus", "Accepted"},
-                                       {"component", component}, {"variable", variable}});
-                }
-            } else {
+            auto* var = find_device_model_var(station, comp_name, var_name, evse_id);
+            if (!var) {
                 results.push_back({{"attributeStatus", "UnknownVariable"},
                                    {"component", component}, {"variable", variable}});
+            } else if (var->readonly) {
+                results.push_back({{"attributeStatus", "Rejected"},
+                                   {"component", component}, {"variable", variable}});
+            } else {
+                var->value = item.value("attributeValue", "");
+                results.push_back({{"attributeStatus", "Accepted"},
+                                   {"component", component}, {"variable", variable}});
+
+                // Sync runtime state
+                if (comp_name == "OCPPCommCtrl" && var_name == "HeartbeatInterval") {
+                    try { station.heartbeat_interval = std::stoi(var->value); } catch (...) {}
+                }
             }
         }
     }
@@ -1597,13 +1603,17 @@ nlohmann::json CPEmulator::on_get_variables(Station& station, const nlohmann::js
         for (const auto& item : payload["getVariableData"]) {
             auto component = item.value("component", nlohmann::json::object());
             auto variable = item.value("variable", nlohmann::json::object());
+            auto comp_name = component.value("name", "");
             auto var_name = variable.value("name", "");
+            int evse_id = 0;
+            if (component.contains("evse"))
+                evse_id = component["evse"].value("id", 0);
 
-            auto it = station.config_keys.find(var_name);
-            if (it != station.config_keys.end()) {
+            auto* var = find_device_model_var(station, comp_name, var_name, evse_id);
+            if (var) {
                 results.push_back({{"attributeStatus", "Accepted"},
                                    {"component", component}, {"variable", variable},
-                                   {"attributeValue", it->second.value}});
+                                   {"attributeValue", var->value}});
             } else {
                 results.push_back({{"attributeStatus", "UnknownVariable"},
                                    {"component", component}, {"variable", variable}});
