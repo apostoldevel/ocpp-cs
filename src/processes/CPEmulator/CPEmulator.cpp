@@ -1773,6 +1773,11 @@ void CPEmulator::send_notify_report(Station& station, int request_id,
             })}
         };
 
+        entry["variableCharacteristics"] = {
+            {"dataType", v.data_type},
+            {"supportsMonitoring", false}
+        };
+
         if (v.evse_id > 0)
             entry["component"]["evse"] = {{"id", v.evse_id}};
 
