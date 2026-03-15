@@ -1,0 +1,20 @@
+{
+  "title": "TriggerMessageRequest",
+  "type": "object",
+  "required": ["requestedMessage"],
+  "properties": {
+    "requestedMessage": {
+      "type": "string",
+      "enum": ["BootNotification", "FirmwareStatusNotification", "Heartbeat", "MeterValues", "StatusNotification", "TransactionEvent"],
+      "description": "Message type to trigger"
+    },
+    "evse": {
+      "type": "object",
+      "description": "Target EVSE (optional)",
+      "properties": {
+        "id": { "type": "integer" },
+        "connectorId": { "type": "integer" }
+      }
+    }
+  }
+}

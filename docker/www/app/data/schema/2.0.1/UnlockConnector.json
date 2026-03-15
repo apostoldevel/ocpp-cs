@@ -1,0 +1,15 @@
+{
+  "title": "UnlockConnectorRequest",
+  "type": "object",
+  "required": ["evseId", "connectorId"],
+  "properties": {
+    "evseId": {
+      "type": "integer",
+      "description": "EVSE ID"
+    },
+    "connectorId": {
+      "type": "integer",
+      "description": "Connector ID within EVSE"
+    }
+  }
+}

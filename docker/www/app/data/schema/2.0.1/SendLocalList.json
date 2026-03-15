@@ -1,0 +1,45 @@
+{
+  "title": "SendLocalListRequest",
+  "type": "object",
+  "required": ["versionNumber", "updateType"],
+  "properties": {
+    "versionNumber": {
+      "type": "integer",
+      "description": "New list version number"
+    },
+    "updateType": {
+      "type": "string",
+      "enum": ["Differential", "Full"],
+      "description": "Full = replace entire list, Differential = merge"
+    },
+    "localAuthorizationList": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["idToken"],
+        "properties": {
+          "idToken": {
+            "type": "object",
+            "required": ["idToken", "type"],
+            "properties": {
+              "idToken": { "type": "string" },
+              "type": {
+                "type": "string",
+                "enum": ["Central", "eMAID", "ISO14443", "ISO15693", "KeyCode", "Local", "MacAddress", "NoAuthorization"]
+              }
+            }
+          },
+          "idTokenInfo": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": ["Accepted", "Blocked", "ConcurrentTx", "Expired", "Invalid", "NoCredit", "NotAllowedTypeEVSE", "NotAtThisLocation", "NotAtThisTime", "Unknown"]
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

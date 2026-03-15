@@ -1,0 +1,16 @@
+{
+  "title": "GetBaseReportRequest",
+  "type": "object",
+  "required": ["requestId", "reportBase"],
+  "properties": {
+    "requestId": {
+      "type": "integer",
+      "description": "Unique request ID to correlate with NotifyReport"
+    },
+    "reportBase": {
+      "type": "string",
+      "enum": ["ConfigurationInventory", "FullInventory", "SummaryInventory"],
+      "description": "Type of inventory to report"
+    }
+  }
+}

@@ -44,6 +44,20 @@ export const OCPP_201_PROFILES = {
     { name: 'SetVariables', description: 'Set device model variables' },
     { name: 'GetVariables', description: 'Read device model variables' },
   ],
+  Provisioning: [
+    { name: 'GetBaseReport', description: 'Request full Device Model inventory' },
+    { name: 'GetReport', description: 'Request filtered Device Model variables' },
+  ],
+  Availability: [
+    { name: 'UnlockConnector', description: 'Unlock cable retention lock' },
+    { name: 'TriggerMessage', description: 'Request station to send a message' },
+    { name: 'ClearCache', description: 'Clear authorization cache' },
+    { name: 'GetTransactionStatus', description: 'Check transaction message sequence status' },
+  ],
+  LocalAuthList: [
+    { name: 'SendLocalList', description: 'Push authorization list to station' },
+    { name: 'GetLocalListVersion', description: 'Query local auth list version' },
+  ],
 }
 
 const schemaCache = {}
