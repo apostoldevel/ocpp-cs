@@ -1067,6 +1067,19 @@ void CSService::handle_action_201(ocpp::CSChargingPoint& point, const ocpp::Ocpp
         response = json::object();
     } else if (msg.action == "DataTransfer") {
         response = {{"status", "Accepted"}};
+    } else if (msg.action == "NotifyReport") {
+        if (msg.payload.contains("reportData")) {
+            auto& data = msg.payload["reportData"];
+            app_.logger().info("[{}] NotifyReport: requestId={}, seqNo={}, {} variables, tbc={}",
+                point.identity(),
+                msg.payload.value("requestId", 0),
+                msg.payload.value("seqNo", 0),
+                data.size(),
+                msg.payload.value("tbc", false));
+        }
+        response = json::object();
+    } else if (msg.action == "FirmwareStatusNotification") {
+        response = json::object();
     } else {
         auto error = ocpp::make_call_error(msg.unique_id, ocpp::error::NotImplemented,
             fmt::format("Action '{}' not implemented for OCPP 2.0.1", msg.action));
