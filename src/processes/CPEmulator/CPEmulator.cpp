@@ -272,22 +272,22 @@ void CPEmulator::create_station(const std::string& dir_name)
         // Initialize minimal Device Model
         auto& dm = station->device_model;
         dm.push_back({"ChargingStation", "Vendor",
-                      station->config.value("ChargePointVendor", "Emulator"), true, "ReadOnly"});
+                      station->config.value("ChargePointVendor", "Emulator"), true, "ReadOnly", 0, "string"});
         dm.push_back({"ChargingStation", "Model",
-                      station->config.value("ChargePointModel", "Virtual-201"), true, "ReadOnly"});
+                      station->config.value("ChargePointModel", "Virtual-201"), true, "ReadOnly", 0, "string"});
         dm.push_back({"ChargingStation", "SerialNumber",
-                      station->config.value("ChargePointSerialNumber", "EM-201-001"), true, "ReadOnly"});
+                      station->config.value("ChargePointSerialNumber", "EM-201-001"), true, "ReadOnly", 0, "string"});
         dm.push_back({"ChargingStation", "FirmwareVersion",
-                      station->config.value("ChargePointSoftwareVersion", "2.0.0"), true, "ReadOnly"});
+                      station->config.value("ChargePointSoftwareVersion", "2.0.0"), true, "ReadOnly", 0, "string"});
         dm.push_back({"OCPPCommCtrl", "HeartbeatInterval",
-                      std::to_string(station->heartbeat_interval), false, "ReadWrite"});
+                      std::to_string(station->heartbeat_interval), false, "ReadWrite", 0, "integer"});
         dm.push_back({"OCPPCommCtrl", "NetworkProfileUri",
-                      station->config.value("CentralSystemURL", ""), true, "ReadOnly"});
-        dm.push_back({"AuthCtrl", "LocalAuthListEnabled", "true", false, "ReadWrite"});
-        dm.push_back({"AuthCtrl", "AuthCacheEnabled", "true", false, "ReadWrite"});
+                      station->config.value("CentralSystemURL", ""), true, "ReadOnly", 0, "string"});
+        dm.push_back({"AuthCtrl", "LocalAuthListEnabled", "true", false, "ReadWrite", 0, "boolean"});
+        dm.push_back({"AuthCtrl", "AuthCacheEnabled", "true", false, "ReadWrite", 0, "boolean"});
         for (auto& evse : station->evses) {
-            dm.push_back({"EVSE", "Power", "22000", true, "ReadOnly", evse.evse_id});
-            dm.push_back({"EVSE", "AvailabilityState", evse.status, true, "ReadOnly", evse.evse_id});
+            dm.push_back({"EVSE", "Power", "22000", true, "ReadOnly", evse.evse_id, "integer"});
+            dm.push_back({"EVSE", "AvailabilityState", evse.status, true, "ReadOnly", evse.evse_id, "string"});
         }
     } else {
         // Initialize per-connector state (1.6)
@@ -697,6 +697,17 @@ CPEmulator::EvseState* CPEmulator::find_evse(Station& station, int evse_id)
 {
     for (auto& evse : station.evses)
         if (evse.evse_id == evse_id) return &evse;
+    return nullptr;
+}
+
+CPEmulator::ReportVariable* CPEmulator::find_device_model_var(
+    Station& station, const std::string& component,
+    const std::string& variable, int evse_id)
+{
+    for (auto& v : station.device_model) {
+        if (v.component == component && v.variable == variable && v.evse_id == evse_id)
+            return &v;
+    }
     return nullptr;
 }
 
