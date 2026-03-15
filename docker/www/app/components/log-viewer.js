@@ -69,8 +69,13 @@ export const LogViewer = {
     }
 
     function clearLog() {
-      if (props.entries === state.logEntries) {
-        state.logEntries.splice(0)
+      // Remove displayed entries from global log
+      const toRemove = new Set(props.entries.map(e => e.uniqueId + e.direction + e.ts))
+      for (let i = state.logEntries.length - 1; i >= 0; i--) {
+        const e = state.logEntries[i]
+        if (toRemove.has(e.uniqueId + e.direction + e.ts)) {
+          state.logEntries.splice(i, 1)
+        }
       }
       emit('clear')
     }

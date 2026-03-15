@@ -1123,13 +1123,20 @@ void CSService::webhook_json(ocpp::CSChargingPoint& point, const ocpp::OcppMessa
         fetch_client_ = std::make_unique<FetchClient>(app_.worker_loop());
     }
 
-    fetch_client_->post(webhook_.url, webhook_payload.dump(), headers,
+    auto body = webhook_payload.dump();
+
+    app_.logger().debug("[{}] webhook POST {} (action: {}, auth: {})",
+        identity, webhook_.url, msg.action,
+        webhook_.auth_scheme.empty() ? "none" : webhook_.auth_scheme);
+
+    fetch_client_->post(webhook_.url, body, headers,
         [this, identity, unique_id](FetchResponse fetch_resp) {
             auto* point = point_manager_.find_by_identity(identity);
             if (!point) return;
 
             if (fetch_resp.status_code < 200 || fetch_resp.status_code >= 300) {
-                app_.logger().error("[{}] webhook error: HTTP {}", identity, fetch_resp.status_code);
+                app_.logger().error("[{}] webhook error: HTTP {}: {}", identity,
+                    fetch_resp.status_code, fetch_resp.body);
                 auto error = ocpp::make_call_error(unique_id,
                     ocpp::error::InternalError, "Webhook error");
                 send_json_response(*point, error);
@@ -1140,15 +1147,24 @@ void CSService::webhook_json(ocpp::CSChargingPoint& point, const ocpp::OcppMessa
                 auto resp_json = json::parse(fetch_resp.body);
 
                 ocpp::OcppMessage response;
-                int type_id = resp_json.value("messageTypeId", 3);
-
                 response.unique_id = resp_json.value("uniqueId", unique_id);
 
-                if (type_id == 4) {
+                // messageTypeId can be int (3/4) or string ("CallResult"/"CallError")
+                bool is_error = false;
+                if (resp_json.contains("messageTypeId")) {
+                    const auto& mt = resp_json["messageTypeId"];
+                    if (mt.is_number())
+                        is_error = (mt.get<int>() == 4);
+                    else if (mt.is_string())
+                        is_error = (mt.get<std::string>() == "CallError");
+                }
+
+                if (is_error) {
                     response.type = ocpp::MessageType::CallError;
                     response.error_code = resp_json.value("errorCode", "InternalError");
                     response.error_description = resp_json.value("errorDescription", "");
-                    response.payload = resp_json.value("payload", json::object());
+                    response.payload = resp_json.contains("errorDetails")
+                        ? resp_json["errorDetails"] : resp_json.value("payload", json::object());
                 } else {
                     response.type = ocpp::MessageType::CallResult;
                     response.payload = resp_json.value("payload", json::object());
