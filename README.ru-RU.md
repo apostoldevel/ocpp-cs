@@ -1,4 +1,6 @@
 [![en](https://img.shields.io/badge/lang-en-green.svg)](README.md)
+[![GitHub release](https://img.shields.io/github/v/release/apostoldevel/ocpp-cs)](https://github.com/apostoldevel/ocpp-cs/releases/latest)
+[![License](https://img.shields.io/github/license/apostoldevel/ocpp-cs)](LICENSE)
 
 <p align="center">
   <img src="doc/screenshot.png" alt="OCPP Central System" width="900">
@@ -245,11 +247,21 @@ mkdir -p logs
 
 Для прямой интеграции с базой данных создайте схему `ocpp` со следующими функциями:
 
-- `ocpp.Parse`, `ocpp.ParseXML`
+**Основные:**
+- `ocpp.Parse(pIdentity, pUniqueId, pAction, pPayload, pAccount, pVersion)` — единый диспетчер для 1.6 и 2.0.1
+- `ocpp.ParseXML` — парсер SOAP 1.5 сообщений
 - `ocpp.ChargePointList`, `ocpp.TransactionList`, `ocpp.ReservationList`
 - `ocpp.JSONToSOAP`, `ocpp.SOAPToJSON`
 
-Центральная система вызывает эти функции при коммуникации с зарядными станциями, передавая данные в формате JSON. Вся бизнес-логика реализуется на PL/pgSQL.
+**OCPP 2.0.1 (вызываются из `ocpp.Parse` при `pVersion = '2.0.1'`):**
+- `ocpp.BootNotification201` — регистрация станции с `ocpp_version`
+- `ocpp.Authorize201` — извлечение вложенного `idToken.idToken`
+- `ocpp.StatusNotification201` — с `evse_id`, `connector_status`
+- `ocpp.TransactionEvent` — Started/Updated/Ended в одной функции
+- `ocpp.MeterValues201` — с `evse_id`
+- `ocpp.NotifyReport` — логирование отчёта Device Model
+
+Центральная система вызывает эти функции при коммуникации с зарядными станциями, передавая данные в формате JSON. Вся бизнес-логика реализуется на PL/pgSQL. Параметр `pVersion` (по умолчанию `'1.6'`) включает версионно-зависимую обработку внутри `ocpp.Parse`.
 
 ## Эмулятор зарядных станций
 

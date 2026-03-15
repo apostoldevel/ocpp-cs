@@ -1,4 +1,6 @@
 [![ru](https://img.shields.io/badge/lang-ru-green.svg)](README.ru-RU.md)
+[![GitHub release](https://img.shields.io/github/v/release/apostoldevel/ocpp-cs)](https://github.com/apostoldevel/ocpp-cs/releases/latest)
+[![License](https://img.shields.io/github/license/apostoldevel/ocpp-cs)](LICENSE)
 
 <p align="center">
   <img src="doc/screenshot.png" alt="OCPP Central System" width="900">
@@ -245,11 +247,21 @@ Your server responds in the same format with the OCPP-compliant `payload`:
 
 For direct database integration, create the `ocpp` schema with these functions:
 
-- `ocpp.Parse`, `ocpp.ParseXML`
+**Core:**
+- `ocpp.Parse(pIdentity, pUniqueId, pAction, pPayload, pAccount, pVersion)` — unified dispatcher for 1.6 and 2.0.1
+- `ocpp.ParseXML` — SOAP 1.5 message parser
 - `ocpp.ChargePointList`, `ocpp.TransactionList`, `ocpp.ReservationList`
 - `ocpp.JSONToSOAP`, `ocpp.SOAPToJSON`
 
-The Central System calls these functions during charge point communication, passing data in JSON format. All business logic is implemented in PL/pgSQL.
+**OCPP 2.0.1 (called from `ocpp.Parse` when `pVersion = '2.0.1'`):**
+- `ocpp.BootNotification201` — registers station with `ocpp_version`
+- `ocpp.Authorize201` — nested `idToken.idToken` extraction
+- `ocpp.StatusNotification201` — with `evse_id`, `connector_status`
+- `ocpp.TransactionEvent` — Started/Updated/Ended via single function
+- `ocpp.MeterValues201` — with `evse_id`
+- `ocpp.NotifyReport` — device model report logging
+
+The Central System calls these functions during charge point communication, passing data in JSON format. All business logic is implemented in PL/pgSQL. The `pVersion` parameter (default `'1.6'`) enables version-specific handling within `ocpp.Parse`.
 
 ## Charge Point Emulator
 
