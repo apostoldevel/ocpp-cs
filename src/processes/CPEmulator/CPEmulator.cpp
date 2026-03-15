@@ -1532,13 +1532,13 @@ nlohmann::json CPEmulator::on_reset_201(Station& station, const nlohmann::json& 
             return {{"status", "Rejected"}};
 
         if (!evse->transaction_id.empty())
-            send_transaction_event(station, *evse, "Ended", "Other");
+            send_transaction_event(station, *evse, "Ended", "ResetCommand");
         evse->reset();
     } else {
         // Full reset: all EVSEs
         for (auto& evse : station.evses) {
             if (!evse.transaction_id.empty())
-                send_transaction_event(station, evse, "Ended", "Other");
+                send_transaction_event(station, evse, "Ended", "ResetCommand");
             evse.reset();
         }
     }
@@ -1795,7 +1795,7 @@ nlohmann::json CPEmulator::on_trigger_message_201(Station& station, const nlohma
                         {
                             {"timestamp", iso_time_now()},
                             {"sampledValue", nlohmann::json::array({
-                                {{"value", std::to_string(evse.meter_value)},
+                                {{"value", evse.meter_value},
                                  {"measurand", "Energy.Active.Import.Register"},
                                  {"unitOfMeasure", {{"unit", "Wh"}}}}
                             })}
