@@ -719,6 +719,55 @@ void CSService::do_charge_point_list(const HttpRequest& /*req*/, HttpResponse& r
     resp.set_body(list.dump(), "application/json");
 }
 
+json CSService::translate_payload(const std::string& operation,
+                                  const json& body,
+                                  const std::string& target_version)
+{
+    json result = body;
+
+    if (target_version == "2.0.1") {
+        if (operation == "Reset") {
+            // Hard->Immediate, Soft->OnIdle
+            if (result.contains("type")) {
+                auto& t = result["type"];
+                if (t == "Hard")      t = "Immediate";
+                else if (t == "Soft") t = "OnIdle";
+            }
+        } else if (operation == "ChangeAvailability") {
+            // 1.6 format {connectorId, type} -> 2.0.1 {operationalStatus, evse?}
+            if (result.contains("connectorId") && !result.contains("operationalStatus")) {
+                int cid = result.value("connectorId", 0);
+                auto type = result.value("type", "Operative");
+                result = {{"operationalStatus", type}};
+                if (cid > 0)
+                    result["evse"] = {{"id", cid}};
+            }
+        }
+    } else {
+        // target is 1.6
+        if (operation == "Reset") {
+            // Immediate->Hard, OnIdle->Soft
+            if (result.contains("type")) {
+                auto& t = result["type"];
+                if (t == "Immediate") t = "Hard";
+                else if (t == "OnIdle") t = "Soft";
+            }
+            result.erase("evseId"); // 1.6 has no evseId
+        } else if (operation == "ChangeAvailability") {
+            // 2.0.1 format {operationalStatus, evse?} -> 1.6 {connectorId, type}
+            if (result.contains("operationalStatus") && !result.contains("connectorId")) {
+                auto status = result.value("operationalStatus", "Operative");
+                int cid = 0;
+                if (result.contains("evse"))
+                    cid = result["evse"].value("id", 0);
+                result = {{"connectorId", cid}, {"type", status}};
+            }
+        }
+    }
+
+    return result;
+}
+
 void CSService::do_charge_point(const HttpRequest& req, HttpResponse& resp,
                                const std::string& identity, const std::string& operation)
 {

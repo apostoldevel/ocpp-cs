@@ -133,6 +133,11 @@ private:
     nlohmann::json charge_point_to_json(const ocpp::CSChargingPoint& point) const;
     nlohmann::json get_charge_point_list() const;
 
+    // Translate REST API payload to target OCPP version
+    static nlohmann::json translate_payload(const std::string& operation,
+                                            const nlohmann::json& body,
+                                            const std::string& target_version);
+
     // ── Pending call management ─────────────────────────────────────────
 
     void cleanup_expired_calls();
