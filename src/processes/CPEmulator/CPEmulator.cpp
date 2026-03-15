@@ -1643,49 +1643,220 @@ nlohmann::json CPEmulator::on_data_transfer_201(Station& station, const nlohmann
 
 nlohmann::json CPEmulator::on_get_base_report(Station& station, const nlohmann::json& payload)
 {
+    int request_id = payload.value("requestId", 0);
+
+    // Send NotifyReport asynchronously (after returning the response)
+    auto* self = this;
+    auto* st = &station;
+    auto vars = station.device_model;  // copy
+
+    loop_->add_timer(std::chrono::milliseconds(100), [self, st, request_id, vars = std::move(vars)]() {
+        self->send_notify_report(*st, request_id, vars);
+    }, false);  // false = one-shot
+
     return {{"status", "Accepted"}};
 }
 
 nlohmann::json CPEmulator::on_get_report(Station& station, const nlohmann::json& payload)
 {
+    int request_id = payload.value("requestId", 0);
+
+    std::vector<ReportVariable> filtered;
+
+    if (payload.contains("componentVariable") && payload["componentVariable"].is_array()) {
+        for (auto& cv : payload["componentVariable"]) {
+            auto comp_name = cv.value("component", nlohmann::json::object()).value("name", "");
+            auto var_name = cv.value("variable", nlohmann::json::object()).value("name", "");
+
+            for (auto& v : station.device_model) {
+                if ((comp_name.empty() || v.component == comp_name) &&
+                    (var_name.empty() || v.variable == var_name)) {
+                    filtered.push_back(v);
+                }
+            }
+        }
+    } else {
+        filtered = station.device_model;
+    }
+
+    if (filtered.empty())
+        return {{"status", "EmptyResultSet"}};
+
+    auto* self = this;
+    auto* st = &station;
+
+    loop_->add_timer(std::chrono::milliseconds(100), [self, st, request_id, filtered = std::move(filtered)]() {
+        self->send_notify_report(*st, request_id, filtered);
+    }, false);
+
     return {{"status", "Accepted"}};
 }
 
 void CPEmulator::send_notify_report(Station& station, int request_id,
                                      const std::vector<ReportVariable>& variables)
 {
+    nlohmann::json report_data = nlohmann::json::array();
+
+    for (auto& v : variables) {
+        nlohmann::json entry = {
+            {"component", {{"name", v.component}}},
+            {"variable", {{"name", v.variable}}},
+            {"variableAttribute", nlohmann::json::array({
+                {
+                    {"value", v.value},
+                    {"mutability", v.mutability},
+                    {"persistent", true},
+                    {"constant", v.readonly}
+                }
+            })}
+        };
+
+        if (v.evse_id > 0)
+            entry["component"]["evse"] = {{"id", v.evse_id}};
+
+        report_data.push_back(std::move(entry));
+    }
+
+    send_request(station, "NotifyReport", {
+        {"requestId", request_id},
+        {"seqNo", 0},
+        {"tbc", false},
+        {"generatedAt", iso_time_now()},
+        {"reportData", std::move(report_data)}
+    });
 }
 
 // ── OCPP 2.0.1 Phase 2 — Availability ──────────────────────────────────────
 
 nlohmann::json CPEmulator::on_unlock_connector_201(Station& station, const nlohmann::json& payload)
 {
+    int evse_id = payload.value("evseId", 0);
+
+    auto* evse = find_evse(station, evse_id);
+    if (!evse)
+        return {{"status", "UnknownConnector"}};
+
+    if (!evse->transaction_id.empty()) {
+        send_transaction_event(station, *evse, "Ended", "UnlockCommand");
+        evse->reset();
+        for (auto& c : evse->connectors)
+            send_status_notification_201(station, evse->evse_id, c.connector_id);
+    }
+
     return {{"status", "Unlocked"}};
 }
 
 nlohmann::json CPEmulator::on_trigger_message_201(Station& station, const nlohmann::json& payload)
 {
+    auto requested = payload.value("requestedMessage", "");
+
+    int evse_id = 0;
+    if (payload.contains("evse"))
+        evse_id = payload["evse"].value("id", 0);
+
+    if (requested == "BootNotification") {
+        send_boot_notification_201(station);
+    } else if (requested == "Heartbeat") {
+        send_heartbeat_201(station);
+    } else if (requested == "StatusNotification") {
+        if (evse_id > 0) {
+            auto* evse = find_evse(station, evse_id);
+            if (evse && !evse->connectors.empty())
+                send_status_notification_201(station, evse_id, evse->connectors[0].connector_id);
+            else
+                return {{"status", "Rejected"}};
+        } else {
+            for (auto& evse : station.evses)
+                for (auto& c : evse.connectors)
+                    send_status_notification_201(station, evse.evse_id, c.connector_id);
+        }
+    } else if (requested == "TransactionEvent") {
+        for (auto& evse : station.evses) {
+            if (!evse.transaction_id.empty())
+                send_transaction_event(station, evse, "Updated", "Trigger");
+        }
+    } else if (requested == "MeterValues") {
+        for (auto& evse : station.evses) {
+            if (!evse.transaction_id.empty()) {
+                send_request(station, "MeterValues", {
+                    {"evseId", evse.evse_id},
+                    {"meterValue", nlohmann::json::array({
+                        {
+                            {"timestamp", iso_time_now()},
+                            {"sampledValue", nlohmann::json::array({
+                                {{"value", std::to_string(evse.meter_value)},
+                                 {"measurand", "Energy.Active.Import.Register"},
+                                 {"unitOfMeasure", {{"unit", "Wh"}}}}
+                            })}
+                        }
+                    })}
+                });
+            }
+        }
+    } else if (requested == "FirmwareStatusNotification") {
+        send_request(station, "FirmwareStatusNotification", {{"status", "Idle"}});
+    } else {
+        return {{"status", "NotImplemented"}};
+    }
+
     return {{"status", "Accepted"}};
 }
 
-nlohmann::json CPEmulator::on_clear_cache_201(Station& station, const nlohmann::json& payload)
+nlohmann::json CPEmulator::on_clear_cache_201(Station& station, const nlohmann::json& /*payload*/)
 {
+    station.auth_cache.clear();
     return {{"status", "Accepted"}};
 }
 
 nlohmann::json CPEmulator::on_get_transaction_status(Station& station, const nlohmann::json& payload)
 {
-    return {{"messagesInQueue", false}};
+    bool in_progress = false;
+
+    if (payload.contains("transactionId")) {
+        auto tx_id = payload["transactionId"].get<std::string>();
+        for (auto& evse : station.evses) {
+            if (evse.transaction_id == tx_id) {
+                in_progress = true;
+                break;
+            }
+        }
+    }
+
+    return {{"messagesInQueue", in_progress}};
 }
 
 // ── OCPP 2.0.1 Phase 2 — Local Auth List ───────────────────────────────────
 
 nlohmann::json CPEmulator::on_send_local_list_201(Station& station, const nlohmann::json& payload)
 {
+    int version = payload.value("versionNumber", 0);
+    auto update_type = payload.value("updateType", "Full");
+
+    if (update_type == "Full") {
+        station.local_auth_list.clear();
+    }
+
+    if (payload.contains("localAuthorizationList") && payload["localAuthorizationList"].is_array()) {
+        for (auto& entry : payload["localAuthorizationList"]) {
+            if (update_type == "Differential") {
+                auto id = entry.value("idToken", nlohmann::json::object()).value("idToken", "");
+                std::erase_if(station.local_auth_list, [&id](const nlohmann::json& e) {
+                    return e.value("idToken", nlohmann::json::object()).value("idToken", "") == id;
+                });
+            }
+            station.local_auth_list.push_back(entry);
+        }
+    }
+
+    station.local_list_version = version;
+
+    app_->logger().info("[{}] LocalAuthList updated: version={}, entries={}, type={}",
+        station.identity, version, station.local_auth_list.size(), update_type);
+
     return {{"status", "Accepted"}};
 }
 
-nlohmann::json CPEmulator::on_get_local_list_version_201(Station& station, const nlohmann::json& payload)
+nlohmann::json CPEmulator::on_get_local_list_version_201(Station& station, const nlohmann::json& /*payload*/)
 {
     return {{"versionNumber", station.local_list_version}};
 }
