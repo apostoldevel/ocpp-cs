@@ -11,8 +11,8 @@
 #include <string_view>
 #include <stdexcept>
 #include <random>
-#include <sstream>
-#include <iomanip>
+
+#include <fmt/format.h>
 
 namespace ocpp
 {
@@ -197,46 +197,6 @@ enum class MessageTrigger {
     MeterValues, StatusNotification
 };
 
-// ── SOAP Message (OCPP 1.5) ────────────────────────────────────────────────
-
-#ifdef WITH_POSTGRESQL
-struct SOAPMessage {
-    std::vector<std::pair<std::string, std::string>> headers;
-    std::vector<std::pair<std::string, std::string>> values;
-    std::string notification;
-
-    std::string get_value(std::string_view key) const
-    {
-        for (const auto& [k, v] : values)
-            if (k == key) return v;
-        return {};
-    }
-
-    void set_value(const std::string& key, const std::string& val)
-    {
-        for (auto& [k, v] : values) {
-            if (k == key) { v = val; return; }
-        }
-        values.emplace_back(key, val);
-    }
-
-    std::string get_header(std::string_view key) const
-    {
-        for (const auto& [k, v] : headers)
-            if (k == key) return v;
-        return {};
-    }
-
-    void set_header(const std::string& key, const std::string& val)
-    {
-        for (auto& [k, v] : headers) {
-            if (k == key) { v = val; return; }
-        }
-        headers.emplace_back(key, val);
-    }
-};
-#endif
-
 // ── OCPP JSON Message (wire format) ────────────────────────────────────────
 
 struct OcppMessage {
@@ -335,9 +295,7 @@ inline std::string generate_unique_id()
 {
     static thread_local std::mt19937_64 gen{std::random_device{}()};
     std::uniform_int_distribution<uint64_t> dist;
-    std::ostringstream oss;
-    oss << std::hex << std::setfill('0') << std::setw(16) << dist(gen);
-    return oss.str();
+    return fmt::format("{:016x}", dist(gen));
 }
 
 // ── Convenience Constructors ────────────────────────────────────────────────

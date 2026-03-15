@@ -11,8 +11,6 @@
 #include "apostol/ws_client.hpp"
 #include "ocpp/protocol.hpp"
 
-#include <stdexcept>
-
 namespace ocpp
 {
 

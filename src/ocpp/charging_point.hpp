@@ -12,7 +12,6 @@
 #include <string_view>
 #include <unordered_map>
 #include <memory>
-#include <functional>
 #include <chrono>
 
 namespace apostol { class WsConnection; }

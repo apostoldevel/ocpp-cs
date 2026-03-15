@@ -12,7 +12,7 @@ namespace ocpp
 
 namespace
 {
-std::atomic<int> s_transaction_id{0};
+std::atomic<uint32_t> s_transaction_id{0};
 constexpr int kDefaultExpirySec = 5 * 60; // 5 min default for idTagInfo/reservation expiry
 } // namespace
 
