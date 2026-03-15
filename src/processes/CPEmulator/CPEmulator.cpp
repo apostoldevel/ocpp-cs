@@ -268,6 +268,27 @@ void CPEmulator::create_station(const std::string& dir_name)
                 station->evses.push_back(std::move(evse));
             }
         }
+
+        // Initialize minimal Device Model
+        auto& dm = station->device_model;
+        dm.push_back({"ChargingStation", "Vendor",
+                      station->config.value("ChargePointVendor", "Emulator"), true, "ReadOnly"});
+        dm.push_back({"ChargingStation", "Model",
+                      station->config.value("ChargePointModel", "Virtual-201"), true, "ReadOnly"});
+        dm.push_back({"ChargingStation", "SerialNumber",
+                      station->config.value("ChargePointSerialNumber", "EM-201-001"), true, "ReadOnly"});
+        dm.push_back({"ChargingStation", "FirmwareVersion",
+                      station->config.value("ChargePointSoftwareVersion", "2.0.0"), true, "ReadOnly"});
+        dm.push_back({"OCPPCommCtrl", "HeartbeatInterval",
+                      std::to_string(station->heartbeat_interval), false, "ReadWrite"});
+        dm.push_back({"OCPPCommCtrl", "NetworkProfileUri",
+                      station->config.value("CentralSystemURL", ""), true, "ReadOnly"});
+        dm.push_back({"AuthCtrl", "LocalAuthListEnabled", "true", false, "ReadWrite"});
+        dm.push_back({"AuthCtrl", "AuthCacheEnabled", "true", false, "ReadWrite"});
+        for (auto& evse : station->evses) {
+            dm.push_back({"EVSE", "Power", "22000", true, "ReadOnly", evse.evse_id});
+            dm.push_back({"EVSE", "AvailabilityState", evse.status, true, "ReadOnly", evse.evse_id});
+        }
     } else {
         // Initialize per-connector state (1.6)
         for (int cid : connector_ids)
@@ -343,6 +364,17 @@ void CPEmulator::register_action_handlers(Station& station)
         reg("GetVariables",            &CPEmulator::on_get_variables);
         reg("ChangeAvailability",      &CPEmulator::on_change_availability_201);
         reg("DataTransfer",            &CPEmulator::on_data_transfer_201);
+        // Phase 2: Provisioning
+        reg("GetBaseReport",        &CPEmulator::on_get_base_report);
+        reg("GetReport",            &CPEmulator::on_get_report);
+        // Phase 2: Availability
+        reg("UnlockConnector",      &CPEmulator::on_unlock_connector_201);
+        reg("TriggerMessage",       &CPEmulator::on_trigger_message_201);
+        reg("ClearCache",           &CPEmulator::on_clear_cache_201);
+        reg("GetTransactionStatus", &CPEmulator::on_get_transaction_status);
+        // Phase 2: Local Auth List
+        reg("SendLocalList",        &CPEmulator::on_send_local_list_201);
+        reg("GetLocalListVersion",  &CPEmulator::on_get_local_list_version_201);
     } else {
         reg("CancelReservation",      &CPEmulator::on_cancel_reservation);
         reg("ChangeAvailability",     &CPEmulator::on_change_availability);
@@ -1605,6 +1637,57 @@ nlohmann::json CPEmulator::on_data_transfer_201(Station& station, const nlohmann
         payload.value("messageId", ""));
 
     return {{"status", "Accepted"}};
+}
+
+// ── OCPP 2.0.1 Phase 2 — Provisioning ──────────────────────────────────────
+
+nlohmann::json CPEmulator::on_get_base_report(Station& station, const nlohmann::json& payload)
+{
+    return {{"status", "Accepted"}};
+}
+
+nlohmann::json CPEmulator::on_get_report(Station& station, const nlohmann::json& payload)
+{
+    return {{"status", "Accepted"}};
+}
+
+void CPEmulator::send_notify_report(Station& station, int request_id,
+                                     const std::vector<ReportVariable>& variables)
+{
+}
+
+// ── OCPP 2.0.1 Phase 2 — Availability ──────────────────────────────────────
+
+nlohmann::json CPEmulator::on_unlock_connector_201(Station& station, const nlohmann::json& payload)
+{
+    return {{"status", "Unlocked"}};
+}
+
+nlohmann::json CPEmulator::on_trigger_message_201(Station& station, const nlohmann::json& payload)
+{
+    return {{"status", "Accepted"}};
+}
+
+nlohmann::json CPEmulator::on_clear_cache_201(Station& station, const nlohmann::json& payload)
+{
+    return {{"status", "Accepted"}};
+}
+
+nlohmann::json CPEmulator::on_get_transaction_status(Station& station, const nlohmann::json& payload)
+{
+    return {{"messagesInQueue", false}};
+}
+
+// ── OCPP 2.0.1 Phase 2 — Local Auth List ───────────────────────────────────
+
+nlohmann::json CPEmulator::on_send_local_list_201(Station& station, const nlohmann::json& payload)
+{
+    return {{"status", "Accepted"}};
+}
+
+nlohmann::json CPEmulator::on_get_local_list_version_201(Station& station, const nlohmann::json& payload)
+{
+    return {{"versionNumber", station.local_list_version}};
 }
 
 } // namespace apostol

@@ -101,6 +101,16 @@ private:
         }
     };
 
+    // ── OCPP 2.0.1: Device Model variable ──────────────────────────────────
+    struct ReportVariable {
+        std::string component;         // e.g. "ChargingStation"
+        std::string variable;          // e.g. "Vendor"
+        std::string value;
+        bool readonly = true;
+        std::string mutability = "ReadOnly";  // ReadOnly, WriteOnly, ReadWrite
+        int evse_id = 0;              // 0 = station-level, >0 = EVSE-specific
+    };
+
     struct Station {
         std::unique_ptr<WsClient> ws;
         std::string identity;
@@ -124,6 +134,13 @@ private:
 
         // 2.0.1 EVSE state (3-tier model)
         std::vector<EvseState> evses;
+
+        // 2.0.1 Device Model
+        std::vector<ReportVariable> device_model;
+
+        // 2.0.1 Local Auth List
+        int local_list_version = 0;
+        std::vector<nlohmann::json> local_auth_list;  // idTokenInfo entries
 
         BootStatus boot_status = BootStatus::not_sent;
         int  heartbeat_interval = 60; // seconds, from BootNotification response
@@ -217,6 +234,22 @@ private:
     nlohmann::json on_get_variables(Station& station, const nlohmann::json& payload);
     nlohmann::json on_change_availability_201(Station& station, const nlohmann::json& payload);
     nlohmann::json on_data_transfer_201(Station& station, const nlohmann::json& payload);
+
+    // ── OCPP 2.0.1 Phase 2 — Provisioning ───────────────────────────────
+    nlohmann::json on_get_base_report(Station& station, const nlohmann::json& payload);
+    nlohmann::json on_get_report(Station& station, const nlohmann::json& payload);
+    void send_notify_report(Station& station, int request_id,
+                            const std::vector<ReportVariable>& variables);
+
+    // ── OCPP 2.0.1 Phase 2 — Availability ───────────────────────────────
+    nlohmann::json on_unlock_connector_201(Station& station, const nlohmann::json& payload);
+    nlohmann::json on_trigger_message_201(Station& station, const nlohmann::json& payload);
+    nlohmann::json on_clear_cache_201(Station& station, const nlohmann::json& payload);
+    nlohmann::json on_get_transaction_status(Station& station, const nlohmann::json& payload);
+
+    // ── OCPP 2.0.1 Phase 2 — Local Auth List ────────────────────────────
+    nlohmann::json on_send_local_list_201(Station& station, const nlohmann::json& payload);
+    nlohmann::json on_get_local_list_version_201(Station& station, const nlohmann::json& payload);
 
     // ── OCPP 2.0.1 — Helpers ────────────────────────────────────────────
     EvseState* find_evse(Station& station, int evse_id);
