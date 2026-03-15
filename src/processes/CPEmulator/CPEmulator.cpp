@@ -1110,14 +1110,23 @@ nlohmann::json CPEmulator::on_get_configuration(Station& station, const nlohmann
     nlohmann::json config_keys = nlohmann::json::array();
     nlohmann::json unknown_keys = nlohmann::json::array();
 
-    if (payload.contains("key") && payload["key"].is_array() && !payload["key"].empty()) {
-        for (const auto& requested : payload["key"]) {
-            auto k = requested.get<std::string>();
-            auto it = station.config_keys.find(k);
-            if (it != station.config_keys.end())
-                config_keys.push_back({{"key", k}, {"value", it->second.value}, {"readonly", it->second.readonly}});
-            else
-                unknown_keys.push_back(k);
+    if (payload.contains("key") && !payload["key"].is_null()) {
+        // Accept both array ["k1","k2"] and single string "k1"
+        nlohmann::json keys_to_find;
+        if (payload["key"].is_array())
+            keys_to_find = payload["key"];
+        else if (payload["key"].is_string())
+            keys_to_find = nlohmann::json::array({payload["key"]});
+
+        if (!keys_to_find.empty()) {
+            for (const auto& requested : keys_to_find) {
+                auto k = requested.get<std::string>();
+                auto it = station.config_keys.find(k);
+                if (it != station.config_keys.end())
+                    config_keys.push_back({{"key", k}, {"value", it->second.value}, {"readonly", it->second.readonly}});
+                else
+                    unknown_keys.push_back(k);
+            }
         }
     } else {
         for (const auto& [k, cv] : station.config_keys)

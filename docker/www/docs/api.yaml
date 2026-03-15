@@ -1301,8 +1301,12 @@ components:
       type: object
       properties:
         key:
-          type: string
-          description: List of keys for which the configuration value is requested.
+          oneOf:
+            - type: string
+            - type: array
+              items:
+                type: string
+          description: Key or list of keys for which the configuration value is requested.
     GetConfigurationResponse:
       type: object
       properties:
