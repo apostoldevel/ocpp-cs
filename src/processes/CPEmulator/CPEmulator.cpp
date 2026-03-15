@@ -625,6 +625,9 @@ void CPEmulator::send_transaction_event(Station& station, EvseState& evse,
         };
     }
 
+    if (evse.remote_start_id > 0)
+        payload["transactionInfo"]["remoteStartId"] = evse.remote_start_id;
+
     // Add meterValue for Updated and Ended
     if (event_type == "Updated" || event_type == "Ended") {
         payload["meterValue"] = nlohmann::json::array({
@@ -1480,6 +1483,7 @@ nlohmann::json CPEmulator::on_request_start_transaction(Station& station, const 
     auto id_token = payload.value("idToken", nlohmann::json::object());
     auto id_tag = id_token.value("idToken", "");
     auto id_type = id_token.value("type", "ISO14443");
+    int remote_start_id = payload.value("remoteStartId", 0);
 
     EvseState* evse = nullptr;
     if (evse_id > 0) {
@@ -1499,6 +1503,7 @@ nlohmann::json CPEmulator::on_request_start_transaction(Station& station, const 
 
     evse->id_token = id_tag;
     evse->id_token_type = id_type;
+    evse->remote_start_id = remote_start_id;
 
     // Authorize then start
     send_authorize_201(station, *evse);
