@@ -657,6 +657,24 @@ void CPEmulator::send_transaction_event(Station& station, EvseState& evse,
         payload["transactionInfo"]["stoppedReason"] = stopped_reason;
     }
 
+    if (event_type == "Ended" && !evse.pending_availability.empty()) {
+        auto pending = evse.pending_availability;
+        evse.pending_availability.clear();
+        auto* self = this;
+        auto* st = &station;
+        auto eid = evse.evse_id;
+        loop_->add_timer(std::chrono::milliseconds(50), [self, st, eid, pending]() {
+            auto* e = self->find_evse(*st, eid);
+            if (e) {
+                e->status = pending;
+                auto* dm_var = self->find_device_model_var(*st, "EVSE", "AvailabilityState", eid);
+                if (dm_var) dm_var->value = pending;
+                for (auto& c : e->connectors)
+                    self->send_status_notification_201(*st, e->evse_id, c.connector_id);
+            }
+        }, false);
+    }
+
     WsClient::ResponseHandler handler;
     if (event_type == "Started") {
         handler = [this, &station, &evse](const WsMessage& resp) {
@@ -1639,27 +1657,38 @@ nlohmann::json CPEmulator::on_change_availability_201(Station& station, const nl
     }
 
     std::string new_status = (op_status == "Inoperative") ? "Unavailable" : "Available";
+    bool any_scheduled = false;
 
     if (evse_id > 0) {
         auto* evse = find_evse(station, evse_id);
         if (!evse)
             return {{"status", "Rejected"}};
-        if (evse->transaction_id.empty()) {
+        if (!evse->transaction_id.empty()) {
+            evse->pending_availability = new_status;
+            any_scheduled = true;
+        } else {
             evse->status = new_status;
+            auto* dm_var = find_device_model_var(station, "EVSE", "AvailabilityState", evse->evse_id);
+            if (dm_var) dm_var->value = new_status;
             if (!evse->connectors.empty())
                 send_status_notification_201(station, evse->evse_id, evse->connectors[0].connector_id);
         }
     } else {
         for (auto& evse : station.evses) {
-            if (evse.transaction_id.empty()) {
+            if (!evse.transaction_id.empty()) {
+                evse.pending_availability = new_status;
+                any_scheduled = true;
+            } else {
                 evse.status = new_status;
+                auto* dm_var = find_device_model_var(station, "EVSE", "AvailabilityState", evse.evse_id);
+                if (dm_var) dm_var->value = new_status;
                 for (auto& conn : evse.connectors)
                     send_status_notification_201(station, evse.evse_id, conn.connector_id);
             }
         }
     }
 
-    return {{"status", "Accepted"}};
+    return {{"status", any_scheduled ? "Scheduled" : "Accepted"}};
 }
 
 nlohmann::json CPEmulator::on_data_transfer_201(Station& station, const nlohmann::json& payload)
