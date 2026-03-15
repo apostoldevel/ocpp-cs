@@ -824,15 +824,8 @@ void CSService::do_charge_point(const HttpRequest& req, HttpResponse& resp,
             return;
         }
 
-        // Send via WebSocket
+        // Send via WebSocket (send_json_response handles logging + broadcast)
         auto msg = ocpp::make_call(actual_op, body);
-        log_json_message(identity, msg);
-
-        broadcast_log({{"ts", ocpp::iso_time_now()}, {"identity", identity},
-                       {"direction", "out"}, {"messageType", "Call"},
-                       {"uniqueId", msg.unique_id}, {"action", actual_op},
-                       {"payload", body}});
-
         send_json_response(*point, msg);
 
         // Defer HTTP response
@@ -876,15 +869,8 @@ void CSService::do_charge_point(const HttpRequest& req, HttpResponse& resp,
     }
 
     if (point->protocol_type() == ocpp::ProtocolType::JSON) {
-        // Build OCPP Call and send via WebSocket
+        // Build OCPP Call and send via WebSocket (send_json_response handles logging + broadcast)
         auto msg = ocpp::make_call(operation, body);
-        log_json_message(identity, msg);
-
-        broadcast_log({{"ts", ocpp::iso_time_now()}, {"identity", identity},
-                       {"direction", "out"}, {"messageType", "Call"},
-                       {"uniqueId", msg.unique_id}, {"action", operation},
-                       {"payload", body}});
-
         send_json_response(*point, msg);
 
         // Defer HTTP response — will be resolved when station replies
