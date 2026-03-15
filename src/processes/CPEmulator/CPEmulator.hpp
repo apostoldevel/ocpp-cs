@@ -89,6 +89,8 @@ private:
         std::string id_token_type = "ISO14443"; // idToken type
         std::chrono::system_clock::time_point status_updated{};
         int seq_no = 0;                         // TransactionEvent sequence number
+        int remote_start_id = 0;              // remoteStartId from RequestStartTransaction
+        std::string pending_availability;     // queued status change (ChangeAvailability "Scheduled")
 
         void reset() {
             status = "Available";
@@ -98,6 +100,8 @@ private:
             id_token_type = "ISO14443";
             status_updated = {};
             seq_no = 0;
+            remote_start_id = 0;
+            pending_availability.clear();
         }
     };
 
@@ -109,6 +113,7 @@ private:
         bool readonly = true;
         std::string mutability = "ReadOnly";  // ReadOnly, WriteOnly, ReadWrite
         int evse_id = 0;              // 0 = station-level, >0 = EVSE-specific
+        std::string data_type = "string";     // DataEnumType: string, integer, boolean, decimal
     };
 
     struct Station {
@@ -253,6 +258,8 @@ private:
 
     // ── OCPP 2.0.1 — Helpers ────────────────────────────────────────────
     EvseState* find_evse(Station& station, int evse_id);
+    ReportVariable* find_device_model_var(Station& station,
+        const std::string& component, const std::string& variable, int evse_id = 0);
     static std::string generate_transaction_id();
 
     // ── Members ──────────────────────────────────────────────────────────
