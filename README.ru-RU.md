@@ -1,6 +1,8 @@
 [![en](https://img.shields.io/badge/lang-en-green.svg)](README.md)
 
-![image](https://user-images.githubusercontent.com/91010417/230783150-ea57f6c4-ba8a-43cf-a033-ef5ffa3a19ff.png)
+<p align="center">
+  <img src="doc/screenshot.png" alt="OCPP Central System" width="900">
+</p>
 
 # OCPP Central System
 
