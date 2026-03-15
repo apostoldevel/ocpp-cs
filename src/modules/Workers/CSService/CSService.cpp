@@ -358,20 +358,18 @@ void CSService::on_ws_message(ocpp::CSChargingPoint& point, const std::string& p
         // Store last request
         point.store_request(msg.action, msg.payload);
 
-        if (point.ocpp_version() == "2.0.1") {
-            // 2.0.1: standalone handler (PG integration will come later)
-            handle_action_201(point, msg);
-        } else {
 #ifdef WITH_POSTGRESQL
-            if (pool_) {
-                parse_json_pg(point, msg);
-            } else
+        if (pool_) {
+            parse_json_pg(point, msg);
+        } else
 #endif
-            if (webhook_.enabled) {
-                parse_json_webhook(point, msg);
-            } else {
+        if (webhook_.enabled) {
+            parse_json_webhook(point, msg);
+        } else {
+            if (point.ocpp_version() == "2.0.1")
+                handle_action_201(point, msg);
+            else
                 parse_json_standalone(point, msg);
-            }
         }
         return;
     }
@@ -973,12 +971,13 @@ void CSService::parse_json_pg(ocpp::CSChargingPoint& point, const ocpp::OcppMess
                               const std::string& account)
 {
     auto sql = fmt::format(
-        "SELECT * FROM ocpp.parse({}, {}, {}, {}::jsonb, {})",
+        "SELECT * FROM ocpp.parse({}, {}, {}, {}::jsonb, {}, {})",
         pq_quote_literal(point.identity()),
         pq_quote_literal(msg.unique_id),
         pq_quote_literal(msg.action),
         pq_quote_literal(msg.payload.dump()),
-        pq_quote_literal(account));
+        pq_quote_literal(account),
+        pq_quote_literal(point.ocpp_version()));
 
     auto identity = point.identity();
     auto unique_id = msg.unique_id;
