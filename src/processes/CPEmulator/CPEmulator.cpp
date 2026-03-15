@@ -19,9 +19,10 @@ namespace apostol
 
 namespace fs = std::filesystem;
 
-static constexpr int    kMeterIncrementWh  = 10;   // simulated meter increment per tick
-static constexpr auto   kReconnectDelay    = std::chrono::seconds(30);
-static constexpr auto   kPingInterval      = std::chrono::seconds(30);
+static constexpr int    kMeterIncrementWh    = 10;   // simulated meter increment per tick
+static constexpr auto   kMeterValuesInterval = std::chrono::seconds(60);
+static constexpr auto   kReconnectDelay      = std::chrono::seconds(30);
+static constexpr auto   kPingInterval        = std::chrono::seconds(30);
 
 // ── Lifecycle ────────────────────────────────────────────────────────────────
 
@@ -70,7 +71,7 @@ void CPEmulator::heartbeat(std::chrono::system_clock::time_point now)
             // Periodic TransactionEvent(Updated) with MeterValues
             bool meter_sent = false;
             if (now >= station->next_meter_values) {
-                station->next_meter_values = now + std::chrono::seconds(60);
+                station->next_meter_values = now + kMeterValuesInterval;
                 for (auto& evse : station->evses) {
                     if (!evse.transaction_id.empty() && evse.status == "Occupied") {
                         send_transaction_event(*station, evse, "Updated", "MeterValuePeriodic");
@@ -126,7 +127,7 @@ void CPEmulator::heartbeat(std::chrono::system_clock::time_point now)
 
         bool meter_sent = false;
         if (now >= station->next_meter_values) {
-            station->next_meter_values = now + std::chrono::seconds(60);
+            station->next_meter_values = now + kMeterValuesInterval;
             for (auto& conn : station->connector_states) {
                 if (conn.status == "Charging" ||
                     conn.status == "SuspendedEVSE" ||
@@ -483,7 +484,6 @@ void CPEmulator::send_boot_notification(Station& station)
             if (status == "Accepted") {
                 station.boot_status = BootStatus::accepted;
                 station.next_heartbeat = now + std::chrono::seconds(interval);
-                // Send initial StatusNotification for whole CP (connectorId=0), then each connector
                 send_status_notification(station, 0);
                 for (auto& conn : station.connector_states)
                     send_status_notification(station, conn.connector_id, conn.status);
@@ -491,8 +491,6 @@ void CPEmulator::send_boot_notification(Station& station)
                 station.boot_status = (status == "Pending")
                     ? BootStatus::pending : BootStatus::rejected;
                 station.next_boot_retry = now + std::chrono::seconds(interval);
-                app_->logger().info("[{}] will retry BootNotification in {}s",
-                                    station.identity, interval);
             }
         });
 }
@@ -1122,7 +1120,7 @@ nlohmann::json CPEmulator::on_clear_cache(Station& station, const nlohmann::json
     return {{"status", "Accepted"}};
 }
 
-nlohmann::json CPEmulator::on_clear_charging_profile(Station& station, const nlohmann::json& payload)
+nlohmann::json CPEmulator::on_clear_charging_profile(Station& station, const nlohmann::json& /*payload*/)
 {
     auto file = load_response_file(station.prefix, "ClearChargingProfile");
     return file.is_null() ? nlohmann::json{{"status", "Accepted"}} : file;
@@ -1170,7 +1168,7 @@ nlohmann::json CPEmulator::on_data_transfer(Station& station, const nlohmann::js
     return response;
 }
 
-nlohmann::json CPEmulator::on_get_composite_schedule(Station& station, const nlohmann::json& payload)
+nlohmann::json CPEmulator::on_get_composite_schedule(Station& station, const nlohmann::json& /*payload*/)
 {
     auto file = load_response_file(station.prefix, "GetCompositeSchedule");
     return file.is_null() ? nlohmann::json{{"status", "Accepted"}} : file;
