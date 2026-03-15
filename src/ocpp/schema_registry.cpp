@@ -41,7 +41,10 @@ void SchemaRegistry::load(const std::string& version,
                     validator2.set_root_schema(schema);
                     validators_.emplace(fmt::format("{}/{}Request", version, filename),
                                         std::move(validator2));
-                } catch (...) {}
+                } catch (const std::exception& e2) {
+                    fmt::print(stderr, "Warning: failed to create 1.6 alias {}Request: {}\n",
+                               filename, e2.what());
+                }
             }
         } catch (const std::exception& e) {
             fmt::print(stderr, "Warning: failed to load schema {}: {}\n",
@@ -73,7 +76,7 @@ bool SchemaRegistry::has_schema(const std::string& version,
                                 const std::string& action,
                                 const std::string& direction) const
 {
-    return validators_.count(make_key(version, action, direction)) > 0;
+    return validators_.contains(make_key(version, action, direction));
 }
 
 } // namespace ocpp
