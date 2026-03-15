@@ -51,7 +51,7 @@ fi
 IMAGE="apostoldevel/cs"
 CONTAINER="cs"
 PORT="${CS_PORT:-9220}"
-WEBHOOK_URL="${WEBHOOK_URL:-https://api.ocpp-css.com/api/v1/ocpp/parse}"
+WEBHOOK_URL="${WEBHOOK_URL:-}"
 
 # ── Stop existing container if running ──────────────────────────────────────
 
@@ -71,10 +71,20 @@ ok "Image pulled"
 # ── Start container ─────────────────────────────────────────────────────────
 
 info "Starting Central System on port ${PORT}..."
+
+DOCKER_OPTS=()
+if [ -n "${WEBHOOK_URL}" ]; then
+    DOCKER_OPTS+=(-e "WEBHOOK_URL=${WEBHOOK_URL}")
+    [ -n "${WEBHOOK_AUTH:-}" ]     && DOCKER_OPTS+=(-e "WEBHOOK_AUTH=${WEBHOOK_AUTH}")
+    [ -n "${WEBHOOK_USERNAME:-}" ] && DOCKER_OPTS+=(-e "WEBHOOK_USERNAME=${WEBHOOK_USERNAME}")
+    [ -n "${WEBHOOK_PASSWORD:-}" ] && DOCKER_OPTS+=(-e "WEBHOOK_PASSWORD=${WEBHOOK_PASSWORD}")
+    [ -n "${WEBHOOK_TOKEN:-}" ]    && DOCKER_OPTS+=(-e "WEBHOOK_TOKEN=${WEBHOOK_TOKEN}")
+fi
+
 docker run -d \
     --name "${CONTAINER}" \
     -p "${PORT}:9220" \
-    -e "WEBHOOK_URL=${WEBHOOK_URL}" \
+    "${DOCKER_OPTS[@]}" \
     --restart unless-stopped \
     "${IMAGE}:latest" >/dev/null
 
