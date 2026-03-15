@@ -50,19 +50,20 @@ That's it. The container runs a fully functional Central System with a built-in 
 
 ## OCPP 2.0.1 Support
 
-The Central System supports 13 OCPP 2.0.1 messages covering the full charging session lifecycle:
+The Central System supports 22 OCPP 2.0.1 messages — full charging session lifecycle, device management, provisioning, and availability:
 
 | Direction | Messages |
 |-----------|----------|
-| CP → CSMS | BootNotification, Heartbeat, StatusNotification, Authorize, TransactionEvent, MeterValues |
-| CSMS → CP | RequestStartTransaction, RequestStopTransaction, Reset, SetVariables, GetVariables, ChangeAvailability |
-| Both | DataTransfer |
+| CP → CSMS (9) | BootNotification, Heartbeat, StatusNotification, Authorize, TransactionEvent, MeterValues, NotifyReport, FirmwareStatusNotification, DataTransfer |
+| CSMS → CP (12) | RequestStartTransaction, RequestStopTransaction, Reset, SetVariables, GetVariables, ChangeAvailability, UnlockConnector, TriggerMessage, ClearCache, GetBaseReport, GetReport, GetTransactionStatus |
+| Both (1) | DataTransfer |
 
 Key differences from OCPP 1.6:
 - **3-tier model** — Station → EVSE → Connector (instead of flat connector list)
 - **TransactionEvent** — single message replaces StartTransaction, StopTransaction, and MeterValues
 - **Device Model** — SetVariables/GetVariables replace ChangeConfiguration/GetConfiguration
 - **Schema validation** — all messages validated against official OCPP 2.0.1 JSON Schemas
+- **Spec-compliant details** — correct triggerReason→stoppedReason mapping, connectorId validation, remoteStartId tracking, scheduled availability changes
 
 The built-in emulator includes 5 OCPP 2.0.1 stations with different configurations:
 

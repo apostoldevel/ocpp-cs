@@ -50,19 +50,20 @@ ws://IP_ВАШЕГО_СЕРВЕРА:9220/ocpp/ID_ВАШЕЙ_СТАНЦИИ
 
 ## Поддержка OCPP 2.0.1
 
-Центральная система поддерживает 13 сообщений OCPP 2.0.1, покрывающих полный цикл зарядной сессии:
+Центральная система поддерживает 22 сообщения OCPP 2.0.1 — полный цикл зарядной сессии, управление устройствами, провизионирование и доступность:
 
 | Направление | Сообщения |
 |-------------|-----------|
-| CP → CSMS | BootNotification, Heartbeat, StatusNotification, Authorize, TransactionEvent, MeterValues |
-| CSMS → CP | RequestStartTransaction, RequestStopTransaction, Reset, SetVariables, GetVariables, ChangeAvailability |
-| Оба | DataTransfer |
+| CP → CSMS (9) | BootNotification, Heartbeat, StatusNotification, Authorize, TransactionEvent, MeterValues, NotifyReport, FirmwareStatusNotification, DataTransfer |
+| CSMS → CP (12) | RequestStartTransaction, RequestStopTransaction, Reset, SetVariables, GetVariables, ChangeAvailability, UnlockConnector, TriggerMessage, ClearCache, GetBaseReport, GetReport, GetTransactionStatus |
+| Оба (1) | DataTransfer |
 
 Ключевые отличия от OCPP 1.6:
 - **3-уровневая модель** — Станция → EVSE → Коннектор (вместо плоского списка коннекторов)
 - **TransactionEvent** — одно сообщение заменяет StartTransaction, StopTransaction и MeterValues
 - **Device Model** — SetVariables/GetVariables заменяют ChangeConfiguration/GetConfiguration
 - **Валидация по схемам** — все сообщения проверяются по официальным OCPP 2.0.1 JSON Schema
+- **Соответствие спецификации** — корректный маппинг triggerReason→stoppedReason, валидация connectorId, отслеживание remoteStartId, отложенная смена доступности
 
 Встроенный эмулятор включает 5 станций OCPP 2.0.1 с разными конфигурациями:
 
