@@ -28,9 +28,7 @@ tags:
   - name: CentralSystem
     description: Central System endpoints
   - name: ChargePoint
-    description: Charge point endpoints (OCPP 1.6)
-  - name: ChargePoint 2.0.1
-    description: Charge point endpoints (OCPP 2.0.1)
+    description: Charge point endpoints
 paths:
   /ping:
     get:
@@ -646,9 +644,9 @@ paths:
         - ChargePoint
       summary: 5.14. Reset
       description: >
-        The Central System SHALL send a Reset.req PDU for requesting a Charge Point to reset itself. The Central System
-        can request a hard or a soft reset. Upon receipt of a Reset.req PDU, the Charge Point SHALL respond with a
-        Reset.conf PDU. The response PDU SHALL include whether the Charge Point will attempt to reset itself.
+        Request the station to reset. The payload format is adapted automatically
+        to the station's OCPP version. "Hard" maps to "Immediate" and "Soft" maps to "OnIdle"
+        for OCPP 2.0.1 stations, and vice versa.
       operationId: Reset
       parameters:
         - $ref: '#/components/parameters/Identity'
@@ -873,7 +871,7 @@ paths:
   /ChargePoint/{identity}/RequestStartTransaction:
     post:
       tags:
-        - ChargePoint 2.0.1
+        - ChargePoint
       summary: Request Start Transaction (OCPP 2.0.1)
       description: >
         The CSMS requests the Charging Station to start a transaction. The Charging Station responds with
@@ -906,7 +904,7 @@ paths:
   /ChargePoint/{identity}/RequestStopTransaction:
     post:
       tags:
-        - ChargePoint 2.0.1
+        - ChargePoint
       summary: Request Stop Transaction (OCPP 2.0.1)
       description: >
         The CSMS requests the Charging Station to stop an ongoing transaction.
@@ -938,7 +936,7 @@ paths:
   /ChargePoint/{identity}/SetVariables:
     post:
       tags:
-        - ChargePoint 2.0.1
+        - ChargePoint
       summary: Set Variables (OCPP 2.0.1)
       description: >
         The CSMS sends this to the Charging Station to set one or more variables in the Device Model.
@@ -971,7 +969,7 @@ paths:
   /ChargePoint/{identity}/GetVariables:
     post:
       tags:
-        - ChargePoint 2.0.1
+        - ChargePoint
       summary: Get Variables (OCPP 2.0.1)
       description: >
         The CSMS sends this to the Charging Station to get one or more variables from the Device Model.
@@ -1001,15 +999,14 @@ paths:
           $ref: '#/components/responses/NotFound'
         '5XX':
           $ref: '#/components/responses/InternalError'
-  /ChargePoint/{identity}/ChangeAvailability201:
+  /ChargePoint/{identity}/GetBaseReport:
     post:
       tags:
-        - ChargePoint 2.0.1
-      summary: Change Availability (OCPP 2.0.1)
+        - ChargePoint
+      summary: Get Base Report
       description: >
-        The CSMS requests the Charging Station to change its availability. Uses operationalStatus instead of
-        connectorId/type from OCPP 1.6. An optional evse object can target a specific EVSE.
-      operationId: ChangeAvailability201
+        Request the station to send a full Device Model report via NotifyReport messages.
+      operationId: GetBaseReport
       parameters:
         - $ref: '#/components/parameters/Identity'
       requestBody:
@@ -1017,32 +1014,41 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ChangeAvailability201'
+              type: object
+              required:
+                - requestId
+                - reportBase
+              properties:
+                requestId:
+                  type: integer
+                reportBase:
+                  type: string
+                  enum: [ConfigurationInventory, FullInventory, SummaryInventory]
       responses:
         '200':
-          description: >
-            Indicates whether the Charging Station is able to perform the availability change.
+          description: Station accepted the report request
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ChangeAvailabilityResponse201'
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [Accepted, Rejected, NotSupported, EmptyResultSet]
         '400':
           $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
         '5XX':
           $ref: '#/components/responses/InternalError'
-  /ChargePoint/{identity}/DataTransfer201:
+  /ChargePoint/{identity}/GetReport:
     post:
       tags:
-        - ChargePoint 2.0.1
-      summary: Data Transfer (OCPP 2.0.1)
+        - ChargePoint
+      summary: Get Report
       description: >
-        The CSMS sends vendor-specific data to the Charging Station. Same concept as OCPP 1.6 DataTransfer
-        but uses the OCPP 2.0.1 message format.
-      operationId: DataTransfer201
+        Request the station to send a filtered Device Model report.
+      operationId: GetReport
       parameters:
         - $ref: '#/components/parameters/Identity'
       requestBody:
@@ -1050,52 +1056,83 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/DataTransfer201'
+              type: object
+              required:
+                - requestId
+              properties:
+                requestId:
+                  type: integer
+                componentVariable:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      component:
+                        type: object
+                        properties:
+                          name:
+                            type: string
+                      variable:
+                        type: object
+                        properties:
+                          name:
+                            type: string
+                componentCriteria:
+                  type: array
+                  items:
+                    type: string
+                    enum: [Active, Available, Enabled, Problem]
       responses:
         '200':
-          description: >
-            Indicates whether the Charging Station accepted the data transfer.
+          description: Station accepted the report request
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/DataTransferResponse201'
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [Accepted, Rejected, NotSupported, EmptyResultSet]
         '400':
           $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
         '5XX':
           $ref: '#/components/responses/InternalError'
-  /ChargePoint/{identity}/Reset201:
+  /ChargePoint/{identity}/GetTransactionStatus:
     post:
       tags:
-        - ChargePoint 2.0.1
-      summary: Reset (OCPP 2.0.1)
+        - ChargePoint
+      summary: Get Transaction Status
       description: >
-        The CSMS requests the Charging Station to reset itself. Uses Immediate/OnIdle instead of Hard/Soft from
-        OCPP 1.6. An optional evseId can target a specific EVSE.
-      operationId: Reset201
+        Check if the station still has message requests to be delivered (OCPP 2.0.1).
+      operationId: GetTransactionStatus
       parameters:
         - $ref: '#/components/parameters/Identity'
       requestBody:
-        required: true
+        required: false
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/Reset201'
+              type: object
+              properties:
+                transactionId:
+                  type: string
+                  description: "Optional transaction ID to query"
       responses:
         '200':
-          description: >
-            Indicates whether the Charging Station is able to perform the reset.
+          description: Station response
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ResetResponse201'
+                type: object
+                properties:
+                  messagesInQueue:
+                    type: boolean
+                  ongoingIndicator:
+                    type: boolean
         '400':
           $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
         '5XX':
@@ -1472,9 +1509,11 @@ components:
       properties:
         type:
           type: string
-          enum: [Hard, Soft]
-          default: Soft
-          description: This contains the type of reset that the Charge Point should perform.
+          enum: [Hard, Soft, Immediate, OnIdle]
+          description: "Hard/Soft (OCPP 1.6) or Immediate/OnIdle (OCPP 2.0.1) — auto-translated"
+        evseId:
+          type: integer
+          description: "Target specific EVSE (OCPP 2.0.1 only, ignored for 1.6)"
     ResetResponse:
       type: object
       required:
@@ -2089,102 +2128,6 @@ components:
                     type: string
                   additionalInfo:
                     type: string
-    ChangeAvailability201:
-      type: object
-      required:
-        - operationalStatus
-      properties:
-        operationalStatus:
-          type: string
-          enum: [Operative, Inoperative]
-          description: The type of availability change that the Charging Station should perform.
-        evse:
-          type: object
-          description: If absent, the change applies to the entire Charging Station.
-          required:
-            - id
-          properties:
-            id:
-              type: integer
-              format: int32
-              description: EVSE Identifier.
-            connectorId:
-              type: integer
-              format: int32
-              description: An id to designate a specific connector of the EVSE.
-    ChangeAvailabilityResponse201:
-      type: object
-      required:
-        - status
-      properties:
-        status:
-          type: string
-          enum: [Accepted, Rejected, Scheduled]
-        statusInfo:
-          type: object
-          properties:
-            reasonCode:
-              type: string
-            additionalInfo:
-              type: string
-    DataTransfer201:
-      type: object
-      required:
-        - vendorId
-      properties:
-        vendorId:
-          type: string
-          description: Identifies the Vendor specific implementation.
-        messageId:
-          type: string
-          description: Additional identification field.
-        data:
-          description: Data without specified length or format. Can be string or JSON object.
-    DataTransferResponse201:
-      type: object
-      required:
-        - status
-      properties:
-        status:
-          type: string
-          enum: [Accepted, Rejected, UnknownMessageId, UnknownVendorId]
-        data:
-          description: Data in response to request.
-        statusInfo:
-          type: object
-          properties:
-            reasonCode:
-              type: string
-            additionalInfo:
-              type: string
-    Reset201:
-      type: object
-      required:
-        - type
-      properties:
-        type:
-          type: string
-          enum: [Immediate, OnIdle]
-          description: The type of reset that the Charging Station should perform.
-        evseId:
-          type: integer
-          format: int32
-          description: If present, the Charging Station SHALL reset only the given EVSE.
-    ResetResponse201:
-      type: object
-      required:
-        - status
-      properties:
-        status:
-          type: string
-          enum: [Accepted, Rejected, Scheduled]
-        statusInfo:
-          type: object
-          properties:
-            reasonCode:
-              type: string
-            additionalInfo:
-              type: string
     # ── End OCPP 2.0.1 Schemas ───────────────────────────────────────────
     status:
       type: object
