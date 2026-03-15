@@ -703,14 +703,10 @@ void CSService::do_api(const HttpRequest& req, HttpResponse& resp)
             return;
         }
 
-#ifdef WITH_POSTGRESQL
-        if (pool_) {
-            if (command == "CentralSystem" && parts.size() >= 4 && parts[3] == "ChargePointList") {
-                do_charge_point_list(req, resp);
-                return;
-            }
+        if (command == "CentralSystem" && parts.size() >= 4 && parts[3] == "ChargePointList") {
+            do_charge_point_list(req, resp);
+            return;
         }
-#endif
     }
 
     reply_error(resp, HttpStatus::not_found, "Unknown API command");
