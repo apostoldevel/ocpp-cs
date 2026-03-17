@@ -131,6 +131,16 @@ void CSService::init_methods()
     add_method("POST", [this](auto& req, auto& resp) { do_post(req, resp); });
 }
 
+// ── Static file serving ─────────────────────────────────────────────────────
+
+std::filesystem::path CSService::resolve_root(const HttpRequest& req) const
+{
+    if (const auto* site = app_.sites().find(get_host(req)))
+        if (!site->root.empty())
+            return site->root;
+    return app_.settings().doc_root;
+}
+
 // ── HTTP GET ────────────────────────────────────────────────────────────────
 
 void CSService::do_get(const HttpRequest& req, HttpResponse& resp)
@@ -149,8 +159,8 @@ void CSService::do_get(const HttpRequest& req, HttpResponse& resp)
         return;
     }
 
-    // Serve static files with try-files fallback
-    try_files(app_.settings().doc_root, req, resp, false);
+    // Serve static files with try-files fallback (per-site root from sites/*.json)
+    try_files(resolve_root(req), req, resp, false);
 }
 
 // ── HTTP POST ───────────────────────────────────────────────────────────────

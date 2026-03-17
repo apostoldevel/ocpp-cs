@@ -126,6 +126,10 @@ private:
     void webhook_json(ocpp::CSChargingPoint& point, const ocpp::OcppMessage& msg,
                      const std::string& account = {});
 
+    // ── Static file serving ────────────────────────────────────────────
+
+    std::filesystem::path resolve_root(const HttpRequest& req) const;
+
     // ── Utilities ───────────────────────────────────────────────────────
 
     static void log_json_message(const std::string& identity, const ocpp::OcppMessage& msg);
