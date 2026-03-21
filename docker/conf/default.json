@@ -43,6 +43,12 @@
     "auth": false
   },
   "postgres": {
-    "connect": false
+    "connect": true,
+    "notice": false,
+    "timeout": 10,
+    "worker": {
+      "min": 5,
+      "max": 10
+    }
   }
 }

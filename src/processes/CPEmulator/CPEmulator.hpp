@@ -262,6 +262,10 @@ private:
         const std::string& component, const std::string& variable, int evse_id = 0);
     static std::string generate_transaction_id();
 
+    // ── Station lookup ──────────────────────────────────────────────────
+
+    Station* find_station(const std::string& identity);
+
     // ── Members ──────────────────────────────────────────────────────────
 
     EventLoop*   loop_ = nullptr;
