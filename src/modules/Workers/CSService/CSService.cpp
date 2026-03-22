@@ -741,6 +741,22 @@ json CSService::translate_payload(const std::string& operation,
                 if (t == "Hard")      t = "Immediate";
                 else if (t == "Soft") t = "OnIdle";
             }
+        } else if (operation == "RequestStartTransaction") {
+            // 1.6 format {idTag, connectorId} -> 2.0.1 {idToken: {idToken, type}, evseId, remoteStartId}
+            if (result.contains("idTag") && !result.contains("idToken")) {
+                auto tag = result.value("idTag", "");
+                int cid = result.value("connectorId", 0);
+                result.erase("idTag");
+                result.erase("connectorId");
+                result.erase("chargingProfile"); // 2.0.1 uses different format
+                result["idToken"] = {{"idToken", tag}, {"type", "ISO14443"}};
+                if (cid > 0)
+                    result["evseId"] = cid;
+                if (!result.contains("remoteStartId"))
+                    result["remoteStartId"] = 1;
+            }
+        } else if (operation == "RequestStopTransaction") {
+            // 1.6 format {transactionId: int/string} -> already handled by SQL (sends string SID)
         } else if (operation == "ChangeAvailability") {
             // 1.6 format {connectorId, type} -> 2.0.1 {operationalStatus, evse?}
             if (result.contains("connectorId") && !result.contains("operationalStatus")) {
