@@ -757,6 +757,21 @@ json CSService::translate_payload(const std::string& operation,
             }
         } else if (operation == "RequestStopTransaction") {
             // 1.6 format {transactionId: int/string} -> already handled by SQL (sends string SID)
+        } else if (operation == "UnlockConnector") {
+            // 1.6 format {connectorId} -> 2.0.1 {evseId, connectorId}
+            if (result.contains("connectorId") && !result.contains("evseId")) {
+                int cid = result.value("connectorId", 0);
+                result["evseId"] = cid > 0 ? cid : 1;
+                result["connectorId"] = 1;
+            }
+        } else if (operation == "TriggerMessage") {
+            // 1.6 format {requestedMessage, connectorId?} -> 2.0.1 {requestedMessage, evse?: {id}}
+            if (result.contains("connectorId")) {
+                int cid = result.value("connectorId", 0);
+                result.erase("connectorId");
+                if (cid > 0)
+                    result["evse"] = {{"id", cid}};
+            }
         } else if (operation == "ChangeAvailability") {
             // 1.6 format {connectorId, type} -> 2.0.1 {operationalStatus, evse?}
             if (result.contains("connectorId") && !result.contains("operationalStatus")) {
@@ -824,6 +839,7 @@ void CSService::do_charge_point(const HttpRequest& req, HttpResponse& resp,
             "GetBaseReport", "GetReport", "UnlockConnector",
             "TriggerMessage", "ClearCache", "GetTransactionStatus",
             "SendLocalList", "GetLocalListVersion",
+            "CancelReservation", "ReserveNow",
         };
 
         // Translate 1.6 name if needed
