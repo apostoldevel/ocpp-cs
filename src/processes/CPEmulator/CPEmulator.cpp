@@ -305,6 +305,7 @@ void CPEmulator::create_station(const std::string& dir_name)
                       station->config.value("CentralSystemURL", ""), true, "ReadOnly", 0, "string"});
         dm.push_back({"AuthCtrl", "LocalAuthListEnabled", "true", false, "ReadWrite", 0, "boolean"});
         dm.push_back({"AuthCtrl", "AuthCacheEnabled", "true", false, "ReadWrite", 0, "boolean"});
+        dm.push_back({"ReservationCtrlr", "NonEvseSpecific", "true", false, "ReadWrite", 0, "boolean"});
         for (auto& evse : station->evses) {
             dm.push_back({"EVSE", "Power", "22000", true, "ReadOnly", evse.evse_id, "integer"});
             dm.push_back({"EVSE", "AvailabilityState", evse.status, true, "ReadOnly", evse.evse_id, "string"});
