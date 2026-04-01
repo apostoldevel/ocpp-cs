@@ -376,6 +376,9 @@ void CPEmulator::register_action_handlers(Station& station)
         // Phase 2: Local Auth List
         reg("SendLocalList",        &CPEmulator::on_send_local_list_201);
         reg("GetLocalListVersion",  &CPEmulator::on_get_local_list_version_201);
+        // Phase 2: Reservation
+        reg("ReserveNow",        &CPEmulator::on_reserve_now_201);
+        reg("CancelReservation", &CPEmulator::on_cancel_reservation_201);
     } else {
         reg("CancelReservation",      &CPEmulator::on_cancel_reservation);
         reg("ChangeAvailability",     &CPEmulator::on_change_availability);
@@ -591,6 +594,15 @@ void CPEmulator::send_status_notification_201(Station& station, int evse_id, int
         {"connectorStatus", status},
         {"evseId", evse_id},
         {"connectorId", connector_id}
+    });
+}
+
+void CPEmulator::send_reservation_status_update(Station& station, int reservation_id,
+                                                 const std::string& status)
+{
+    send_request(station, "ReservationStatusUpdate", {
+        {"reservationId", reservation_id},
+        {"reservationUpdateStatus", status}
     });
 }
 
@@ -1077,6 +1089,115 @@ nlohmann::json CPEmulator::on_cancel_reservation(Station& station, const nlohman
     send_status_notification(station, conn->connector_id, "Available");
 
     return {{"status", "Accepted"}};
+}
+
+nlohmann::json CPEmulator::on_reserve_now_201(Station& station, const nlohmann::json& payload)
+{
+    int reservation_id = payload.value("id", 0);
+    if (reservation_id <= 0)
+        throw std::invalid_argument("missing id");
+
+    if (!payload.contains("expiryDateTime"))
+        throw std::invalid_argument("missing expiryDateTime");
+    if (!payload.contains("idToken"))
+        throw std::invalid_argument("missing idToken");
+
+    auto expiry = parse_iso_time(payload["expiryDateTime"].get<std::string>());
+    auto id_token_obj = payload["idToken"];
+    auto id_token = id_token_obj.value("idToken", "");
+    auto id_token_type = id_token_obj.value("type", "ISO14443");
+
+    std::string group_id_token;
+    if (payload.contains("groupIdToken") && payload["groupIdToken"].is_object())
+        group_id_token = payload["groupIdToken"].value("idToken", "");
+
+    int evse_id = payload.value("evseId", 0);
+
+    // Helper: apply reservation to an EVSE
+    auto apply_reservation = [&](EvseState& evse) -> nlohmann::json {
+        // H01.FR.02: same reservationId — replace
+        if (evse.reservation && evse.reservation->id == reservation_id) {
+            // Update in-place
+        } else if (evse.status == "Faulted") {
+            return {{"status", "Faulted"}};
+        } else if (evse.status == "Unavailable") {
+            return {{"status", "Unavailable"}};
+        } else if (evse.status != "Available" && evse.status != "Reserved") {
+            return {{"status", "Occupied"}};
+        } else if (evse.status == "Reserved" &&
+                   (!evse.reservation || evse.reservation->id != reservation_id)) {
+            return {{"status", "Occupied"}};
+        }
+
+        evse.reservation = Reservation201{
+            reservation_id, id_token, id_token_type,
+            group_id_token, evse.evse_id, expiry
+        };
+        evse.status = "Reserved";
+        evse.status_updated = std::chrono::system_clock::now();
+
+        for (auto& conn : evse.connectors)
+            send_status_notification_201(station, evse.evse_id, conn.connector_id);
+
+        app_->logger().info("[{}] ReserveNow (2.0.1): id={} evse={} idToken={}",
+            station.identity, reservation_id, evse.evse_id, id_token);
+
+        return {{"status", "Accepted"}};
+    };
+
+    if (evse_id > 0) {
+        // S2: specific EVSE
+        auto* evse = find_evse(station, evse_id);
+        if (!evse)
+            return {{"status", "Rejected"}};
+        return apply_reservation(*evse);
+    }
+
+    // S1: non-specific EVSE
+    auto* var = find_device_model_var(station, "ReservationCtrlr", "NonEvseSpecific");
+    if (!var || var->value != "true")
+        return {{"status", "Rejected"}};
+
+    // Find first available EVSE
+    int faulted = 0, unavailable = 0;
+    for (auto& evse : station.evses) {
+        if (evse.status == "Available")
+            return apply_reservation(evse);
+        if (evse.status == "Faulted") faulted++;
+        if (evse.status == "Unavailable") unavailable++;
+    }
+
+    if (faulted == static_cast<int>(station.evses.size()))
+        return {{"status", "Faulted"}};
+    if (unavailable == static_cast<int>(station.evses.size()))
+        return {{"status", "Unavailable"}};
+
+    return {{"status", "Occupied"}};
+}
+
+nlohmann::json CPEmulator::on_cancel_reservation_201(Station& station, const nlohmann::json& payload)
+{
+    int reservation_id = payload.value("reservationId", 0);
+    if (reservation_id <= 0)
+        throw std::invalid_argument("missing reservationId");
+
+    for (auto& evse : station.evses) {
+        if (evse.reservation && evse.reservation->id == reservation_id) {
+            app_->logger().info("[{}] CancelReservation (2.0.1): id={} evse={}",
+                station.identity, reservation_id, evse.evse_id);
+
+            evse.reservation.reset();
+            evse.status = "Available";
+            evse.status_updated = std::chrono::system_clock::now();
+
+            for (auto& conn : evse.connectors)
+                send_status_notification_201(station, evse.evse_id, conn.connector_id);
+
+            return {{"status", "Accepted"}};
+        }
+    }
+
+    return {{"status", "Rejected"}};
 }
 
 nlohmann::json CPEmulator::on_change_availability(Station& station, const nlohmann::json& payload)
