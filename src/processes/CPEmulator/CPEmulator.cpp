@@ -68,6 +68,25 @@ void CPEmulator::heartbeat(std::chrono::system_clock::time_point now)
                     evse.meter_value += kMeterIncrementWh;
             }
 
+            // Cancel expired reservations (H04)
+            for (auto& evse : station->evses) {
+                if (evse.reservation && evse.reservation->expiry != std::chrono::system_clock::time_point{} &&
+                    now >= evse.reservation->expiry) {
+                    int res_id = evse.reservation->id;
+                    app_->logger().info("[{}] reservation {} expired on EVSE {}",
+                        station->identity, res_id, evse.evse_id);
+
+                    evse.reservation.reset();
+                    evse.status = "Available";
+                    evse.status_updated = now;
+
+                    for (auto& conn : evse.connectors)
+                        send_status_notification_201(*station, evse.evse_id, conn.connector_id);
+
+                    send_reservation_status_update(*station, res_id, "Expired");
+                }
+            }
+
             // Periodic TransactionEvent(Updated) with MeterValues
             bool meter_sent = false;
             if (now >= station->next_meter_values) {
@@ -1673,7 +1692,21 @@ nlohmann::json CPEmulator::on_request_start_transaction(Station& station, const 
         }
     }
 
-    if (!evse || !evse->transaction_id.empty())
+    if (!evse)
+        return {{"status", "Rejected"}};
+
+    // H03: check reservation
+    if (evse->reservation) {
+        bool token_match = (evse->reservation->id_token == id_tag);
+        bool group_match = (!evse->reservation->group_id_token.empty() &&
+                            evse->reservation->group_id_token == id_tag);
+        if (!token_match && !group_match)
+            return {{"status", "Rejected"}};
+        // Reservation consumed by starting transaction
+        evse->reservation.reset();
+    }
+
+    if (!evse->transaction_id.empty())
         return {{"status", "Rejected"}};
 
     evse->id_token = id_tag;
@@ -1827,6 +1860,12 @@ nlohmann::json CPEmulator::on_change_availability_201(Station& station, const nl
             any_scheduled = true;
         } else {
             evse->status = new_status;
+            // H01.FR.16/17: cancel reservation on Inoperative
+            if (new_status == "Unavailable" && evse->reservation) {
+                int res_id = evse->reservation->id;
+                evse->reservation.reset();
+                send_reservation_status_update(station, res_id, "Removed");
+            }
             auto* dm_var = find_device_model_var(station, "EVSE", "AvailabilityState", evse->evse_id);
             if (dm_var) dm_var->value = new_status;
             if (!evse->connectors.empty())
@@ -1839,6 +1878,12 @@ nlohmann::json CPEmulator::on_change_availability_201(Station& station, const nl
                 any_scheduled = true;
             } else {
                 evse.status = new_status;
+                // H01.FR.16/17: cancel reservation on Inoperative
+                if (new_status == "Unavailable" && evse.reservation) {
+                    int res_id = evse.reservation->id;
+                    evse.reservation.reset();
+                    send_reservation_status_update(station, res_id, "Removed");
+                }
                 auto* dm_var = find_device_model_var(station, "EVSE", "AvailabilityState", evse.evse_id);
                 if (dm_var) dm_var->value = new_status;
                 for (auto& conn : evse.connectors)
