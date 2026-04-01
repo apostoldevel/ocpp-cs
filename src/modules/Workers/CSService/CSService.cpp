@@ -781,6 +781,23 @@ json CSService::translate_payload(const std::string& operation,
                 if (cid > 0)
                     result["evse"] = {{"id", cid}};
             }
+        } else if (operation == "ReserveNow") {
+            // 1.6 format {connectorId, expiryDate, idTag, reservationId, parentIdTag?}
+            // -> 2.0.1 {id, expiryDateTime, idToken, groupIdToken?, evseId?}
+            if (result.contains("reservationId") && !result.contains("id")) {
+                int rid = result.value("reservationId", 0);
+                int cid = result.value("connectorId", 0);
+                auto tag = result.value("idTag", "");
+                auto expiry = result.value("expiryDate", "");
+                auto parent = result.value("parentIdTag", "");
+
+                result = {{"id", rid}, {"expiryDateTime", expiry},
+                          {"idToken", {{"idToken", tag}, {"type", "ISO14443"}}}};
+                if (cid > 0)
+                    result["evseId"] = cid;
+                if (!parent.empty())
+                    result["groupIdToken"] = {{"idToken", parent}, {"type", "ISO14443"}};
+            }
         }
     } else {
         // target is 1.6
