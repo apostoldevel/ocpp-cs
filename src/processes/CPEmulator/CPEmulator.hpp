@@ -9,6 +9,7 @@
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <optional>
 #include <vector>
 
 #include <nlohmann/json.hpp>
@@ -77,6 +78,15 @@ private:
         std::string connector_type = "cCCS2";  // ConnectorEnumType
     };
 
+    struct Reservation201 {
+        int id = 0;
+        std::string id_token;
+        std::string id_token_type = "ISO14443";
+        std::string group_id_token;
+        int evse_id = 0;  // 0 = any EVSE (non-specific)
+        std::chrono::system_clock::time_point expiry{};
+    };
+
     struct EvseState {
         int evse_id = 0;
         std::vector<ConnectorState201> connectors;
@@ -91,6 +101,7 @@ private:
         int seq_no = 0;                         // TransactionEvent sequence number
         int remote_start_id = 0;              // remoteStartId from RequestStartTransaction
         std::string pending_availability;     // queued status change (ChangeAvailability "Scheduled")
+        std::optional<Reservation201> reservation;  // nullopt = not reserved
 
         void reset() {
             status = "Available";
@@ -102,6 +113,7 @@ private:
             seq_no = 0;
             remote_start_id = 0;
             pending_availability.clear();
+            reservation.reset();
         }
     };
 
@@ -239,6 +251,12 @@ private:
     nlohmann::json on_get_variables(Station& station, const nlohmann::json& payload);
     nlohmann::json on_change_availability_201(Station& station, const nlohmann::json& payload);
     nlohmann::json on_data_transfer_201(Station& station, const nlohmann::json& payload);
+
+    // ── OCPP 2.0.1 — Reservation ────────────────────────────────────────
+    nlohmann::json on_reserve_now_201(Station& station, const nlohmann::json& payload);
+    nlohmann::json on_cancel_reservation_201(Station& station, const nlohmann::json& payload);
+    void send_reservation_status_update(Station& station, int reservation_id,
+                                        const std::string& status);
 
     // ── OCPP 2.0.1 Phase 2 — Provisioning ───────────────────────────────
     nlohmann::json on_get_base_report(Station& station, const nlohmann::json& payload);
