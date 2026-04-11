@@ -733,6 +733,12 @@ json CSService::translate_payload(const std::string& operation,
 {
     json result = body;
 
+    // For multi-EVSE OCPP 2.0.1 stations the target evse is NOT the same as
+    // connectorId (one physical connector can belong to any of several EVSEs).
+    // The backend passes the real evse_id as an explicit "evseId" field in the
+    // 1.6-shaped payload; we prefer it over connectorId when present. Callers
+    // that don't know evse_id fall back to the legacy connectorId-as-evseId
+    // mapping which is correct for single-EVSE stations.
     if (target_version == "2.0.1") {
         if (operation == "Reset") {
             // Hard->Immediate, Soft->OnIdle
@@ -742,59 +748,68 @@ json CSService::translate_payload(const std::string& operation,
                 else if (t == "Soft") t = "OnIdle";
             }
         } else if (operation == "RequestStartTransaction") {
-            // 1.6 format {idTag, connectorId} -> 2.0.1 {idToken: {idToken, type}, evseId, remoteStartId}
+            // 1.6 format {idTag, connectorId, evseId?} -> 2.0.1 {idToken, evseId, remoteStartId}
             if (result.contains("idTag") && !result.contains("idToken")) {
                 auto tag = result.value("idTag", "");
+                int eid = result.value("evseId", 0);
                 int cid = result.value("connectorId", 0);
+                int effective = eid > 0 ? eid : cid;
                 result.erase("idTag");
                 result.erase("connectorId");
                 result.erase("chargingProfile"); // 2.0.1 uses different format
                 result["idToken"] = {{"idToken", tag}, {"type", "ISO14443"}};
-                if (cid > 0)
-                    result["evseId"] = cid;
+                if (effective > 0)
+                    result["evseId"] = effective;
                 if (!result.contains("remoteStartId"))
                     result["remoteStartId"] = 1;
             }
         } else if (operation == "RequestStopTransaction") {
             // 1.6 format {transactionId: int/string} -> already handled by SQL (sends string SID)
         } else if (operation == "UnlockConnector") {
-            // 1.6 format {connectorId} -> 2.0.1 {evseId, connectorId}
-            if (result.contains("connectorId") && !result.contains("evseId")) {
+            // 1.6 format {connectorId, evseId?} -> 2.0.1 {evseId, connectorId}
+            if (!result.contains("operationalStatus")) {
+                int eid = result.value("evseId", 0);
                 int cid = result.value("connectorId", 0);
-                result["evseId"] = cid > 0 ? cid : 1;
+                int effective = eid > 0 ? eid : cid;
+                result["evseId"] = effective > 0 ? effective : 1;
                 result["connectorId"] = 1;
             }
         } else if (operation == "TriggerMessage") {
-            // 1.6 format {requestedMessage, connectorId?} -> 2.0.1 {requestedMessage, evse?: {id}}
-            if (result.contains("connectorId")) {
-                int cid = result.value("connectorId", 0);
-                result.erase("connectorId");
-                if (cid > 0)
-                    result["evse"] = {{"id", cid}};
-            }
+            // 1.6 format {requestedMessage, connectorId?, evseId?} -> 2.0.1 {requestedMessage, evse?: {id}}
+            int eid = result.value("evseId", 0);
+            int cid = result.value("connectorId", 0);
+            int effective = eid > 0 ? eid : cid;
+            result.erase("connectorId");
+            result.erase("evseId");
+            if (effective > 0)
+                result["evse"] = {{"id", effective}};
         } else if (operation == "ChangeAvailability") {
-            // 1.6 format {connectorId, type} -> 2.0.1 {operationalStatus, evse?}
+            // 1.6 format {connectorId, evseId?, type} -> 2.0.1 {operationalStatus, evse?}
             if (result.contains("connectorId") && !result.contains("operationalStatus")) {
+                int eid = result.value("evseId", 0);
                 int cid = result.value("connectorId", 0);
+                int effective = eid > 0 ? eid : cid;
                 auto type = result.value("type", "Operative");
                 result = {{"operationalStatus", type}};
-                if (cid > 0)
-                    result["evse"] = {{"id", cid}};
+                if (effective > 0)
+                    result["evse"] = {{"id", effective}};
             }
         } else if (operation == "ReserveNow") {
-            // 1.6 format {connectorId, expiryDate, idTag, reservationId, parentIdTag?}
+            // 1.6 format {connectorId, evseId?, expiryDate, idTag, reservationId, parentIdTag?}
             // -> 2.0.1 {id, expiryDateTime, idToken, groupIdToken?, evseId?}
             if (result.contains("reservationId") && !result.contains("id")) {
                 int rid = result.value("reservationId", 0);
+                int eid = result.value("evseId", 0);
                 int cid = result.value("connectorId", 0);
+                int effective = eid > 0 ? eid : cid;
                 auto tag = result.value("idTag", "");
                 auto expiry = result.value("expiryDate", "");
                 auto parent = result.value("parentIdTag", "");
 
                 result = {{"id", rid}, {"expiryDateTime", expiry},
                           {"idToken", {{"idToken", tag}, {"type", "ISO14443"}}}};
-                if (cid > 0)
-                    result["evseId"] = cid;
+                if (effective > 0)
+                    result["evseId"] = effective;
                 if (!parent.empty())
                     result["groupIdToken"] = {{"idToken", parent}, {"type", "ISO14443"}};
             }
