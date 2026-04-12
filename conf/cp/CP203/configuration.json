@@ -1,33 +1,31 @@
 {
   "OcppVersion": "2.0.1",
   "ChargePointVendor": "Emulator",
-  "ChargePointModel": "TripleDC-201",
+  "ChargePointModel": "Combo-DC-AC",
   "ChargePointSerialNumber": "EM-201-003",
   "ChargePointSoftwareVersion": "2.0.0",
   "CentralSystemURL": "ws://localhost:9220/ocpp/",
   "Evses": [
     {
       "evseId": 1,
+      "power": 50000,
       "connectors": [
-        {"connectorId": 1, "type": "cCCS2"}
+        {"connectorId": 1, "type": "cCCS2"},
+        {"connectorId": 2, "type": "cCHAdeMO"}
       ]
     },
     {
       "evseId": 2,
+      "power": 22000,
       "connectors": [
-        {"connectorId": 1, "type": "cCCS1"}
-      ]
-    },
-    {
-      "evseId": 3,
-      "connectors": [
-        {"connectorId": 1, "type": "cChaoJi"}
+        {"connectorId": 1, "type": "cType2"}
       ]
     }
   ],
   "ConfigurationKeys": {
-    "HeartbeatInterval": {"value": "120", "readonly": false},
+    "HeartbeatInterval": {"value": "60", "readonly": false},
     "MeterValueSampleInterval": {"value": "60", "readonly": false},
     "AuthorizeRemoteTxRequests": {"value": "true", "readonly": false}
-  }
+  },
+  "Geo": {"latitude": 55.6761, "longitude": 12.5683, "location": "Copenhagen, Denmark"}
 }

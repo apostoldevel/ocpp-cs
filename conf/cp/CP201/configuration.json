@@ -1,26 +1,22 @@
 {
   "OcppVersion": "2.0.1",
   "ChargePointVendor": "Emulator",
-  "ChargePointModel": "Virtual-201",
+  "ChargePointModel": "Wallbox-DC",
   "ChargePointSerialNumber": "EM-201-001",
   "ChargePointSoftwareVersion": "2.0.0",
   "CentralSystemURL": "ws://localhost:9220/ocpp/",
   "Evses": [
     {
       "evseId": 1,
+      "power": 7400,
       "connectors": [
         {"connectorId": 1, "type": "cCCS2"}
-      ]
-    },
-    {
-      "evseId": 2,
-      "connectors": [
-        {"connectorId": 1, "type": "cCCS1"}
       ]
     }
   ],
   "ConfigurationKeys": {
     "HeartbeatInterval": {"value": "60", "readonly": false},
     "MeterValueSampleInterval": {"value": "60", "readonly": false}
-  }
+  },
+  "Geo": {"latitude": 52.3676, "longitude": 4.9041, "location": "Amsterdam, Netherlands"}
 }

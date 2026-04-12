@@ -1,33 +1,37 @@
 {
   "OcppVersion": "2.0.1",
   "ChargePointVendor": "Emulator",
-  "ChargePointModel": "QuadAC-201",
+  "ChargePointModel": "Hub-4x-Mixed",
   "ChargePointSerialNumber": "EM-201-005",
   "ChargePointSoftwareVersion": "2.0.0",
   "CentralSystemURL": "ws://localhost:9220/ocpp/",
   "Evses": [
     {
       "evseId": 1,
+      "power": 22000,
       "connectors": [
         {"connectorId": 1, "type": "sType2"}
       ]
     },
     {
       "evseId": 2,
+      "power": 22000,
       "connectors": [
-        {"connectorId": 1, "type": "sType2"}
+        {"connectorId": 1, "type": "cType2"}
       ]
     },
     {
       "evseId": 3,
+      "power": 50000,
       "connectors": [
-        {"connectorId": 1, "type": "sType1"}
+        {"connectorId": 1, "type": "cCCS2"}
       ]
     },
     {
       "evseId": 4,
+      "power": 50000,
       "connectors": [
-        {"connectorId": 1, "type": "sType1"}
+        {"connectorId": 1, "type": "cGBT"}
       ]
     }
   ],
@@ -35,5 +39,6 @@
     "HeartbeatInterval": {"value": "90", "readonly": false},
     "MeterValueSampleInterval": {"value": "60", "readonly": false},
     "AuthorizeRemoteTxRequests": {"value": "true", "readonly": false}
-  }
+  },
+  "Geo": {"latitude": 38.7223, "longitude": -9.1393, "location": "Lisbon, Portugal"}
 }

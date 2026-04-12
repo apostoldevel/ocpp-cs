@@ -1,23 +1,25 @@
 {
   "OcppVersion": "2.0.1",
   "ChargePointVendor": "Emulator",
-  "ChargePointModel": "DualCable-201",
+  "ChargePointModel": "DualCable-DC-AC",
   "ChargePointSerialNumber": "EM-201-004",
   "ChargePointSoftwareVersion": "2.0.0",
   "CentralSystemURL": "ws://localhost:9220/ocpp/",
   "Evses": [
     {
       "evseId": 1,
+      "power": 50000,
       "connectors": [
         {"connectorId": 1, "type": "cCCS2"},
-        {"connectorId": 2, "type": "cCCS1"}
+        {"connectorId": 2, "type": "cCHAdeMO"}
       ]
     },
     {
       "evseId": 2,
+      "power": 22000,
       "connectors": [
-        {"connectorId": 1, "type": "cCCS2"},
-        {"connectorId": 2, "type": "cChaoJi"}
+        {"connectorId": 1, "type": "sType2"},
+        {"connectorId": 2, "type": "cGBT"}
       ]
     }
   ],
@@ -25,5 +27,6 @@
     "HeartbeatInterval": {"value": "60", "readonly": false},
     "MeterValueSampleInterval": {"value": "90", "readonly": false},
     "AuthorizeRemoteTxRequests": {"value": "true", "readonly": false}
-  }
+  },
+  "Geo": {"latitude": 60.1699, "longitude": 24.9384, "location": "Helsinki, Finland"}
 }
