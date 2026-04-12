@@ -647,9 +647,11 @@ void CPEmulator::send_transaction_event(Station& station, EvseState& evse,
         }}
     };
 
-    // Add EVSE info
+    // Add EVSE info (use active_connector_id from CSMS hint if available)
     nlohmann::json evse_info = {{"id", evse.evse_id}};
-    if (!evse.connectors.empty())
+    if (evse.active_connector_id > 0)
+        evse_info["connectorId"] = evse.active_connector_id;
+    else if (!evse.connectors.empty())
         evse_info["connectorId"] = evse.connectors[0].connector_id;
     payload["evse"] = evse_info;
 
@@ -725,9 +727,10 @@ void CPEmulator::send_transaction_event(Station& station, EvseState& evse,
                 if (status == "Accepted") {
                     ev->status = "Occupied";
                     ev->status_updated = std::chrono::system_clock::now();
-                    if (!ev->connectors.empty())
-                        send_status_notification_201(*st, ev->evse_id,
-                                                     ev->connectors[0].connector_id);
+                    int cid = ev->active_connector_id > 0
+                        ? ev->active_connector_id
+                        : (!ev->connectors.empty() ? ev->connectors[0].connector_id : 1);
+                    send_status_notification_201(*st, ev->evse_id, cid);
                 }
             }
         };
@@ -1713,6 +1716,10 @@ nlohmann::json CPEmulator::on_request_start_transaction(Station& station, const 
     evse->id_token = id_tag;
     evse->id_token_type = id_type;
     evse->remote_start_id = remote_start_id;
+
+    // Read connectorId hint from CSMS customData (dual-cable EVSE support)
+    if (payload.contains("customData"))
+        evse->active_connector_id = payload["customData"].value("connectorId", 0);
 
     // Authorize then start
     send_authorize_201(station, *evse);

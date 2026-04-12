@@ -100,6 +100,7 @@ private:
         std::chrono::system_clock::time_point status_updated{};
         int seq_no = 0;                         // TransactionEvent sequence number
         int remote_start_id = 0;              // remoteStartId from RequestStartTransaction
+        int active_connector_id = 0;          // connectorId hint from CSMS customData (dual-cable EVSE)
         std::string pending_availability;     // queued status change (ChangeAvailability "Scheduled")
         std::optional<Reservation201> reservation;  // nullopt = not reserved
 
@@ -112,6 +113,7 @@ private:
             status_updated = {};
             seq_no = 0;
             remote_start_id = 0;
+            active_connector_id = 0;
             pending_availability.clear();
             reservation.reset();
         }

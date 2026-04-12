@@ -889,6 +889,11 @@ void CSService::do_charge_point(const HttpRequest& req, HttpResponse& resp,
 
         auto body = content_to_json(req);
 
+        // Save connectorId before translation (OCPP 2.0.1 RequestStartTransaction has no connectorId)
+        int saved_connector_id = 0;
+        if (actual_op == "RequestStartTransaction" && body.contains("connectorId"))
+            saved_connector_id = body.value("connectorId", 0);
+
         // Translate payload fields for cross-version compatibility
         body = translate_payload(actual_op, body, "2.0.1");
 
@@ -896,6 +901,17 @@ void CSService::do_charge_point(const HttpRequest& req, HttpResponse& resp,
         if (auto err = schema_registry_.validate("2.0.1", actual_op, "Request", body)) {
             reply_error(resp, HttpStatus::bad_request, *err);
             return;
+        }
+
+        // For emulator stations: pass connectorId hint via customData so CPEmulator
+        // knows which connector to report in TransactionEvent/StatusNotification.
+        // Real stations never have vendorName "Emulator" so this branch is skipped.
+        if (saved_connector_id > 0) {
+            auto& boot = point->last_request("BootNotification");
+            bool is_emulator = boot.contains("chargingStation") &&
+                boot["chargingStation"].value("vendorName", "") == "Emulator";
+            if (is_emulator)
+                body["customData"] = {{"vendorId", "ChargeMeCar"}, {"connectorId", saved_connector_id}};
         }
 
         // Send via WebSocket (send_json_response handles logging + broadcast)
