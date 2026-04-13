@@ -353,7 +353,7 @@ void CSService::on_ws_message(ocpp::CSChargingPoint& point, const std::string& p
         // the full payload. Currently used for geo in BootNotification (OCPP 1.6 emulators).
         nlohmann::json stripped;
         if (msg.action == "BootNotification" && point.ocpp_version() != "2.0.1") {
-            for (auto key : {"latitude", "longitude", "location"}) {
+            for (auto key : {"latitude", "longitude", "location", "connectors"}) {
                 if (msg.payload.contains(key)) {
                     stripped[key] = msg.payload[key];
                     msg.payload.erase(key);
