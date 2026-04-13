@@ -348,6 +348,19 @@ void CSService::on_ws_message(ocpp::CSChargingPoint& point, const std::string& p
     log_json_message(point.identity(), msg);
 
     if (msg.type == ocpp::MessageType::Call) {
+        // Strip vendor-extension fields before schema validation (they are not part of the spec
+        // and would fail additionalProperties check). Restore them after validation so PG receives
+        // the full payload. Currently used for geo in BootNotification (OCPP 1.6 emulators).
+        nlohmann::json stripped;
+        if (msg.action == "BootNotification" && point.ocpp_version() != "2.0.1") {
+            for (auto key : {"latitude", "longitude", "location"}) {
+                if (msg.payload.contains(key)) {
+                    stripped[key] = msg.payload[key];
+                    msg.payload.erase(key);
+                }
+            }
+        }
+
         // Validate against JSON schema
         auto err = schema_registry_.validate(point.ocpp_version(), msg.action, "Request", msg.payload);
         if (err) {
@@ -358,6 +371,10 @@ void CSService::on_ws_message(ocpp::CSChargingPoint& point, const std::string& p
             send_json_response(point, error);
             return;
         }
+
+        // Restore stripped fields so PG receives the full payload
+        if (!stripped.empty())
+            msg.payload.update(stripped);
 
         // Broadcast to log subscribers
         broadcast_log({{"ts", ocpp::iso_time_now()}, {"identity", point.identity()},

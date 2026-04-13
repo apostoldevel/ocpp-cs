@@ -484,6 +484,14 @@ void CPEmulator::send_boot_notification(Station& station)
             {"chargePointSerialNumber", require_key("ChargePointSerialNumber")},
             {"firmwareVersion",         require_key("ChargePointSoftwareVersion")}
         };
+
+        // Send geo coordinates as extra fields (OCPP 1.6 has no strict schema enforcement)
+        if (station.config.contains("Geo")) {
+            auto& geo = station.config["Geo"];
+            if (geo.contains("latitude"))  payload["latitude"]  = geo["latitude"];
+            if (geo.contains("longitude")) payload["longitude"] = geo["longitude"];
+            if (geo.contains("location"))  payload["location"]  = geo["location"];
+        }
     }
 
     app_->logger().info("[{}] sending BootNotification", station.identity);
@@ -563,10 +571,24 @@ void CPEmulator::send_boot_notification_201(Station& station)
 
     app_->logger().info("[{}] sending BootNotification (2.0.1)", station.identity);
 
-    send_request(station, "BootNotification", {
+    nlohmann::json boot_payload = {
         {"reason", "PowerUp"},
         {"chargingStation", charging_station}
-    }, [this, identity = station.identity](const WsMessage& resp) {
+    };
+
+    // Send geo coordinates via customData (vendor extension, not part of OCPP 2.0.1 spec)
+    if (station.config.contains("Geo")) {
+        auto& geo = station.config["Geo"];
+        boot_payload["customData"] = {
+            {"vendorId", "ChargeMeCar"},
+            {"latitude", geo.value("latitude", 0.0)},
+            {"longitude", geo.value("longitude", 0.0)},
+            {"location", geo.value("location", "")}
+        };
+    }
+
+    send_request(station, "BootNotification", std::move(boot_payload),
+        [this, identity = station.identity](const WsMessage& resp) {
         auto* st = find_station(identity);
         if (!st) return;
 
