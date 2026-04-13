@@ -485,12 +485,16 @@ void CPEmulator::send_boot_notification(Station& station)
             {"firmwareVersion",         require_key("ChargePointSoftwareVersion")}
         };
 
-        // Send geo coordinates as extra fields (OCPP 1.6 has no strict schema enforcement)
+        // Send geo + connector layout as extra fields (stripped before schema validation by CSService)
         if (station.config.contains("Geo")) {
             auto& geo = station.config["Geo"];
             if (geo.contains("latitude"))  payload["latitude"]  = geo["latitude"];
             if (geo.contains("longitude")) payload["longitude"] = geo["longitude"];
             if (geo.contains("location"))  payload["location"]  = geo["location"];
+        }
+
+        if (station.config.contains("connectorId") && station.config["connectorId"].is_array()) {
+            payload["connectors"] = station.config["connectorId"];
         }
     }
 
@@ -576,16 +580,39 @@ void CPEmulator::send_boot_notification_201(Station& station)
         {"chargingStation", charging_station}
     };
 
-    // Send geo coordinates via customData (vendor extension, not part of OCPP 2.0.1 spec)
+    // Send geo + connector layout via customData (vendor extension)
+    nlohmann::json custom_data = {{"vendorId", "ChargeMeCar"}};
+
     if (station.config.contains("Geo")) {
         auto& geo = station.config["Geo"];
-        boot_payload["customData"] = {
-            {"vendorId", "ChargeMeCar"},
-            {"latitude", geo.value("latitude", 0.0)},
-            {"longitude", geo.value("longitude", 0.0)},
-            {"location", geo.value("location", "")}
-        };
+        custom_data["latitude"] = geo.value("latitude", 0.0);
+        custom_data["longitude"] = geo.value("longitude", 0.0);
+        custom_data["location"] = geo.value("location", "");
     }
+
+    if (!station.evses.empty()) {
+        auto evses_json = nlohmann::json::array();
+        for (auto& evse : station.evses) {
+            nlohmann::json evse_json = {{"evseId", evse.evse_id}};
+            auto conns = nlohmann::json::array();
+            for (auto& conn : evse.connectors)
+                conns.push_back({{"connectorId", conn.connector_id}, {"type", conn.connector_type}});
+            evse_json["connectors"] = conns;
+            // Include per-EVSE power from config if available
+            if (station.config.contains("Evses")) {
+                for (auto& cfg_evse : station.config["Evses"]) {
+                    if (cfg_evse.value("evseId", 0) == evse.evse_id && cfg_evse.contains("power")) {
+                        evse_json["power"] = cfg_evse["power"];
+                        break;
+                    }
+                }
+            }
+            evses_json.push_back(evse_json);
+        }
+        custom_data["evses"] = evses_json;
+    }
+
+    boot_payload["customData"] = custom_data;
 
     send_request(station, "BootNotification", std::move(boot_payload),
         [this, identity = station.identity](const WsMessage& resp) {
