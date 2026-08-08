@@ -96,8 +96,13 @@ CSService::CSService(Application& app)
         app.logger().warn("OCPP 2.0.1 schemas not loaded: {}", e.what());
     }
 
-    // Environment variable overrides
-    if (const char* env_url = std::getenv("WEBHOOK_URL")) {
+    // Environment variable overrides.
+    //
+    // A non-empty WEBHOOK_URL is what turns the webhook on. An empty one —
+    // which is what `-e WEBHOOK_URL=` or a compose file referencing an unset
+    // variable produces — must leave the mode alone instead of marking the
+    // webhook enabled with nowhere to post to.
+    if (const char* env_url = std::getenv("WEBHOOK_URL"); env_url && *env_url) {
         webhook_.url = env_url;
         webhook_.enabled = true;
     }
