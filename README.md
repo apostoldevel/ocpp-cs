@@ -241,7 +241,13 @@ Your server responds in the same format with the OCPP-compliant `payload`:
 - `uniqueId` — request ID
 - `action` — OCPP action name
 - `payload` — OCPP data
-- `account` — optional user account (extracted from the connection URL: `ws://host/ocpp/EM-A0000001/AC0001`)
+- `account` — optional user account (extracted from the connection URL: the path is `/ocpp/{account}/{identity}` with three segments, or `/ocpp/{identity}` with two — for example `ws://host/ocpp/AC0001/EM-A0000001`)
+
+> **The account comes first, the identifier last.** Swapping the two fails
+> silently: the last segment is always taken as the charge point identifier, so
+> the station registers under the account value and reports an empty `account`.
+> If a station does not appear where you expect it, check the `identity` field
+> of its first webhook call.
 
 ### PostgreSQL
 
