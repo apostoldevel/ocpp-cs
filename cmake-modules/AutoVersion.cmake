@@ -2,10 +2,16 @@ find_package(Git)
 
 set(GIT_REVISION "e00000")
 
+# Скрипт запускается через `cmake -P`, поэтому CMAKE_CURRENT_SOURCE_DIR равен
+# каталогу сборки, а не корню проекта. Корень берём из VERSION_FILE — он
+# приходит абсолютным путём из CMakeLists.txt.
+get_filename_component(PROJECT_ROOT "${VERSION_FILE}" DIRECTORY)
+
 if (GIT_FOUND)
-    if (EXISTS ../.git)
+    if (EXISTS "${PROJECT_ROOT}/.git")
         execute_process(
                 COMMAND ${GIT_EXECUTABLE} rev-parse --short HEAD
+                WORKING_DIRECTORY "${PROJECT_ROOT}"
                 OUTPUT_VARIABLE GIT_REVISION
                 OUTPUT_STRIP_TRAILING_WHITESPACE
         )
